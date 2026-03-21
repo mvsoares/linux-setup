@@ -1,9 +1,9 @@
 # =============================================================================
-# Module 08 — Editor Setup (Cursor · VSCodium · Neovim)
+# Module 08 — Editor Setup (Cursor · VSCodium · Neovim · WezTerm)
 # =============================================================================
-init_sub 4
+init_sub 5
 
-# ── VSCodium ──────────────────────────────────────────────────────────────────
+# ── VSCodium ──────────────────────────────────────────────────────────────
 if command -v codium &>/dev/null; then
     skip "VSCodium"
 else
@@ -67,7 +67,7 @@ if command -v codium &>/dev/null; then
 fi
 tick "VSCodium + extensions"
 
-# ── Cursor IDE settings ──────────────────────────────────────────────────────
+# ── Cursor IDE settings ──────────────────────────────────────────────────
 CURSOR_SETTINGS="${USER_HOME}/.config/Cursor/User/settings.json"
 if [[ -f "$CURSOR_SETTINGS" ]]; then
     skip "Cursor IDE settings (already exists)"
@@ -153,7 +153,7 @@ CURSOR_JSON
 fi
 tick "Cursor IDE settings"
 
-# ── Neovim ────────────────────────────────────────────────────────────────────
+# ── Neovim ────────────────────────────────────────────────────────────────
 if command -v nvim &>/dev/null; then
     skip "Neovim"
 else
@@ -189,18 +189,96 @@ else
 fi
 tick "Neovim + kickstart.nvim"
 
-# ── WezTerm config ────────────────────────────────────────────────────────────
+# ── WezTerm ──────────────────────────────────────────────────────────────
+if command -v wezterm &>/dev/null; then
+    skip "WezTerm"
+else
+    info "Adding WezTerm repo..."
+    curl -fsSL https://apt.fury.io/wez/gpg.key \
+        | gpg --batch --yes --dearmor -o /usr/share/keyrings/wezterm-fury.gpg >> "$LOG_FILE" 2>&1 || warn "WezTerm key failed"
+    chmod 644 /usr/share/keyrings/wezterm-fury.gpg
+    echo 'deb [signed-by=/usr/share/keyrings/wezterm-fury.gpg] https://apt.fury.io/wez/ * *' \
+        > /etc/apt/sources.list.d/wezterm.list
+    apt_quiet update
+    apt_each wezterm
+fi
+
 WEZTERM_CFG="${USER_HOME}/.config/wezterm/wezterm.lua"
 if [[ -f "$WEZTERM_CFG" ]]; then
     if grep -q "'JetBrains Mono'" "$WEZTERM_CFG"; then
         sed -i "s/'JetBrains Mono'/'JetBrainsMono Nerd Font'/g" "$WEZTERM_CFG"
-        ok "WezTerm font fixed: JetBrains Mono → JetBrainsMono Nerd Font"
+        ok "WezTerm font fixed: JetBrains Mono -> JetBrainsMono Nerd Font"
     else
-        ok "WezTerm font already correct"
+        ok "WezTerm config already present"
     fi
 else
-    info "WezTerm config not found — skipping font fix"
+    info "Deploying WezTerm config..."
+    install -d -o "$REAL_USER" -g "$REAL_USER" "$(dirname "$WEZTERM_CFG")"
+    cat > "$WEZTERM_CFG" << 'WEZLUA'
+local wezterm = require 'wezterm'
+local config = wezterm.config_builder()
+
+config.font = wezterm.font('JetBrainsMono Nerd Font', { weight = 'Regular' })
+config.font_size = 14.0
+config.line_height = 1.1
+
+config.color_scheme = 'Monokai Remastered'
+
+config.window_background_opacity = 0.95
+config.window_decorations = 'RESIZE'
+config.window_padding = { left = 10, right = 10, top = 10, bottom = 10 }
+config.initial_cols = 220
+config.initial_rows = 50
+
+config.hide_tab_bar_if_only_one_tab = true
+config.use_fancy_tab_bar = false
+config.tab_bar_at_bottom = true
+config.tab_max_width = 32
+
+config.scrollback_lines = 10000
+config.animation_fps = 60
+config.front_end = 'WebGpu'
+config.automatically_reload_config = true
+
+config.default_cursor_style = 'BlinkingBar'
+config.cursor_blink_rate = 500
+
+config.audible_bell = 'Disabled'
+config.visual_bell = { fade_in_duration_ms = 0, fade_out_duration_ms = 0 }
+
+config.keys = {
+  { key = 'd', mods = 'SUPER',       action = wezterm.action.SplitHorizontal { domain = 'CurrentPaneDomain' } },
+  { key = 'D', mods = 'SUPER',       action = wezterm.action.SplitVertical   { domain = 'CurrentPaneDomain' } },
+  { key = 'h', mods = 'SUPER|CTRL',  action = wezterm.action.ActivatePaneDirection 'Left'  },
+  { key = 'l', mods = 'SUPER|CTRL',  action = wezterm.action.ActivatePaneDirection 'Right' },
+  { key = 'k', mods = 'SUPER|CTRL',  action = wezterm.action.ActivatePaneDirection 'Up'    },
+  { key = 'j', mods = 'SUPER|CTRL',  action = wezterm.action.ActivatePaneDirection 'Down'  },
+  { key = 'w', mods = 'SUPER',       action = wezterm.action.CloseCurrentPane { confirm = false } },
+  { key = 't', mods = 'SUPER',       action = wezterm.action.SpawnTab 'CurrentPaneDomain' },
+  { key = '[', mods = 'SUPER',       action = wezterm.action.ActivateTabRelative(-1) },
+  { key = ']', mods = 'SUPER',       action = wezterm.action.ActivateTabRelative(1)  },
+  { key = '+', mods = 'SUPER',       action = wezterm.action.IncreaseFontSize },
+  { key = '-', mods = 'SUPER',       action = wezterm.action.DecreaseFontSize },
+  { key = '0', mods = 'SUPER',       action = wezterm.action.ResetFontSize    },
+  { key = 'f', mods = 'SUPER|CTRL',  action = wezterm.action.ToggleFullScreen },
+  { key = 'c', mods = 'SUPER',       action = wezterm.action.CopyTo 'Clipboard'    },
+  { key = 'v', mods = 'SUPER',       action = wezterm.action.PasteFrom 'Clipboard' },
+  { key = 'f', mods = 'SUPER',       action = wezterm.action.Search { CaseSensitiveString = '' } },
+}
+
+config.mouse_bindings = {
+  {
+    event  = { Down = { streak = 3, button = 'Left' } },
+    action = wezterm.action.SelectTextAtMouseCursor 'SemanticZone',
+    mods   = 'NONE',
+  },
+}
+
+return config
+WEZLUA
+    chown "$REAL_USER:$REAL_USER" "$WEZTERM_CFG"
+    ok "WezTerm config deployed (Monokai Remastered, JetBrainsMono Nerd Font)"
 fi
-tick "WezTerm config"
+tick "WezTerm + config"
 
 ok "Editor setup complete"

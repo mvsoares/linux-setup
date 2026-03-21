@@ -41,7 +41,7 @@ MODULES=(
     "05-gnome.sh:GNOME Extensions & Desktop Configuration"
     "06-cloud-k8s.sh:Cloud CLIs & Kubernetes Tools"
     "07-languages.sh:Language Runtimes & Version Managers"
-    "08-editors.sh:Editor Setup (Cursor · VSCodium · Neovim)"
+    "08-editors.sh:Editor Setup (Cursor · VSCodium · Neovim · WezTerm)"
     "09-workspace.sh:Workspace Config (Git · Tmux · Direnv)"
     "10-tweaks.sh:System Tweaks · Performance · Cleanup"
 )
@@ -182,7 +182,7 @@ printf "${BOLD}${GREEN}║${RESET}  %-64s${BOLD}${GREEN}║${RESET}\n" "✔ Them
 printf "${BOLD}${GREEN}║${RESET}  %-64s${BOLD}${GREEN}║${RESET}\n" "✔ GNOME    : 9 extensions · Dock · Blur · workspaces"
 printf "${BOLD}${GREEN}║${RESET}  %-64s${BOLD}${GREEN}║${RESET}\n" "✔ Cloud    : AWS · GCP · Azure · kubectl · helm · k9s"
 printf "${BOLD}${GREEN}║${RESET}  %-64s${BOLD}${GREEN}║${RESET}\n" "✔ Langs    : nvm · pyenv · rustup · Go · SDKMAN"
-printf "${BOLD}${GREEN}║${RESET}  %-64s${BOLD}${GREEN}║${RESET}\n" "✔ Editors  : Cursor · VSCodium · Neovim"
+printf "${BOLD}${GREEN}║${RESET}  %-64s${BOLD}${GREEN}║${RESET}\n" "✔ Editors  : Cursor · VSCodium · Neovim · WezTerm"
 printf "${BOLD}${GREEN}║${RESET}  %-64s${BOLD}${GREEN}║${RESET}\n" "✔ Workspace: git-delta · tmux · direnv · editorconfig"
 printf "${BOLD}${GREEN}║${RESET}  %-64s${BOLD}${GREEN}║${RESET}\n" "✔ Kernel   : swappiness=10 · inotify · fstrim · preload"
 [[ $ERRORS -gt 0 ]] && \
