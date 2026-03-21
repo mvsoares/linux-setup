@@ -8,7 +8,7 @@ apt_quiet install \
     build-essential cmake ninja-build pkg-config \
     git git-lfs git-extras curl wget aria2 \
     gnupg2 ca-certificates software-properties-common apt-transport-https \
-    unzip p7zip-full unrar-free xclip xdotool dconf-editor preload
+    unzip p7zip-full unrar-free xclip xdotool dconf-editor preload bc
 apt_each gparted stacer p7zip-rar libsecret-1-0 libsecret-1-dev
 tick "System essentials"
 
@@ -30,19 +30,20 @@ tick "System monitors & diagnostics"
 info "Installing developer tools..."
 apt_quiet install gh python3 python3-pip python3-venv python3-dev nodejs jq
 apt_each docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin \
-         yq direnv mkcert pipx
+         yq direnv mkcert pipx redis-tools
 if [[ -n "$REAL_USER" ]]; then
     usermod -aG docker "$REAL_USER" 2>/dev/null && ok "User '${REAL_USER}' → docker group" || warn "Could not add to docker group"
 fi
 tick "Developer tools (docker, gh, python, node)"
 
 info "Installing network & file tools..."
-apt_quiet install nmap netcat-openbsd dnsutils rsync tree ranger fzf ripgrep fd-find bat tmux mosh
-apt_each whois rclone mc eza screen ssh-askpass
+apt_quiet install nmap netcat-openbsd dnsutils rsync tree ranger fzf ripgrep fd-find bat tmux mosh \
+    strace tcpdump
+apt_each whois rclone mc eza screen ssh-askpass chafa remmina
 tick "Network & file tools"
 
 info "Installing video & codecs..."
-apt_quiet install ffmpeg mpv celluloid colord
+apt_quiet install ffmpeg mpv celluloid colord yt-dlp
 apt_each vlc \
     gstreamer1.0-plugins-base gstreamer1.0-plugins-good \
     gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly \

@@ -1,7 +1,7 @@
 # =============================================================================
 # Module 08 — Editor Setup (Cursor · VSCodium · Neovim · WezTerm)
 # =============================================================================
-init_sub 5
+init_sub 10
 
 # ── VSCodium ──────────────────────────────────────────────────────────────
 if command -v codium &>/dev/null; then
@@ -66,6 +66,25 @@ if command -v codium &>/dev/null; then
     done
 fi
 tick "VSCodium + extensions"
+
+# ── Cursor IDE (install) ──────────────────────────────────────────────────
+if command -v cursor &>/dev/null; then
+    skip "Cursor IDE $(cursor --version 2>/dev/null | head -1 || true)"
+else
+    info "Installing Cursor IDE..."
+    _cursor_tmp=$(mktemp -d)
+    _cursor_deb="${_cursor_tmp}/cursor.deb"
+    if curl -fsSL "https://downloads.cursor.com/production/linux/deb/x64/cursor-latest.deb" \
+            -o "$_cursor_deb" >> "$LOG_FILE" 2>&1; then
+        dpkg -i "$_cursor_deb" >> "$LOG_FILE" 2>&1 \
+            || apt-get install -f -y -qq >> "$LOG_FILE" 2>&1 \
+            && ok "Cursor IDE installed" || warn "Cursor IDE install failed — install manually from cursor.com"
+    else
+        warn "Cursor IDE — download failed (install manually from cursor.com)"
+    fi
+    rm -rf "$_cursor_tmp"
+fi
+tick "Cursor IDE"
 
 # ── Cursor IDE settings ──────────────────────────────────────────────────
 CURSOR_SETTINGS="${USER_HOME}/.config/Cursor/User/settings.json"
@@ -280,5 +299,46 @@ WEZLUA
     ok "WezTerm config deployed (Monokai Remastered, JetBrainsMono Nerd Font)"
 fi
 tick "WezTerm + config"
+
+# ── AI Code Assist CLIs ───────────────────────────────────────────────────
+# Cursor CLI Agent (Anysphere)
+if command -v agent &>/dev/null; then
+    skip "Cursor CLI $(agent --version 2>/dev/null | head -1 || true)"
+else
+    info "Installing Cursor CLI Agent..."
+    as_user "curl -fsSL https://cursor.com/install | bash" >> "$LOG_FILE" 2>&1 \
+        && ok "Cursor CLI Agent installed" || warn "Cursor CLI install failed — run: curl https://cursor.com/install -fsS | bash"
+fi
+tick "Cursor CLI Agent"
+
+# Gemini CLI (Google)
+if command -v gemini &>/dev/null; then
+    skip "Gemini CLI $(gemini --version 2>/dev/null | head -1 || true)"
+else
+    info "Installing Gemini CLI..."
+    npm install -g @google/gemini-cli >> "$LOG_FILE" 2>&1 \
+        && ok "Gemini CLI installed" || warn "Gemini CLI install failed — run: npm install -g @google/gemini-cli"
+fi
+tick "Gemini CLI"
+
+# Claude Code (Anthropic)
+if command -v claude &>/dev/null; then
+    skip "Claude Code $(claude --version 2>/dev/null | head -1 || true)"
+else
+    info "Installing Claude Code CLI..."
+    npm install -g @anthropic-ai/claude-code >> "$LOG_FILE" 2>&1 \
+        && ok "Claude Code installed" || warn "Claude Code install failed — run: npm install -g @anthropic-ai/claude-code"
+fi
+tick "Claude Code CLI"
+
+# Codex CLI (OpenAI)
+if command -v codex &>/dev/null; then
+    skip "Codex CLI $(codex --version 2>/dev/null | head -1 || true)"
+else
+    info "Installing OpenAI Codex CLI..."
+    npm install -g @openai/codex >> "$LOG_FILE" 2>&1 \
+        && ok "Codex CLI installed" || warn "Codex CLI install failed — run: npm install -g @openai/codex"
+fi
+tick "Codex CLI"
 
 ok "Editor setup complete"
