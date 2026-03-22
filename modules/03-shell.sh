@@ -198,6 +198,9 @@ fi
 tick "Starship configuration"
 
 # ── synth-shell ───────────────────────────────────────────────────────────────
+# shellcheck source=../lib/synth-shell-theme-picker.sh
+source "${SCRIPT_DIR}/lib/synth-shell-theme-picker.sh"
+
 if [[ -n "$REAL_USER" ]] && [[ -f "${USER_HOME}/.config/synth-shell/synth-shell-prompt.sh" ]]; then
     skip "synth-shell (already installed)"
 else
@@ -213,6 +216,12 @@ else
             && ok "synth-shell installed" \
             || warn "synth-shell setup had errors — check ${LOG_FILE}"
         rm -rf /tmp/synth-shell-install
+        # Prompt colors: gallery themes 1–20 (see synth-shell-color-preview.html). Override with SYNTH_SHELL_THEME=N
+        if [[ -z "${SYNTH_SHELL_THEME:-}" ]] && [[ -z "${CI:-}" ]] && { [[ -t 0 ]] || [[ -r /dev/tty ]]; }; then
+            synth_shell_print_theme_gallery
+        fi
+        theme_n=$(synth_shell_resolve_theme_choice 2)
+        synth_shell_apply_prompt_theme "$theme_n" || true
     else
         warn "synth-shell clone failed"
     fi

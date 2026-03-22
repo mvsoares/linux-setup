@@ -1,0 +1,1171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Synth-Shell Color Gallery</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --page-bg: #0b0b0b;
+      --panel-bg: #141414;
+      --card-bg: #171717;
+      --terminal-bg: #000000;
+      --border: #2b2b2b;
+      --text: #f5f5f5;
+      --muted: #aaaaaa;
+      --soft: #8b8b8b;
+      --shadow: 0 10px 28px rgba(0, 0, 0, 0.34);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--page-bg);
+      color: var(--text);
+      font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.45;
+    }
+
+    .page {
+      width: min(1500px, calc(100% - 32px));
+      margin: 28px auto 42px;
+    }
+
+    h1,
+    h2,
+    p {
+      margin: 0;
+    }
+
+    .intro {
+      margin-bottom: 20px;
+      padding: 22px;
+      background: var(--panel-bg);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      box-shadow: var(--shadow);
+    }
+
+    .eyebrow {
+      display: inline-block;
+      margin-bottom: 10px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: #1f1f1f;
+      border: 1px solid #303030;
+      color: var(--muted);
+      font-size: 12px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .intro p {
+      color: var(--muted);
+      margin-top: 8px;
+      max-width: 980px;
+    }
+
+    .callout {
+      margin-top: 14px;
+      padding: 12px 14px;
+      border-radius: 12px;
+      background: #111111;
+      border: 1px solid #2a2a2a;
+      color: #d8d8d8;
+      font-size: 14px;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 14px;
+      margin: 18px 0 22px;
+    }
+
+    .stat {
+      padding: 16px;
+      border-radius: 14px;
+      background: var(--panel-bg);
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow);
+    }
+
+    .stat .label {
+      color: var(--soft);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .stat .value {
+      margin-top: 6px;
+      font-size: 26px;
+      font-weight: 700;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+      gap: 18px;
+    }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      overflow: hidden;
+      box-shadow: var(--shadow);
+    }
+
+    .card-header {
+      padding: 18px 18px 12px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .card-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+    }
+
+    .card-header h2 {
+      font-size: 20px;
+    }
+
+    .card-header p {
+      color: var(--muted);
+      margin-top: 6px;
+      font-size: 14px;
+    }
+
+    .badge {
+      flex: 0 0 auto;
+      padding: 4px 10px;
+      border-radius: 999px;
+      border: 1px solid #343434;
+      background: #101010;
+      color: #dddddd;
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .terminal {
+      background: var(--terminal-bg);
+      padding: 18px;
+      min-height: 166px;
+      border-bottom: 1px solid var(--border);
+      font-family: "JetBrainsMono Nerd Font", "CaskaydiaMono Nerd Font", "MesloLGS NF", "FiraCode Nerd Font", monospace;
+      font-size: 15px;
+    }
+
+    .terminal-top {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+    }
+
+    .dot.red {
+      background: #ff5f56;
+    }
+
+    .dot.yellow {
+      background: #ffbd2e;
+    }
+
+    .dot.green {
+      background: #27c93f;
+    }
+
+    .terminal-note {
+      color: #7d7d7d;
+      font-size: 12px;
+      margin-bottom: 12px;
+    }
+
+    .spacer {
+      height: 16px;
+    }
+
+    .line {
+      white-space: nowrap;
+      overflow-x: auto;
+      padding-bottom: 2px;
+    }
+
+    .line + .line {
+      margin-top: 10px;
+    }
+
+    .seg,
+    .sep,
+    .cmd {
+      display: inline-block;
+      vertical-align: top;
+    }
+
+    .seg {
+      padding: 4px 11px;
+      font-weight: 700;
+    }
+
+    .sep {
+      margin-left: -1px;
+      padding: 0;
+      font-size: 20px;
+      line-height: 1.65;
+      font-weight: 700;
+    }
+
+    .cmd {
+      padding-left: 8px;
+      font-weight: 700;
+    }
+
+    .card-body {
+      padding: 16px 18px 18px;
+    }
+
+    .meta {
+      color: var(--muted);
+      margin-bottom: 12px;
+      font-size: 14px;
+    }
+
+    pre {
+      margin: 0;
+      padding: 14px;
+      border-radius: 12px;
+      border: 1px solid #242424;
+      background: #0f0f0f;
+      color: #f2f2f2;
+      overflow-x: auto;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    code {
+      font-family: "JetBrainsMono Nerd Font", "CaskaydiaMono Nerd Font", "MesloLGS NF", "Fira Code", monospace;
+    }
+
+    .footer {
+      margin-top: 18px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .theme-toolbar {
+      margin-bottom: 22px;
+      padding: 18px 20px;
+      background: var(--panel-bg);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      box-shadow: var(--shadow);
+    }
+
+    .theme-toolbar-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 14px 18px;
+    }
+
+    .theme-toolbar label[for="theme-picker"] {
+      font-weight: 700;
+      font-size: 14px;
+      color: var(--text);
+    }
+
+    #theme-picker {
+      min-width: min(420px, 100%);
+      padding: 10px 14px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: #0f0f0f;
+      color: var(--text);
+      font: inherit;
+      font-size: 14px;
+    }
+
+    .picker-swatch {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      min-height: 36px;
+    }
+
+    .picker-swatch-chip {
+      width: 36px;
+      height: 28px;
+      border-radius: 8px;
+      border: 1px solid #3a3a3a;
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+    }
+
+    .picker-swatch-legend {
+      font-size: 12px;
+      color: var(--soft);
+      margin-left: 4px;
+    }
+
+    .filter-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 12px;
+      font-size: 14px;
+      color: var(--muted);
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .filter-toggle input {
+      accent-color: #6b9fff;
+    }
+
+    .theme-num {
+      display: inline-block;
+      margin-right: 8px;
+      padding: 2px 8px;
+      border-radius: 8px;
+      background: #1c1c1c;
+      border: 1px solid #333;
+      font-size: 13px;
+      font-weight: 800;
+      color: var(--muted);
+      vertical-align: middle;
+    }
+
+    .card.filtered-out {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="intro">
+      <div class="eyebrow">Black Bash Terminal</div>
+      <h1>Synth-Shell Color Gallery</h1>
+      <p>This gallery now includes 20 prompt color options for a black Bash terminal background. The first option is tuned from your latest screenshot, and the second option mirrors your current live synth-shell config.</p>
+      <div class="callout">
+        Latest screenshot checked: <code>~/Pictures/Screenshots/Screenshot from 2026-03-22 02-11-49.png</code><br>
+        Visual read: purple host block, light cwd block showing <code>~</code>, and an amber input cursor/accent.
+      </div>
+    </section>
+
+    <section class="theme-toolbar" aria-label="Choose theme">
+      <div class="theme-toolbar-row">
+        <label for="theme-picker">Theme</label>
+        <select id="theme-picker" aria-describedby="picker-help"></select>
+        <div id="picker-swatch" class="picker-swatch" role="img" aria-label="Host, pwd, and Git background colors"></div>
+        <span class="picker-swatch-legend" id="picker-help">host · pwd · git</span>
+      </div>
+      <label class="filter-toggle">
+        <input type="checkbox" id="theme-filter-only" />
+        Show only selected theme
+      </label>
+    </section>
+
+    <section class="stats">
+      <div class="stat">
+        <div class="label">Total Options</div>
+        <div class="value">20</div>
+      </div>
+      <div class="stat">
+        <div class="label">Screenshot Based</div>
+        <div class="value">1</div>
+      </div>
+      <div class="stat">
+        <div class="label">Current Live Match</div>
+        <div class="value">1</div>
+      </div>
+      <div class="stat">
+        <div class="label">Background Assumption</div>
+        <div class="value">Black</div>
+      </div>
+    </section>
+
+    <section class="grid" id="gallery"></section>
+
+    <p class="footer">Use the theme menu above to jump to a palette and preview host or pwd or git colors. During <code>setup.sh</code>, the installer lists the same numbered themes with terminal color swatches and writes your choice to <code>~/.config/synth-shell/synth-shell-prompt.config</code> (override with <code>SYNTH_SHELL_THEME=N</code>). Nerd Font powerline separators are assumed.</p>
+  </main>
+
+  <script>
+    const defaultLine1 = {
+      segments: [
+        { type: "host", text: "mvsoares-ubuntu" },
+        { type: "pwd", text: "~/projetos/linux-setup" },
+        { type: "git", text: "main" }
+      ],
+      command: "git status"
+    };
+
+    const defaultLine2 = {
+      segments: [
+        { type: "host", text: "mvsoares-ubuntu" },
+        { type: "pwd", text: "~/work/api" },
+        { type: "git", text: "feature/auth ◔" },
+        { type: "pyenv", text: ".venv" },
+        { type: "tf", text: "prod" },
+        { type: "kube", text: "gke-prod" }
+      ],
+      command: "kubectl get pods"
+    };
+
+    const themes = [
+      {
+        name: "Screenshot Match",
+        badge: "From Screenshot",
+        description: "Purple host, light cwd, and amber input based on the latest screenshot.",
+        why: "Closest visual fit to what your screenshot is already showing.",
+        config: {
+          format: "HOST PWD GIT PYENV TF KUBE",
+          enable_vertical_padding: true,
+          enable_command_on_new_line: false,
+          font_color_host: "white",
+          background_host: "141",
+          font_color_pwd: "black",
+          background_pwd: "255",
+          font_color_git: "light-gray",
+          background_git: "238",
+          font_color_pyenv: "white",
+          background_pyenv: "63",
+          font_color_tf: "black",
+          background_tf: "228",
+          font_color_kube: "white",
+          background_kube: "135",
+          font_color_input: "214",
+          background_input: "none"
+        },
+        line1: {
+          segments: [
+            { type: "host", text: "mvsoares-ubuntu" },
+            { type: "pwd", text: "~" }
+          ],
+          command: "vim ~/.config/synth-shell/synth-shell-prompt.config"
+        },
+        line2: {
+          segments: [
+            { type: "host", text: "mvsoares-ubuntu" },
+            { type: "pwd", text: "~/projetos/linux-setup" },
+            { type: "git", text: "main" }
+          ],
+          command: "git diff"
+        }
+      },
+      {
+        name: "Current Live Theme",
+        badge: "Live Config",
+        description: "Matches your active synth-shell prompt config.",
+        why: "Balanced blue and gray palette with strong contrast on black.",
+        config: {
+          format: "HOST PWD GIT PYENV TF KUBE",
+          enable_vertical_padding: true,
+          enable_command_on_new_line: false,
+          font_color_host: "white",
+          background_host: "light-blue",
+          font_color_pwd: "dark-gray",
+          background_pwd: "white",
+          font_color_git: "light-gray",
+          background_git: "dark-gray",
+          font_color_pyenv: "white",
+          background_pyenv: "blue",
+          font_color_tf: "purple",
+          background_tf: "light-purple",
+          font_color_kube: "white",
+          background_kube: "purple",
+          font_color_input: "45",
+          background_input: "none"
+        }
+      },
+      {
+        name: "Dracula Punch",
+        badge: "Bold",
+        description: "Purple heavy base with bright environment segments.",
+        why: "Great if you want the prompt to stand out hard on pure black.",
+        config: {
+          format: "HOST PWD GIT PYENV TF KUBE",
+          enable_vertical_padding: true,
+          enable_command_on_new_line: false,
+          font_color_host: "white",
+          background_host: "141",
+          font_color_pwd: "white",
+          background_pwd: "60",
+          font_color_git: "black",
+          background_git: "84",
+          font_color_pyenv: "black",
+          background_pyenv: "117",
+          font_color_tf: "black",
+          background_tf: "228",
+          font_color_kube: "white",
+          background_kube: "205",
+          font_color_input: "201",
+          background_input: "none"
+        }
+      },
+      {
+        name: "Nord Ice",
+        badge: "Cool",
+        description: "Steel blue and soft cyan tones with quieter contrast.",
+        why: "Cleaner if you prefer calmer terminal colors all day long.",
+        config: {
+          format: "HOST PWD GIT PYENV TF KUBE",
+          enable_vertical_padding: true,
+          enable_command_on_new_line: false,
+          font_color_host: "black",
+          background_host: "117",
+          font_color_pwd: "black",
+          background_pwd: "153",
+          font_color_git: "white",
+          background_git: "60",
+          font_color_pyenv: "black",
+          background_pyenv: "151",
+          font_color_tf: "black",
+          background_tf: "187",
+          font_color_kube: "black",
+          background_kube: "110",
+          font_color_input: "111",
+          background_input: "none"
+        }
+      },
+      {
+        name: "Matrix Green",
+        badge: "Retro",
+        description: "Green forward prompt with classic hacker-terminal energy.",
+        why: "Retro without sacrificing visibility for Git and cloud segments.",
+        config: {
+          format: "HOST PWD GIT PYENV TF KUBE",
+          enable_vertical_padding: true,
+          enable_command_on_new_line: false,
+          font_color_host: "black",
+          background_host: "119",
+          font_color_pwd: "black",
+          background_pwd: "71",
+          font_color_git: "black",
+          background_git: "148",
+          font_color_pyenv: "black",
+          background_pyenv: "120",
+          font_color_tf: "black",
+          background_tf: "190",
+          font_color_kube: "black",
+          background_kube: "80",
+          font_color_input: "82",
+          background_input: "none"
+        }
+      },
+      {
+        name: "Amber Heat",
+        badge: "Warm",
+        description: "Orange and gold segments designed specifically for black terminals.",
+        why: "Best if you want warmth and strong visual separation.",
+        config: {
+          format: "HOST PWD GIT PYENV TF KUBE",
+          enable_vertical_padding: true,
+          enable_command_on_new_line: false,
+          font_color_host: "black",
+          background_host: "214",
+          font_color_pwd: "black",
+          background_pwd: "223",
+          font_color_git: "black",
+          background_git: "215",
+          font_color_pyenv: "black",
+          background_pyenv: "221",
+          font_color_tf: "black",
+          background_tf: "220",
+          font_color_kube: "black",
+          background_kube: "208",
+          font_color_input: "214",
+          background_input: "none"
+        }
+      },
+      {
+        name: "Cloud Ops",
+        badge: "Practical",
+        description: "Blue first theme with green Git and soft violet env context.",
+        why: "Safe default if you want something new without going too loud.",
+        config: {
+          format: "HOST PWD GIT PYENV TF KUBE",
+          enable_vertical_padding: true,
+          enable_command_on_new_line: false,
+          font_color_host: "white",
+          background_host: "68",
+          font_color_pwd: "black",
+          background_pwd: "117",
+          font_color_git: "black",
+          background_git: "114",
+          font_color_pyenv: "black",
+          background_pyenv: "141",
+          font_color_tf: "black",
+          background_tf: "186",
+          font_color_kube: "black",
+          background_kube: "110",
+          font_color_input: "45",
+          background_input: "none"
+        }
+      },
+      {
+        name: "Catppuccin Mauve",
+        badge: "Pastel",
+        description: "Soft mauve and rose tones with light cards for pwd and envs.",
+        why: "Nice if you want a softer pastel look without losing readability.",
+        config: {
+          format: "HOST PWD GIT PYENV TF KUBE",
+          enable_vertical_padding: true,
+          enable_command_on_new_line: false,
+          font_color_host: "white",
+          background_host: "177",
+          font_color_pwd: "black",
+          background_pwd: "225",
+          font_color_git: "black",
+          background_git: "152",
+          font_color_pyenv: "black",
+          background_pyenv: "117",
+          font_color_tf: "black",
+          background_tf: "181",
+          font_color_kube: "black",
+          background_kube: "147",
+          font_color_input: "183",
+          background_input: "none"
+        }
+      },
+      {
+        name: "Solarized Night",
+        badge: "Muted",
+        description: "Solarized-inspired blue and sand tones for low glare sessions.",
+        why: "Works well when bright prompts feel fatiguing.",
+        config: {
+          format: "HOST PWD GIT PYENV TF KUBE",
+          enable_vertical_padding: true,
+          enable_command_on_new_line: false,
+          font_color_host: "black",
+          background_host: "109",
+          font_color_pwd: "black",
+          background_pwd: "187",
+          font_color_git: "white",
+          background_git: "60",
+          font_color_pyenv: "black",
+          background_pyenv: "72",
+          font_color_tf: "black",
+          background_tf: "136",
+          font_color_kube: "black",
+          background_kube: "73",
+          font_color_input: "110",
+          background_input: "none"
+        }
+      },
+      {
+        name: "Gruvbox Dark",
+        badge: "Earthy",
+        description: "Dusty yellow, olive, and warm tan inspired by Gruvbox.",
+        why: "A good middle ground between subdued and colorful.",
+        config: {
+          format: "HOST PWD GIT PYENV TF KUBE",
+          enable_vertical_padding: true,
+          enable_command_on_new_line: false,
+          font_color_host: "black",
+          background_host: "214",
+          font_color_pwd: "black",
+          background_pwd: "223",
+          font_color_git: "black",
+          background_git: "142",
+          font_color_pyenv: "black",
+          background_pyenv: "108",
+          font_color_tf: "black",
+          background_tf: "215",
+          font_color_kube: "black",
+          background_kube: "109",
+          font_color_input: "214",
+          background_input: "none"
+        }
+      },
+      {
+        name: "Monokai Neon",
+        badge: "Neon",
+        description: "Electric cyan, neon red, and hot yellow for high visibility.",
+        why: "Great if you want a playful prompt with very obvious states.",
+        config: {
+          format: "HOST PWD GIT PYENV TF KUBE",
+          enable_vertical_padding: true,
+          enable_command_on_new_line: false,
+          font_color_host: "black",
+          background_host: "81",
+          font_color_pwd: "black",
+          background_pwd: "229",
+          font_color_git: "black",
+          background_git: "197",
+          font_color_pyenv: "black",
+          background_pyenv: "118",
+          font_color_tf: "black",
+          background_tf: "221",
+          font_color_kube: "black",
+          background_kube: "141",
+          font_color_input: "208",
+          background_input: "none"
+        }
+      },
+      {
+        name: "Tokyo Night",
+        badge: "Modern",
+        description: "Navy base with cool blues, violet envs, and gold Terraform.",
+        why: "One of the most balanced modern dark-theme options in the set.",
+        config: {
+          format: "HOST PWD GIT PYENV TF KUBE",
+          enable_vertical_padding: true,
+          enable_command_on_new_line: false,
+          font_color_host: "white",
+          background_host: "60",
+          font_color_pwd: "black",
+          background_pwd: "153",
+          font_color_git: "black",
+          background_git: "114",
+          font_color_pyenv: "black",
+          background_pyenv: "103",
+          font_color_tf: "black",
+          background_tf: "180",
+          font_color_kube: "black",
+          background_kube: "110",
+          font_color_input: "111",
+          background_input: "none"
+        }
+      },
+      {
+        name: "Synthwave Pink",
+        badge: "Vivid",
+        description: "Bright magenta and cyan with a dark terminal nightclub feel.",
+        why: "Very visible and very fun if you like stronger accent colors.",
+        config: {
+          format: "HOST PWD GIT PYENV TF KUBE",
+          enable_vertical_padding: true,
+          enable_command_on_new_line: false,
+          font_color_host: "white",
+          background_host: "205",
+          font_color_pwd: "black",
+          background_pwd: "225",
+          font_color_git: "black",
+          background_git: "39",
+          font_color_pyenv: "black",
+          background_pyenv: "147",
+          font_color_tf: "black",
+          background_tf: "213",
+          font_color_kube: "black",
+          background_kube: "81",
+          font_color_input: "207",
+          background_input: "none"
+        }
+      },
+      {
+        name: "Forest Mint",
+        badge: "Fresh",
+        description: "Mint greens and pale neutrals with a bright leafy feel.",
+        why: "Lighter than Matrix Green and easier on the eyes.",
+        config: {
+          format: "HOST PWD GIT PYENV TF KUBE",
+          enable_vertical_padding: true,
+          enable_command_on_new_line: false,
+          font_color_host: "black",
+          background_host: "121",
+          font_color_pwd: "black",
+          background_pwd: "194",
+          font_color_git: "black",
+          background_git: "71",
+          font_color_pyenv: "black",
+          background_pyenv: "151",
+          font_color_tf: "black",
+          background_tf: "186",
+          font_color_kube: "black",
+          background_kube: "79",
+          font_color_input: "120",
+          background_input: "none"
+        }
+      },
+      {
+        name: "Ruby Steel",
+        badge: "Serious",
+        description: "Deep ruby host with steel gray Git and warm neutral env blocks.",
+        why: "Good if you want something professional but not boring.",
+        config: {
+          format: "HOST PWD GIT PYENV TF KUBE",
+          enable_vertical_padding: true,
+          enable_command_on_new_line: false,
+          font_color_host: "white",
+          background_host: "167",
+          font_color_pwd: "black",
+          background_pwd: "252",
+          font_color_git: "white",
+          background_git: "238",
+          font_color_pyenv: "black",
+          background_pyenv: "181",
+          font_color_tf: "black",
+          background_tf: "179",
+          font_color_kube: "black",
+          background_kube: "110",
+          font_color_input: "174",
+          background_input: "none"
+        }
+      },
+      {
+        name: "Ice Gold",
+        badge: "Bright",
+        description: "Icy pwd and kube segments contrasted with gold Git and input accents.",
+        why: "High clarity on black without feeling as loud as neon themes.",
+        config: {
+          format: "HOST PWD GIT PYENV TF KUBE",
+          enable_vertical_padding: true,
+          enable_command_on_new_line: false,
+          font_color_host: "black",
+          background_host: "117",
+          font_color_pwd: "black",
+          background_pwd: "255",
+          font_color_git: "black",
+          background_git: "221",
+          font_color_pyenv: "black",
+          background_pyenv: "153",
+          font_color_tf: "black",
+          background_tf: "187",
+          font_color_kube: "black",
+          background_kube: "111",
+          font_color_input: "221",
+          background_input: "none"
+        }
+      },
+      {
+        name: "Aqua Slate",
+        badge: "Balanced",
+        description: "Teal and slate with a restrained yellow Terraform accent.",
+        why: "One of the most neutral choices if you want subtle color variety.",
+        config: {
+          format: "HOST PWD GIT PYENV TF KUBE",
+          enable_vertical_padding: true,
+          enable_command_on_new_line: false,
+          font_color_host: "black",
+          background_host: "80",
+          font_color_pwd: "black",
+          background_pwd: "152",
+          font_color_git: "black",
+          background_git: "67",
+          font_color_pyenv: "black",
+          background_pyenv: "109",
+          font_color_tf: "black",
+          background_tf: "186",
+          font_color_kube: "black",
+          background_kube: "73",
+          font_color_input: "45",
+          background_input: "none"
+        }
+      },
+      {
+        name: "Cyber Lime",
+        badge: "Sharp",
+        description: "Acid green host and input with loud red Git state blocks.",
+        why: "Perfect if you want Git changes to jump at you instantly.",
+        config: {
+          format: "HOST PWD GIT PYENV TF KUBE",
+          enable_vertical_padding: true,
+          enable_command_on_new_line: false,
+          font_color_host: "black",
+          background_host: "118",
+          font_color_pwd: "black",
+          background_pwd: "229",
+          font_color_git: "black",
+          background_git: "196",
+          font_color_pyenv: "black",
+          background_pyenv: "190",
+          font_color_tf: "black",
+          background_tf: "220",
+          font_color_kube: "black",
+          background_kube: "45",
+          font_color_input: "118",
+          background_input: "none"
+        }
+      },
+      {
+        name: "Lavender Sunset",
+        badge: "Soft Warmth",
+        description: "Lavender base with peach and rose accents for the env segments.",
+        why: "A softer warm palette that still feels distinct on black.",
+        config: {
+          format: "HOST PWD GIT PYENV TF KUBE",
+          enable_vertical_padding: true,
+          enable_command_on_new_line: false,
+          font_color_host: "white",
+          background_host: "141",
+          font_color_pwd: "black",
+          background_pwd: "224",
+          font_color_git: "black",
+          background_git: "174",
+          font_color_pyenv: "black",
+          background_pyenv: "181",
+          font_color_tf: "black",
+          background_tf: "216",
+          font_color_kube: "black",
+          background_kube: "117",
+          font_color_input: "213",
+          background_input: "none"
+        }
+      },
+      {
+        name: "Minimal Mono",
+        badge: "Minimal",
+        description: "Mostly grayscale prompt with only the input line tinted.",
+        why: "Best if you like powerline structure but want low color noise.",
+        config: {
+          format: "HOST PWD GIT PYENV TF KUBE",
+          enable_vertical_padding: true,
+          enable_command_on_new_line: false,
+          font_color_host: "white",
+          background_host: "dark-gray",
+          font_color_pwd: "black",
+          background_pwd: "light-gray",
+          font_color_git: "white",
+          background_git: "black",
+          font_color_pyenv: "black",
+          background_pyenv: "white",
+          font_color_tf: "black",
+          background_tf: "light-gray",
+          font_color_kube: "black",
+          background_kube: "white",
+          font_color_input: "111",
+          background_input: "none"
+        }
+      }
+    ];
+
+    const namedColors = {
+      black: "#000000",
+      red: "#cd0000",
+      green: "#00cd00",
+      yellow: "#cdcd00",
+      blue: "#0000ee",
+      purple: "#cd00cd",
+      cyan: "#00cdcd",
+      "light-gray": "#e5e5e5",
+      "dark-gray": "#7f7f7f",
+      "light-red": "#ff0000",
+      "light-green": "#00ff00",
+      "light-yellow": "#ffff00",
+      "light-blue": "#5c5cff",
+      "light-purple": "#ff00ff",
+      "light-cyan": "#00ffff",
+      white: "#ffffff",
+      none: "transparent"
+    };
+
+    function tokenToHex(token) {
+      const raw = String(token).trim().toLowerCase();
+      if (raw in namedColors) {
+        return namedColors[raw];
+      }
+
+      const value = Number(raw);
+      if (!Number.isInteger(value) || value < 0 || value > 255) {
+        return "#ffffff";
+      }
+
+      const palette = [
+        "#000000", "#800000", "#008000", "#808000", "#000080", "#800080", "#008080", "#c0c0c0",
+        "#808080", "#ff0000", "#00ff00", "#ffff00", "#0000ff", "#ff00ff", "#00ffff", "#ffffff"
+      ];
+
+      if (value < 16) {
+        return palette[value];
+      }
+
+      if (value >= 232) {
+        const gray = 8 + (value - 232) * 10;
+        return rgbToHex(gray, gray, gray);
+      }
+
+      const base = value - 16;
+      const r = Math.floor(base / 36);
+      const g = Math.floor((base % 36) / 6);
+      const b = base % 6;
+      const scale = [0, 95, 135, 175, 215, 255];
+      return rgbToHex(scale[r], scale[g], scale[b]);
+    }
+
+    function rgbToHex(r, g, b) {
+      return "#" + [r, g, b].map((part) => part.toString(16).padStart(2, "0")).join("");
+    }
+
+    function escapeHtml(text) {
+      return String(text)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;");
+    }
+
+    function buildSnippet(config) {
+      return [
+        `format="${config.format}"`,
+        `separator_char='\\uE0B0'`,
+        `enable_vertical_padding=${config.enable_vertical_padding}`,
+        `enable_command_on_new_line=${config.enable_command_on_new_line}`,
+        "",
+        `font_color_host="${config.font_color_host}"`,
+        `background_host="${config.background_host}"`,
+        "",
+        `font_color_pwd="${config.font_color_pwd}"`,
+        `background_pwd="${config.background_pwd}"`,
+        "",
+        `font_color_git="${config.font_color_git}"`,
+        `background_git="${config.background_git}"`,
+        "",
+        `font_color_pyenv="${config.font_color_pyenv}"`,
+        `background_pyenv="${config.background_pyenv}"`,
+        "",
+        `font_color_tf="${config.font_color_tf}"`,
+        `background_tf="${config.background_tf}"`,
+        "",
+        `font_color_kube="${config.font_color_kube}"`,
+        `background_kube="${config.background_kube}"`,
+        "",
+        `font_color_input="${config.font_color_input}"`,
+        `background_input="${config.background_input}"`
+      ].join("\n");
+    }
+
+    function getThemeColors(config) {
+      return {
+        hostFg: tokenToHex(config.font_color_host),
+        hostBg: tokenToHex(config.background_host),
+        pwdFg: tokenToHex(config.font_color_pwd),
+        pwdBg: tokenToHex(config.background_pwd),
+        gitFg: tokenToHex(config.font_color_git),
+        gitBg: tokenToHex(config.background_git),
+        pyenvFg: tokenToHex(config.font_color_pyenv),
+        pyenvBg: tokenToHex(config.background_pyenv),
+        tfFg: tokenToHex(config.font_color_tf),
+        tfBg: tokenToHex(config.background_tf),
+        kubeFg: tokenToHex(config.font_color_kube),
+        kubeBg: tokenToHex(config.background_kube),
+        inputFg: tokenToHex(config.font_color_input)
+      };
+    }
+
+    function renderLine(line, colors) {
+      const html = [];
+
+      line.segments.forEach((segment, index) => {
+        const fg = colors[segment.type + "Fg"];
+        const bg = colors[segment.type + "Bg"];
+        const nextSegment = line.segments[index + 1];
+        const nextBg = nextSegment ? colors[nextSegment.type + "Bg"] : "var(--terminal-bg)";
+
+        html.push(
+          `<span class="seg" style="color:${fg};background:${bg};">${escapeHtml(segment.text)}</span>`
+        );
+        html.push(
+          `<span class="sep" style="color:${bg};background:${nextBg};">&#xe0b0;</span>`
+        );
+      });
+
+      html.push(
+        `<span class="cmd" style="color:${colors.inputFg};">${escapeHtml(line.command)}</span>`
+      );
+
+      return `<div class="line">${html.join("")}</div>`;
+    }
+
+    function createCard(theme, index) {
+      const num = index + 1;
+      const colors = getThemeColors(theme.config);
+      const line1 = theme.line1 || defaultLine1;
+      const line2 = theme.line2 || defaultLine2;
+      const article = document.createElement("article");
+      article.className = "card";
+      article.id = `theme-${num}`;
+      article.dataset.themeIndex = String(num);
+      article.innerHTML = `
+        <div class="card-header">
+          <div class="card-top">
+            <div>
+              <h2><span class="theme-num" aria-label="Theme ${num}">#${num}</span> ${escapeHtml(theme.name)}</h2>
+              <p>${escapeHtml(theme.description)}</p>
+            </div>
+            <span class="badge">${escapeHtml(theme.badge)}</span>
+          </div>
+        </div>
+        <div class="terminal">
+          <div class="terminal-top">
+            <span class="dot red"></span>
+            <span class="dot yellow"></span>
+            <span class="dot green"></span>
+          </div>
+          <div class="terminal-note">Black background preview, same-line command entry, vertical padding enabled.</div>
+          <div class="spacer"></div>
+          ${renderLine(line1, colors)}
+          ${renderLine(line2, colors)}
+        </div>
+        <div class="card-body">
+          <p class="meta">${escapeHtml(theme.why)}</p>
+          <pre><code>${escapeHtml(buildSnippet(theme.config))}</code></pre>
+        </div>
+      `;
+      return article;
+    }
+
+    function updatePickerSwatch(theme) {
+      const colors = getThemeColors(theme.config);
+      const el = document.getElementById("picker-swatch");
+      const triple = [
+        { key: "hostBg", label: "host bg" },
+        { key: "pwdBg", label: "pwd bg" },
+        { key: "gitBg", label: "git bg" }
+      ];
+      el.innerHTML = triple
+        .map(
+          (t) =>
+            `<span class="picker-swatch-chip" style="background:${colors[t.key]}" title="${t.label}"></span>`
+        )
+        .join("");
+    }
+
+    const gallery = document.getElementById("gallery");
+    themes.forEach((theme, index) => gallery.appendChild(createCard(theme, index)));
+
+    const picker = document.getElementById("theme-picker");
+    themes.forEach((theme, index) => {
+      const opt = document.createElement("option");
+      opt.value = String(index + 1);
+      opt.textContent = `${index + 1}. ${theme.name}`;
+      picker.appendChild(opt);
+    });
+    picker.value = "1";
+    updatePickerSwatch(themes[0]);
+
+    picker.addEventListener("change", () => {
+      const i = parseInt(picker.value, 10) - 1;
+      if (i < 0 || i >= themes.length) return;
+      updatePickerSwatch(themes[i]);
+      const card = document.getElementById(`theme-${picker.value}`);
+      if (card) card.scrollIntoView({ behavior: "smooth", block: "start" });
+      const filterOnly = document.getElementById("theme-filter-only");
+      if (filterOnly && filterOnly.checked) applyFilterOnly(true);
+    });
+
+    function applyFilterOnly(enabled) {
+      const n = picker.value;
+      document.querySelectorAll(".card").forEach((card) => {
+        const match = card.dataset.themeIndex === n;
+        card.classList.toggle("filtered-out", enabled && !match);
+      });
+    }
+
+    document.getElementById("theme-filter-only").addEventListener("change", (e) => {
+      applyFilterOnly(e.target.checked);
+    });
+  </script>
+</body>
+</html>
