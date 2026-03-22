@@ -34,7 +34,7 @@ install_nerd_font() {
 install_google_font() {
     local name="$1"
     local dest="${FONT_DIR}/general/${name}"
-    if [[ -d "$dest" ]] && ls "$dest"/*.ttf &>/dev/null 2>&1; then
+    if [[ -d "$dest" ]] && { ls "$dest"/*.ttf &>/dev/null 2>&1 || ls "$dest"/*.otf &>/dev/null 2>&1; }; then
         ok "${name} — already installed"
         return
     fi
@@ -48,10 +48,11 @@ install_google_font() {
         mkdir -p "$dest"
         unzip -qo "$zipfile" -d "$dest" >> "$LOG_FILE" 2>&1 || true
         rm -f "$zipfile"
-        if ls "$dest"/*.ttf &>/dev/null 2>&1 || ls "$dest"/**/*.ttf &>/dev/null 2>&1; then
+        if ls "$dest"/*.ttf &>/dev/null 2>&1 || ls "$dest"/**/*.ttf &>/dev/null 2>&1 \
+                || ls "$dest"/*.otf &>/dev/null 2>&1 || ls "$dest"/**/*.otf &>/dev/null 2>&1; then
             ok "${name}"
         else
-            warn "${name} — zip contained no .ttf files"
+            warn "${name} — zip contained no font files"
         fi
     else
         rm -f "$zipfile"
@@ -171,7 +172,7 @@ else
     info "Installing Catppuccin Mocha GTK theme..."
     local_tmp=$(mktemp -d)
     CAPP_URL=$(curl -sSf "https://api.github.com/repos/catppuccin/gtk/releases/latest" 2>/dev/null \
-        | grep browser_download_url | grep "mocha-mauve" | grep "standard+default" | head -1 | cut -d'"' -f4 || echo "")
+        | grep browser_download_url | grep -i "mocha" | grep -i "mauve" | head -1 | cut -d'"' -f4 || echo "")
     if [[ -n "$CAPP_URL" ]]; then
         curl -fsSL "$CAPP_URL" -o "${local_tmp}/catppuccin.zip" >> "$LOG_FILE" 2>&1
         unzip -qo "${local_tmp}/catppuccin.zip" -d /usr/share/themes/ >> "$LOG_FILE" 2>&1 \

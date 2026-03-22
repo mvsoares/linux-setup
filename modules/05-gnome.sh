@@ -30,10 +30,14 @@ install_extension() {
     fi
     info "Fetching ${name} (ext #${ext_id})..."
     local info_json version_tag
-    info_json=$(curl -fsSL \
-        "https://extensions.gnome.org/extension-info/?pk=${ext_id}&shell_version=${SHELL_VER}" 2>/dev/null)
-    [[ -z "$info_json" ]] && info_json=$(curl -fsSL \
-        "https://extensions.gnome.org/extension-info/?pk=${ext_id}&shell_version=${SHELL_MAJOR}.0" 2>/dev/null)
+    # Try exact version, then major.0, then unversioned (grab latest available)
+    for try_ver in "${SHELL_VER}" "${SHELL_MAJOR}.0" ""; do
+        local qp="pk=${ext_id}"
+        [[ -n "$try_ver" ]] && qp+="&shell_version=${try_ver}"
+        info_json=$(curl -fsSL "https://extensions.gnome.org/extension-info/?${qp}" 2>/dev/null)
+        [[ -n "$info_json" ]] && echo "$info_json" | python3 -c "import sys,json; json.load(sys.stdin)" &>/dev/null && break
+        info_json=""
+    done
 
     version_tag=$(echo "$info_json" | python3 -c "
 import sys, json
@@ -43,7 +47,9 @@ try:
     for key in ['${SHELL_VER}', '${SHELL_MAJOR}.0']:
         if key in vsm:
             print(vsm[key].get('version', '')); sys.exit(0)
-    if vsm: print(list(vsm.values())[-1].get('version', ''))
+    if vsm:
+        latest = sorted(vsm.keys(), key=lambda v: [int(x) for x in v.split('.')], reverse=True)
+        print(vsm[latest[0]].get('version', ''))
 except: pass
 " 2>/dev/null || echo "")
 

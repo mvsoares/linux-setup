@@ -9,12 +9,16 @@ apt_quiet install \
     git git-lfs git-extras curl wget aria2 \
     gnupg2 ca-certificates software-properties-common apt-transport-https \
     unzip p7zip-full unrar-free xclip xdotool dconf-editor preload bc
-apt_each gparted stacer p7zip-rar libsecret-1-0 libsecret-1-dev
+apt_each gparted stacer libsecret-1-0 libsecret-1-dev
+# p7zip-rar removed from Ubuntu 26+
+[[ "$UBUNTU_MAJOR" -lt 26 ]] && apt_each p7zip-rar
 tick "System essentials"
 
 info "Installing monitors & diagnostics..."
 apt_quiet install btop htop iotop iftop ncdu
-apt_each nvtop nethogs lm-sensors fancontrol smartmontools inxi neofetch sysstat upower powertop
+apt_each nvtop nethogs lm-sensors fancontrol smartmontools inxi sysstat upower powertop
+# neofetch removed from Ubuntu 26+
+[[ "$UBUNTU_MAJOR" -lt 26 ]] && apt_each neofetch
 # fastfetch needs a PPA on Ubuntu 24.04
 if ! command -v fastfetch &>/dev/null; then
     if ! apt_quiet install fastfetch 2>/dev/null; then

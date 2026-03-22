@@ -212,14 +212,19 @@ tick "Neovim + kickstart.nvim"
 if command -v wezterm &>/dev/null; then
     skip "WezTerm"
 else
-    info "Adding WezTerm repo..."
-    curl -fsSL https://apt.fury.io/wez/gpg.key \
-        | gpg --batch --yes --dearmor -o /usr/share/keyrings/wezterm-fury.gpg >> "$LOG_FILE" 2>&1 || warn "WezTerm key failed"
-    chmod 644 /usr/share/keyrings/wezterm-fury.gpg
-    echo 'deb [signed-by=/usr/share/keyrings/wezterm-fury.gpg] https://apt.fury.io/wez/ * *' \
-        > /etc/apt/sources.list.d/wezterm.list
-    apt_quiet update
-    apt_each wezterm
+    info "Installing WezTerm..."
+    # Try Flatpak first (works on any Ubuntu version), fall back to apt repo
+    if command -v flatpak &>/dev/null && flatpak install -y flathub org.wezfurlong.wezterm >> "$LOG_FILE" 2>&1; then
+        ok "WezTerm (Flatpak)"
+    else
+        curl -fsSL https://apt.fury.io/wez/gpg.key \
+            | gpg --batch --yes --dearmor -o /usr/share/keyrings/wezterm-fury.gpg >> "$LOG_FILE" 2>&1 || warn "WezTerm key failed"
+        chmod 644 /usr/share/keyrings/wezterm-fury.gpg
+        echo 'deb [signed-by=/usr/share/keyrings/wezterm-fury.gpg] https://apt.fury.io/wez/ * *' \
+            > /etc/apt/sources.list.d/wezterm.list
+        apt_quiet update
+        apt_each wezterm
+    fi
 fi
 
 WEZTERM_CFG="${USER_HOME}/.config/wezterm/wezterm.lua"
@@ -278,33 +283,47 @@ else
 fi
 tick "Cursor CLI Agent"
 
+# Source nvm so npm is available (installed by module 07 as the real user)
+NVM_DIR="${USER_HOME}/.nvm"
+if [[ -s "${NVM_DIR}/nvm.sh" ]]; then
+    export NVM_DIR
+    # shellcheck source=/dev/null
+    source "${NVM_DIR}/nvm.sh"
+fi
+
 # Gemini CLI (Google)
 if command -v gemini &>/dev/null; then
     skip "Gemini CLI $(gemini --version 2>/dev/null | head -1 || true)"
-else
+elif command -v npm &>/dev/null; then
     info "Installing Gemini CLI..."
-    npm install -g @google/gemini-cli >> "$LOG_FILE" 2>&1 \
+    as_user "source '${NVM_DIR}/nvm.sh' && npm install -g @google/gemini-cli" >> "$LOG_FILE" 2>&1 \
         && ok "Gemini CLI installed" || warn "Gemini CLI install failed — run: npm install -g @google/gemini-cli"
+else
+    warn "Gemini CLI skipped — npm not available (install nvm/node first)"
 fi
 tick "Gemini CLI"
 
 # Claude Code (Anthropic)
 if command -v claude &>/dev/null; then
     skip "Claude Code $(claude --version 2>/dev/null | head -1 || true)"
-else
+elif command -v npm &>/dev/null; then
     info "Installing Claude Code CLI..."
-    npm install -g @anthropic-ai/claude-code >> "$LOG_FILE" 2>&1 \
+    as_user "source '${NVM_DIR}/nvm.sh' && npm install -g @anthropic-ai/claude-code" >> "$LOG_FILE" 2>&1 \
         && ok "Claude Code installed" || warn "Claude Code install failed — run: npm install -g @anthropic-ai/claude-code"
+else
+    warn "Claude Code skipped — npm not available (install nvm/node first)"
 fi
 tick "Claude Code CLI"
 
 # Codex CLI (OpenAI)
 if command -v codex &>/dev/null; then
     skip "Codex CLI $(codex --version 2>/dev/null | head -1 || true)"
-else
+elif command -v npm &>/dev/null; then
     info "Installing OpenAI Codex CLI..."
-    npm install -g @openai/codex >> "$LOG_FILE" 2>&1 \
+    as_user "source '${NVM_DIR}/nvm.sh' && npm install -g @openai/codex" >> "$LOG_FILE" 2>&1 \
         && ok "Codex CLI installed" || warn "Codex CLI install failed — run: npm install -g @openai/codex"
+else
+    warn "Codex CLI skipped — npm not available (install nvm/node first)"
 fi
 tick "Codex CLI"
 

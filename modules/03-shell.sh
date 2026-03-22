@@ -45,7 +45,9 @@ command -v zoxide &>/dev/null && eval "$(zoxide init bash)" && alias cd='z'
 command -v direnv &>/dev/null && eval "$(direnv hook bash)" 2>/dev/null || true
 command -v dust &>/dev/null && alias du='dust'
 command -v procs &>/dev/null && alias pss='procs'
-command -v duf &>/dev/null && alias df='duf'
+if command -v duf &>/dev/null; then
+    df() { if [[ $# -eq 0 ]]; then duf; else command df "$@"; fi; }
+fi
 command -v btm &>/dev/null && alias top='btm'
 
 # fzf keybindings
@@ -67,7 +69,7 @@ alias lg='lazygit'; alias lzd='lazydocker'
 alias dk='docker'; alias dkc='docker compose'; alias py='python3'
 alias please='sudo'; alias ports='ss -tulpn'
 alias myip='curl -s ifconfig.me'
-alias sysinfo='inxi -Fxz 2>/dev/null || fastfetch 2>/dev/null || neofetch'
+alias sysinfo='fastfetch 2>/dev/null || neofetch 2>/dev/null || inxi -Fxz 2>/dev/null'
 alias weather='curl -s wttr.in/?format=3'
 alias update='sudo apt update && sudo apt upgrade -y && sudo snap refresh && flatpak update -y 2>/dev/null'
 alias fonts-list='fc-list | sort'; alias fonts-mono='fc-list :spacing=mono | sort'
@@ -210,12 +212,22 @@ else
             https://github.com/andresgongora/synth-shell.git \
             /tmp/synth-shell-install >> "$LOG_FILE" 2>&1; then
         chmod +x /tmp/synth-shell-install/setup.sh
-        printf "i\nu\nn\ny\ny\ny\ny\n" | \
+        # synth-shell prompts: read -s -n 1 (single char, no echo)
+        # Answers: i=install, u=user, n=skip greeter, y=prompt, y=better-ls, y=alias, y=better-history
+        printf 'iunyyyy' | \
             sudo -u "$REAL_USER" HOME="$USER_HOME" \
             bash /tmp/synth-shell-install/setup.sh >> "$LOG_FILE" 2>&1 \
             && ok "synth-shell installed" \
             || warn "synth-shell setup had errors — check ${LOG_FILE}"
         rm -rf /tmp/synth-shell-install
+        # Fix synth-shell kube segment: upstream uses broken yq query that errors with Go yq/jq
+        SYNTH_PROMPT="${USER_HOME}/.config/synth-shell/synth-shell-prompt.sh"
+        if [[ -f "$SYNTH_PROMPT" ]] && grep -q "yq '\.contexts" "$SYNTH_PROMPT"; then
+            sed -i "/type yq/d" "$SYNTH_PROMPT"
+            sed -i "s|echo -n \"\$(kubectl config view.*yq.*head -n 1)\"|echo -n \"\$(kubectl config current-context 2>/dev/null)\"|" \
+                "$SYNTH_PROMPT"
+            ok "synth-shell kube segment patched"
+        fi
         # Prompt colors: gallery themes 1–20 (see synth-shell-color-preview.html). Override with SYNTH_SHELL_THEME=N
         if [[ -z "${SYNTH_SHELL_THEME:-}" ]] && [[ -z "${CI:-}" ]] && { [[ -t 0 ]] || [[ -r /dev/tty ]]; }; then
             synth_shell_print_theme_gallery
