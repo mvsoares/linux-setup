@@ -31,32 +31,39 @@ install_nerd_font() {
 }
 
 # ── Google Font installer ────────────────────────────────────────────────────
+# Uses the JSON manifest API (the old zip endpoint returns HTML now)
 install_google_font() {
     local name="$1"
     local dest="${FONT_DIR}/general/${name}"
-    if [[ -d "$dest" ]] && { ls "$dest"/*.ttf &>/dev/null 2>&1 || ls "$dest"/*.otf &>/dev/null 2>&1; }; then
+    if [[ -d "$dest" ]] && find "$dest" -maxdepth 2 \( -name '*.ttf' -o -name '*.otf' \) -print -quit 2>/dev/null | grep -q .; then
         ok "${name} — already installed"
         return
     fi
     local encoded="${name// /+}"
-    local zipfile="/tmp/gf-${name}.zip"
-    rm -f "$zipfile"
-    if curl -fsSL -A "Mozilla/5.0 (X11; Linux x86_64)" \
-            "https://fonts.google.com/download?family=${encoded}" \
-            -o "$zipfile" >> "$LOG_FILE" 2>&1 \
-            && file "$zipfile" 2>/dev/null | grep -qi "zip"; then
-        mkdir -p "$dest"
-        unzip -qo "$zipfile" -d "$dest" >> "$LOG_FILE" 2>&1 || true
-        rm -f "$zipfile"
-        if ls "$dest"/*.ttf &>/dev/null 2>&1 || ls "$dest"/**/*.ttf &>/dev/null 2>&1 \
-                || ls "$dest"/*.otf &>/dev/null 2>&1 || ls "$dest"/**/*.otf &>/dev/null 2>&1; then
-            ok "${name}"
-        else
-            warn "${name} — zip contained no font files"
-        fi
+    local manifest
+    manifest=$(curl -fsSL "https://fonts.google.com/download/list?family=${encoded}" 2>/dev/null | tail -n +2)
+    if [[ -z "$manifest" ]]; then
+        warn "${name} — manifest fetch failed"
+        return
+    fi
+    mkdir -p "$dest"
+    local count=0
+    while IFS=$'\t' read -r filename url; do
+        local fpath="${dest}/${filename}"
+        mkdir -p "$(dirname "$fpath")"
+        curl -fsSL "$url" -o "$fpath" >> "$LOG_FILE" 2>&1 && count=$((count + 1))
+    done < <(echo "$manifest" | python3 -c "
+import sys, json
+data = json.load(sys.stdin)
+for ref in data.get('manifest', {}).get('fileRefs', []):
+    fn = ref.get('filename', '')
+    if fn.endswith(('.ttf', '.otf')):
+        print(fn + '\t' + ref.get('url', ''))
+" 2>/dev/null)
+    if [[ $count -gt 0 ]]; then
+        ok "${name} (${count} files)"
     else
-        rm -f "$zipfile"
-        warn "${name} — download failed or returned invalid file (install manually)"
+        warn "${name} — no font files downloaded"
     fi
 }
 

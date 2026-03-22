@@ -4,6 +4,11 @@
 init_sub 11
 
 # ── Repositories ──────────────────────────────────────────────────────────────
+if ! command -v curl &>/dev/null; then
+    info "Installing curl (required for repo setup)..."
+    apt-get install -y -q curl >> "$LOG_FILE" 2>&1 || warn "curl install failed"
+fi
+
 info "Enabling universe / multiverse / restricted..."
 for comp in universe multiverse restricted; do
     add-apt-repository -y -n "$comp" >> "$LOG_FILE" 2>&1 || true
