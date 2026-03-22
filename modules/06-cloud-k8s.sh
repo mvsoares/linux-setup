@@ -52,7 +52,9 @@ fi
 tick "AWS extras (eksctl, session-manager, completion)"
 
 # ── Google Cloud SDK ──────────────────────────────────────────────────────────
-if [[ -f /etc/apt/sources.list.d/google-cloud-sdk.list ]] || command -v gcloud &>/dev/null; then
+if command -v gcloud &>/dev/null \
+        || { [[ -f /etc/apt/sources.list.d/google-cloud-sdk.list ]] \
+             && [[ -s /usr/share/keyrings/cloud.google.gpg ]]; }; then
     tick "Google Cloud repo — already present"
 else
     info "Adding Google Cloud SDK repo..."
@@ -74,13 +76,21 @@ apt_each google-cloud-cli-gke-gcloud-auth-plugin 2>/dev/null || true
 tick "Google Cloud SDK + GKE auth"
 
 # ── Azure CLI ─────────────────────────────────────────────────────────────────
-if [[ -f /etc/apt/sources.list.d/azure-cli.list ]] || command -v az &>/dev/null; then
+if command -v az &>/dev/null \
+        || { [[ -f /etc/apt/sources.list.d/azure-cli.list ]] \
+             && [[ -s /usr/share/keyrings/microsoft-azure.gpg ]]; }; then
     tick "Azure CLI repo — already present"
 else
     info "Adding Azure CLI repo..."
     curl -fsSL "https://packages.microsoft.com/keys/microsoft.asc" \
         | gpg --batch --yes --dearmor -o /usr/share/keyrings/microsoft-azure.gpg >> "$LOG_FILE" 2>&1 || warn "Azure key failed"
+    # Fall back to noble if Azure CLI has no repo for the current codename
     AZ_DISTRO=$(lsb_release -cs 2>/dev/null || echo "noble")
+    if ! curl -fsSL "https://packages.microsoft.com/repos/azure-cli/dists/${AZ_DISTRO}/Release" \
+            &>/dev/null; then
+        AZ_DISTRO="noble"
+        info "Azure CLI has no repo for $(lsb_release -cs 2>/dev/null), falling back to ${AZ_DISTRO}"
+    fi
     echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/microsoft-azure.gpg] \
 https://packages.microsoft.com/repos/azure-cli/ ${AZ_DISTRO} main" \
         > /etc/apt/sources.list.d/azure-cli.list

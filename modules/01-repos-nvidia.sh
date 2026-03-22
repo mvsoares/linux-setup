@@ -11,7 +11,9 @@ done
 tick "Core repositories enabled"
 
 # GitHub CLI
-if [[ -f /etc/apt/sources.list.d/github-cli.list ]] || command -v gh &>/dev/null; then
+if command -v gh &>/dev/null \
+        || { [[ -f /etc/apt/sources.list.d/github-cli.list ]] \
+             && [[ -s /usr/share/keyrings/githubcli-archive-keyring.gpg ]]; }; then
     tick "GitHub CLI repo — already present"
 else
     info "Adding GitHub CLI repo..."
@@ -23,7 +25,9 @@ https://cli.github.com/packages stable main" > /etc/apt/sources.list.d/github-cl
 fi
 
 # Docker CE
-if [[ -f /etc/apt/sources.list.d/docker.list ]] || command -v docker &>/dev/null; then
+if command -v docker &>/dev/null \
+        || { [[ -f /etc/apt/sources.list.d/docker.list ]] \
+             && [[ -s /etc/apt/keyrings/docker.gpg ]]; }; then
     tick "Docker CE repo — already present"
 else
     info "Adding Docker CE repo..."
@@ -46,7 +50,9 @@ https://download.docker.com/linux/ubuntu ${DOCKER_CODENAME} stable" \
 fi
 
 # Brave Browser
-if [[ -f /etc/apt/sources.list.d/brave-browser-release.list ]] || command -v brave-browser &>/dev/null; then
+if command -v brave-browser &>/dev/null \
+        || { [[ -f /etc/apt/sources.list.d/brave-browser-release.list ]] \
+             && [[ -s /usr/share/keyrings/brave-browser-archive-keyring.gpg ]]; }; then
     tick "Brave Browser repo — already present"
 else
     info "Adding Brave Browser repo..."
@@ -59,7 +65,9 @@ https://brave-browser-apt-release.s3.brave.com/ stable main" \
 fi
 
 # VSCode
-if [[ -f /etc/apt/sources.list.d/vscode.list ]] || command -v code &>/dev/null; then
+if command -v code &>/dev/null \
+        || { [[ -f /etc/apt/sources.list.d/vscode.list ]] \
+             && [[ -s /etc/apt/keyrings/microsoft.gpg ]]; }; then
     tick "VSCode repo — already present"
 else
     info "Adding Microsoft VSCode repo..."
