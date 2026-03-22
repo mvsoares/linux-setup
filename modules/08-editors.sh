@@ -237,6 +237,34 @@ else
     chown "$REAL_USER:$REAL_USER" "$WEZTERM_CFG"
     ok "WezTerm config deployed (Monokai Remastered, JetBrainsMono Nerd Font)"
 fi
+
+# Append bash hook that feeds the running command name into WezTerm tab titles
+BASHRC="${USER_HOME}/.bashrc"
+if [[ -f "$BASHRC" ]] && ! grep -q '__wezterm_set_user_var' "$BASHRC"; then
+    cat >> "$BASHRC" << 'WEZTERM_HOOK'
+
+# ── WezTerm tab title: show running command ──────────────────────────────────
+__wezterm_set_user_var() {
+    printf "\033]1337;SetUserVar=%s=%s\007" "$1" "$(printf '%s' "$2" | base64)"
+}
+
+__wezterm_preexec_fired=1
+__wezterm_debug() {
+    [[ "$__wezterm_preexec_fired" == "1" ]] && return
+    [[ -n "${COMP_LINE:-}" ]] && return
+    __wezterm_preexec_fired=1
+    local cmd="${BASH_COMMAND%% *}"
+    cmd="${cmd##*/}"
+    __wezterm_set_user_var cmd "$cmd"
+}
+trap '__wezterm_debug' DEBUG
+
+PROMPT_COMMAND="${PROMPT_COMMAND:-}"'; __wezterm_set_user_var cmd ""; __wezterm_preexec_fired=0'
+WEZTERM_HOOK
+    ok "WezTerm bash hook added (process name in tab titles)"
+else
+    skip "WezTerm bash hook (already in .bashrc)"
+fi
 tick "WezTerm + config"
 
 # ── AI Code Assist CLIs ───────────────────────────────────────────────────
