@@ -50,6 +50,10 @@ command -v pyenv &>/dev/null && eval "$(pyenv init -)" 2>/dev/null
 PYENV_BLOCK
         chown "$REAL_USER:$REAL_USER" "$PYENV_INIT"
     fi
+    # Migrate: move 2>/dev/null from inside $() to the eval (suppresses uutils readlink errors)
+    if [[ -f "$PYENV_INIT" ]] && grep -q 'pyenv init - 2>/dev/null)' "$PYENV_INIT"; then
+        sed -i 's|eval "$(pyenv init - 2>/dev/null)"|eval "$(pyenv init -)" 2>/dev/null|' "$PYENV_INIT"
+    fi
 fi
 
 # pipx — install Python CLI tools in isolated envs
