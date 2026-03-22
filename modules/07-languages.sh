@@ -46,13 +46,14 @@ else
 # pyenv
 export PYENV_ROOT="$HOME/.pyenv"
 [[ -d "$PYENV_ROOT/bin" ]] && export PATH="$PYENV_ROOT/bin:$PATH"
-command -v pyenv &>/dev/null && eval "$(pyenv init -)" 2>/dev/null
+command -v pyenv &>/dev/null && eval "$(pyenv init - 2>/dev/null)" 2>/dev/null
 PYENV_BLOCK
         chown "$REAL_USER:$REAL_USER" "$PYENV_INIT"
     fi
-    # Migrate: move 2>/dev/null from inside $() to the eval (suppresses uutils readlink errors)
-    if [[ -f "$PYENV_INIT" ]] && grep -q 'pyenv init - 2>/dev/null)' "$PYENV_INIT"; then
-        sed -i 's|eval "$(pyenv init - 2>/dev/null)"|eval "$(pyenv init -)" 2>/dev/null|' "$PYENV_INIT"
+    # Migrate: ensure both 2>/dev/null are present (suppresses uutils readlink errors on Ubuntu 26+)
+    if [[ -f "$PYENV_INIT" ]] && grep -q 'pyenv init' "$PYENV_INIT" \
+            && ! grep -q 'pyenv init - 2>/dev/null)" 2>/dev/null' "$PYENV_INIT"; then
+        sed -i '/pyenv init/s|.*pyenv init.*|command -v pyenv \&>/dev/null \&\& eval "$(pyenv init - 2>/dev/null)" 2>/dev/null|' "$PYENV_INIT"
     fi
 fi
 
