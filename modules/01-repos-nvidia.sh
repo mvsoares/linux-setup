@@ -1,7 +1,7 @@
 # =============================================================================
 # Module 01 — Extra Repositories & NVIDIA Drivers
 # =============================================================================
-init_sub 11
+init_sub 10
 
 # ── Repositories ──────────────────────────────────────────────────────────────
 if ! command -v curl &>/dev/null; then
@@ -27,31 +27,6 @@ else
     echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] \
 https://cli.github.com/packages stable main" > /etc/apt/sources.list.d/github-cli.list
     tick "GitHub CLI repo added"
-fi
-
-# Docker CE
-if command -v docker &>/dev/null \
-        || { [[ -f /etc/apt/sources.list.d/docker.list ]] \
-             && [[ -s /etc/apt/keyrings/docker.gpg ]]; }; then
-    tick "Docker CE repo — already present"
-else
-    info "Adding Docker CE repo..."
-    install -m 0755 -d /etc/apt/keyrings
-    curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
-        | gpg --batch --yes --dearmor -o /etc/apt/keyrings/docker.gpg >> "$LOG_FILE" 2>&1 || warn "Docker key failed"
-    chmod a+r /etc/apt/keyrings/docker.gpg
-    # Use VERSION_CODENAME; fall back to UBUNTU_CODENAME or noble if Docker
-    # doesn't have a repo for the current release yet (e.g. Ubuntu 26 resolute)
-    DOCKER_CODENAME=$(. /etc/os-release && echo "${VERSION_CODENAME}")
-    if ! curl -fsSL "https://download.docker.com/linux/ubuntu/dists/${DOCKER_CODENAME}/Release" \
-            &>/dev/null; then
-        DOCKER_CODENAME=$(. /etc/os-release && echo "${UBUNTU_CODENAME:-noble}")
-        info "Docker has no repo for $(. /etc/os-release && echo "$VERSION_CODENAME"), falling back to ${DOCKER_CODENAME}"
-    fi
-    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
-https://download.docker.com/linux/ubuntu ${DOCKER_CODENAME} stable" \
-        > /etc/apt/sources.list.d/docker.list
-    tick "Docker CE repo added"
 fi
 
 # Brave Browser

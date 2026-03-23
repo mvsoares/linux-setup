@@ -196,12 +196,12 @@ if ls /usr/share/themes/Orchis* &>/dev/null 2>&1; then
 else
     info "Installing Orchis GTK theme..."
     local_tmp=$(mktemp -d)
-    if git clone --depth=1 https://github.com/vinceliuice/Orchis-theme.git \
+    if timeout 60 git clone --depth=1 https://github.com/vinceliuice/Orchis-theme.git \
             "${local_tmp}/orchis" >> "$LOG_FILE" 2>&1; then
         bash "${local_tmp}/orchis/install.sh" -t purple -c dark >> "$LOG_FILE" 2>&1 \
             && ok "Orchis GTK theme (purple dark)" || warn "Orchis install had errors"
     else
-        warn "Orchis clone failed"
+        warn "Orchis clone failed or timed out (60s limit)"
     fi
     rm -rf "$local_tmp"
 fi

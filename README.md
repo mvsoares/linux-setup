@@ -20,8 +20,8 @@ The setup is split into **10 ordered modules**, each independently skippable and
 
 | # | Module | Highlights |
 |---|--------|------------|
-| 1 | **Repos & NVIDIA** | Universe/multiverse, Docker CE, Brave, GitHub CLI, Flatpak/Flathub, NVIDIA drivers + Vulkan + power rules |
-| 2 | **System & CLI** | build-essential, git, Docker, fzf, ripgrep, fd, bat, eza, zoxide, git-delta, lazygit, lazydocker, dust, procs, btm, hyperfine, glow, and more |
+| 1 | **Repos & NVIDIA** | Universe/multiverse, Brave, GitHub CLI, Flatpak/Flathub, NVIDIA drivers + Vulkan + power rules |
+| 2 | **System & CLI** | build-essential, git, Podman, fzf, ripgrep, fd, bat, eza, zoxide, git-delta, lazygit, lazydocker, dust, procs, btm, hyperfine, glow, and more |
 | 3 | **Shell** | Starship prompt, synth-shell (30 prompt themes + interactive picker), global aliases, fzf integration, zoxide init, history tuning |
 | 4 | **Fonts & Themes** | 25+ Nerd Fonts, Inter, Monaspace, Geist; Dracula & Catppuccin GTK themes; Papirus & Tela icons; Bibata cursors |
 | 5 | **GNOME** | Dash to Dock, Blur my Shell, Just Perfection, Caffeine, Clipboard Indicator, Vitals, Space Bar; dark mode, workspace shortcuts, Nautilus tree view |

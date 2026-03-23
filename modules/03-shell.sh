@@ -65,8 +65,8 @@ alias gst='git stash'; alias gd='git diff'
 alias gl='git log --oneline --graph --decorate -20'
 alias lg='lazygit'; alias lzd='lazydocker'
 
-# Docker & system
-alias dk='docker'; alias dkc='docker compose'; alias py='python3'
+# Podman & system
+alias dk='podman'; alias dkc='podman compose'; alias py='python3'
 alias please='sudo'; alias ports='ss -tulpn'
 alias myip='curl -s ifconfig.me'
 alias sysinfo='fastfetch 2>/dev/null || neofetch 2>/dev/null || inxi -Fxz 2>/dev/null'

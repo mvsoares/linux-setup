@@ -1,7 +1,7 @@
 # =============================================================================
-# Module 08 — Editor Setup (Cursor · VSCodium · Neovim · WezTerm)
+# Module 08 — Editor Setup (VSCodium · Neovim · WezTerm)
 # =============================================================================
-init_sub 10
+init_sub 8
 
 # ── VSCodium ──────────────────────────────────────────────────────────────
 if command -v codium &>/dev/null; then
@@ -67,111 +67,6 @@ if command -v codium &>/dev/null; then
 fi
 tick "VSCodium + extensions"
 
-# ── Cursor IDE (install) ──────────────────────────────────────────────────
-if command -v cursor &>/dev/null; then
-    skip "Cursor IDE $(cursor --version 2>/dev/null | head -1 || true)"
-else
-    info "Installing Cursor IDE..."
-    _cursor_tmp=$(mktemp -d)
-    _cursor_deb="${_cursor_tmp}/cursor.deb"
-    if curl -fsSL "https://downloads.cursor.com/production/linux/deb/x64/cursor-latest.deb" \
-            -o "$_cursor_deb" >> "$LOG_FILE" 2>&1; then
-        dpkg -i "$_cursor_deb" >> "$LOG_FILE" 2>&1 \
-            || apt-get install -f -y -qq >> "$LOG_FILE" 2>&1 \
-            && ok "Cursor IDE installed" || warn "Cursor IDE install failed — install manually from cursor.com"
-    else
-        warn "Cursor IDE — download failed (install manually from cursor.com)"
-    fi
-    rm -rf "$_cursor_tmp"
-fi
-tick "Cursor IDE"
-
-# ── Cursor IDE settings ──────────────────────────────────────────────────
-CURSOR_SETTINGS="${USER_HOME}/.config/Cursor/User/settings.json"
-if [[ -f "$CURSOR_SETTINGS" ]]; then
-    skip "Cursor IDE settings (already exists)"
-else
-    info "Configuring Cursor IDE..."
-    install -d -o "$REAL_USER" -g "$REAL_USER" "$(dirname "$CURSOR_SETTINGS")"
-
-    cat > "$CURSOR_SETTINGS" << 'CURSOR_JSON'
-{
-    "window.commandCenter": true,
-
-    "editor.fontFamily": "'JetBrainsMono Nerd Font', 'Monaspace Neon', 'Fira Code', 'Geist Mono', monospace",
-    "editor.fontLigatures": "'calt', 'liga', 'ss01', 'ss02', 'ss03', 'ss04', 'ss05'",
-    "editor.fontSize": 14,
-    "editor.lineHeight": 1.6,
-    "editor.cursorBlinking": "smooth",
-    "editor.cursorSmoothCaretAnimation": "on",
-    "editor.smoothScrolling": true,
-    "editor.minimap.enabled": false,
-    "editor.renderWhitespace": "boundary",
-    "editor.bracketPairColorization.enabled": true,
-    "editor.guides.bracketPairs": "active",
-    "editor.stickyScroll.enabled": true,
-    "editor.linkedEditing": true,
-    "editor.formatOnSave": true,
-    "editor.formatOnPaste": true,
-    "editor.tabSize": 2,
-    "editor.detectIndentation": true,
-    "editor.wordWrap": "off",
-    "editor.suggestSelection": "first",
-    "editor.inlineSuggest.enabled": true,
-    "editor.unicodeHighlight.allowedLocales": { "pt-br": true },
-
-    "terminal.integrated.fontFamily": "'JetBrainsMono Nerd Font'",
-    "terminal.integrated.fontSize": 13,
-    "terminal.integrated.lineHeight": 1.2,
-    "terminal.integrated.cursorBlinking": true,
-    "terminal.integrated.scrollback": 10000,
-    "terminal.integrated.defaultProfile.linux": "bash",
-
-    "files.trimTrailingWhitespace": true,
-    "files.insertFinalNewline": true,
-    "files.trimFinalNewlines": true,
-    "files.autoSave": "afterDelay",
-    "files.autoSaveDelay": 1000,
-    "files.exclude": {
-        "**/.git": true,
-        "**/.DS_Store": true,
-        "**/node_modules": true,
-        "**/__pycache__": true,
-        "**/.venv": true,
-        "**/.mypy_cache": true
-    },
-
-    "workbench.startupEditor": "none",
-    "workbench.tree.indent": 16,
-    "workbench.editor.enablePreview": false,
-    "workbench.list.smoothScrolling": true,
-    "workbench.colorTheme": "Dracula",
-    "workbench.iconTheme": "material-icon-theme",
-    "workbench.productIconTheme": "material-product-icons",
-
-    "explorer.confirmDelete": false,
-    "explorer.confirmDragAndDrop": false,
-    "explorer.compactFolders": false,
-
-    "git.autofetch": true,
-    "git.confirmSync": false,
-    "git.enableSmartCommit": true,
-
-    "search.exclude": {
-        "**/node_modules": true,
-        "**/dist": true,
-        "**/build": true,
-        "**/.next": true,
-        "**/target": true,
-        "**/.venv": true
-    }
-}
-CURSOR_JSON
-    chown "$REAL_USER:$REAL_USER" "$CURSOR_SETTINGS"
-    ok "Cursor IDE settings configured"
-fi
-tick "Cursor IDE settings"
-
 # ── Neovim ────────────────────────────────────────────────────────────────
 if command -v nvim &>/dev/null; then
     skip "Neovim"
@@ -209,22 +104,36 @@ fi
 tick "Neovim + kickstart.nvim"
 
 # ── WezTerm ──────────────────────────────────────────────────────────────
-if command -v wezterm &>/dev/null; then
+if command -v wezterm &>/dev/null || flatpak list 2>/dev/null | grep -q org.wezfurlong.wezterm; then
     skip "WezTerm"
 else
     info "Installing WezTerm..."
-    # Try Flatpak first (works on any Ubuntu version), fall back to apt repo
-    if command -v flatpak &>/dev/null && flatpak install -y flathub org.wezfurlong.wezterm >> "$LOG_FILE" 2>&1; then
-        ok "WezTerm (Flatpak)"
-    else
-        curl -fsSL https://apt.fury.io/wez/gpg.key \
-            | gpg --batch --yes --dearmor -o /usr/share/keyrings/wezterm-fury.gpg >> "$LOG_FILE" 2>&1 || warn "WezTerm key failed"
-        chmod 644 /usr/share/keyrings/wezterm-fury.gpg
-        echo 'deb [signed-by=/usr/share/keyrings/wezterm-fury.gpg] https://apt.fury.io/wez/ * *' \
-            > /etc/apt/sources.list.d/wezterm.list
-        apt_quiet update
-        apt_each wezterm
+    # Try apt repo first (native), fall back to Flatpak
+    _wez_installed=false
+    curl -fsSL https://apt.fury.io/wez/gpg.key \
+        | gpg --batch --yes --dearmor -o /usr/share/keyrings/wezterm-fury.gpg >> "$LOG_FILE" 2>&1 \
+        && chmod 644 /usr/share/keyrings/wezterm-fury.gpg \
+        && echo 'deb [signed-by=/usr/share/keyrings/wezterm-fury.gpg] https://apt.fury.io/wez/ * *' \
+            > /etc/apt/sources.list.d/wezterm.list \
+        && apt-get update -q >> "$LOG_FILE" 2>&1 \
+        && apt-get install -y -qq wezterm >> "$LOG_FILE" 2>&1 \
+        && _wez_installed=true && ok "WezTerm (apt)"
+
+    if ! $_wez_installed && command -v flatpak &>/dev/null; then
+        info "Trying WezTerm via Flatpak..."
+        if flatpak install -y flathub org.wezfurlong.wezterm >> "$LOG_FILE" 2>&1; then
+            # Create wrapper so 'command -v wezterm' works
+            cat > /usr/local/bin/wezterm << 'WEZWRAP'
+#!/bin/sh
+exec flatpak run org.wezfurlong.wezterm "$@"
+WEZWRAP
+            chmod +x /usr/local/bin/wezterm
+            ok "WezTerm (Flatpak)"
+            _wez_installed=true
+        fi
     fi
+
+    $_wez_installed || warn "WezTerm install failed"
 fi
 
 WEZTERM_CFG="${USER_HOME}/.config/wezterm/wezterm.lua"

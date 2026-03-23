@@ -123,15 +123,46 @@ snap_install() {
 }
 
 # ── GitHub release helper ─────────────────────────────────────────────────────
+# Get latest release tag via redirect header (no API quota used)
+_github_latest_tag() {
+    local loc
+    loc=$(curl -sI "https://github.com/$1/releases/latest" 2>/dev/null \
+        | grep -i '^location:' | head -1)
+    echo "$loc" | sed 's|.*/tag/||; s/\r//; s/[[:space:]]//g'
+}
+
+# Find asset download URL from release HTML page (no API quota used)
+_github_asset_url() {
+    local repo="$1" tag="$2" pattern="$3"
+    local url
+    url=$(curl -fsSL "https://github.com/${repo}/releases/expanded_assets/${tag}" 2>/dev/null \
+        | grep -oP 'href="\K[^"]*'"$pattern"'[^"]*' | head -1)
+    if [[ -n "$url" && ! "$url" =~ ^https ]]; then
+        url="https://github.com${url}"
+    fi
+    echo "$url"
+}
+
 github_latest_version() {
+    local tag
+    tag=$(_github_latest_tag "$1")
+    if [[ -n "$tag" ]]; then
+        echo "${tag#v}"
+        return
+    fi
+    # Fall back to API (counts against rate limit)
     curl -sSf "https://api.github.com/repos/$1/releases/latest" 2>/dev/null \
         | grep tag_name | cut -d'"' -f4 | sed 's/^v//'
 }
 
 install_github_deb() {
     local repo="$1" pattern="$2" name="$3"
-    local url
-    url=$(curl -sSf "https://api.github.com/repos/${repo}/releases/latest" 2>/dev/null \
+    local url tag
+    # Try redirect + HTML scrape (no API quota)
+    tag=$(_github_latest_tag "$repo")
+    [[ -n "$tag" ]] && url=$(_github_asset_url "$repo" "$tag" "$pattern")
+    # Fall back to API
+    [[ -z "$url" ]] && url=$(curl -sSf "https://api.github.com/repos/${repo}/releases/latest" 2>/dev/null \
         | grep browser_download_url | grep "$pattern" | head -1 | cut -d'"' -f4)
     if [[ -n "$url" ]]; then
         local tmp=$(mktemp -d)
@@ -147,8 +178,12 @@ install_github_deb() {
 
 install_github_tar() {
     local repo="$1" pattern="$2" binary="$3" name="$4"
-    local url
-    url=$(curl -sSf "https://api.github.com/repos/${repo}/releases/latest" 2>/dev/null \
+    local url tag
+    # Try redirect + HTML scrape (no API quota)
+    tag=$(_github_latest_tag "$repo")
+    [[ -n "$tag" ]] && url=$(_github_asset_url "$repo" "$tag" "$pattern")
+    # Fall back to API
+    [[ -z "$url" ]] && url=$(curl -sSf "https://api.github.com/repos/${repo}/releases/latest" 2>/dev/null \
         | grep browser_download_url | grep "$pattern" | head -1 | cut -d'"' -f4)
     if [[ -n "$url" ]]; then
         local tmp=$(mktemp -d)

@@ -33,12 +33,9 @@ tick "System monitors & diagnostics"
 
 info "Installing developer tools..."
 apt_quiet install gh python3 python3-pip python3-venv python3-dev nodejs jq
-apt_each docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin \
+apt_each podman podman-compose buildah skopeo \
          yq direnv mkcert pipx redis-tools
-if [[ -n "$REAL_USER" ]]; then
-    usermod -aG docker "$REAL_USER" 2>/dev/null && ok "User '${REAL_USER}' → docker group" || warn "Could not add to docker group"
-fi
-tick "Developer tools (docker, gh, python, node)"
+tick "Developer tools (podman, gh, python, node)"
 
 info "Installing network & file tools..."
 apt_quiet install nmap netcat-openbsd dnsutils rsync tree ranger fzf ripgrep fd-find bat tmux mosh \
@@ -116,7 +113,10 @@ fi
 
 # procs (better ps)
 if ! command -v procs &>/dev/null; then
-    _procs_url=$(curl -sSf "https://api.github.com/repos/dalance/procs/releases/latest" 2>/dev/null \
+    _procs_tag=$(_github_latest_tag "dalance/procs")
+    _procs_url=""
+    [[ -n "$_procs_tag" ]] && _procs_url=$(_github_asset_url "dalance/procs" "$_procs_tag" "x86_64-linux.zip")
+    [[ -z "$_procs_url" ]] && _procs_url=$(curl -sSf "https://api.github.com/repos/dalance/procs/releases/latest" 2>/dev/null \
         | grep browser_download_url | grep "x86_64-linux.zip" | head -1 | cut -d'"' -f4)
     if [[ -n "$_procs_url" ]]; then
         _procs_tmp=$(mktemp -d)
