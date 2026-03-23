@@ -3,9 +3,8 @@
 # install-wezterm.sh — Standalone WezTerm installer + config deployment
 # =============================================================================
 # Installs WezTerm (apt → Flatpak fallback) and deploys the project config:
-#   • Monokai Remastered color scheme
-#   • JetBrainsMono Nerd Font
-#   • Google-colored tab bar with process name display
+#   • VictorMono NF font
+#   • Google-colored tab bar with process name display (fancy tab bar)
 #   • GPU-accelerated (WebGpu) rendering
 #   • Tmux-style pane/tab keybindings (Super+d, Super+D, etc.)
 #
@@ -143,9 +142,9 @@ fi
 # ── Summary ──────────────────────────────────────────────────────────────────
 echo ""
 echo -e "  ${BOLD}Config highlights:${RESET}"
-echo -e "    Color scheme   Monokai Remastered"
-echo -e "    Font           JetBrainsMono Nerd Font 14pt (tabs 12.5pt)"
-echo -e "    Tab bar        Bottom, Google-colored, shows process|dir"
+echo -e "    Font           VictorMono NF 12.5pt (tabs 12pt)"
+echo -e "    Tab bar        Bottom, fancy, Google-colored, shows process|dir"
+echo -e "    Window         Integrated buttons + resize"
 echo -e "    Rendering      WebGpu (Vulkan) or OpenGL (auto-detected)"
 echo -e "    Opacity        95%"
 echo -e "    Keybindings    Super+d split, Super+w close, Super+t tab"

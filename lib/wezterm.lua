@@ -2,29 +2,28 @@ local wezterm = require 'wezterm'
 local config = wezterm.config_builder()
 
 -- ─── Font ────────────────────────────────────────────────────────────────────
-config.font = wezterm.font('JetBrainsMono Nerd Font', { weight = 'Regular' })
-config.font_size = 14.0
-config.line_height = 1.1
+config.font = wezterm.font('VictorMono NF', { weight = 'Regular' })
+config.font_size = 12.5
+config.line_height = 1.0
 
 -- ─── Color Scheme ────────────────────────────────────────────────────────────
-config.color_scheme = 'Monokai Remastered'
+--config.color_scheme = 'Monokai Remastered'
 
 -- ─── Window ──────────────────────────────────────────────────────────────────
-config.enable_wayland = false
 config.window_background_opacity = 0.95
-config.window_decorations = 'RESIZE'  -- hide titlebar, keep resize border
+config.window_decorations = 'INTEGRATED_BUTTONS|RESIZE'
 config.window_padding = { left = 10, right = 10, top = 10, bottom = 10 }
 config.initial_cols = 220
 config.initial_rows = 50
 
 -- ─── Tab Bar ─────────────────────────────────────────────────────────────────
-config.hide_tab_bar_if_only_one_tab = true
+config.hide_tab_bar_if_only_one_tab = false
 config.use_fancy_tab_bar = true
 config.tab_bar_at_bottom = true
-config.tab_max_width = 30
+config.tab_max_width = 32
 config.window_frame = {
-  font = wezterm.font('JetBrainsMono Nerd Font', { weight = 'Bold' }),
-  font_size = 12.5,
+  font = wezterm.font('VictorMono NFM Thin', { weight = 'Bold' }),
+  font_size = 12,
 }
 
 local tab_colors = {
@@ -69,20 +68,21 @@ wezterm.on('format-tab-title', function(tab)
     label = process .. '|' .. dir
   end
 
+  local title = ' ' .. index .. ' ' .. label .. ' '
+
   if tab.is_active then
     return wezterm.format {
       { Background = { Color = colors.bg } },
       { Foreground = { Color = '#ffffff' } },
       { Attribute = { Intensity = 'Bold' } },
-      { Text = ' ' .. index .. ' ' .. label .. ' ' },
+      { Attribute = { Underline = 'Single' } },
+      { Text = '⚡ == ' .. index .. ' ' .. label .. ' ' },
     }
   else
     return wezterm.format {
-      { Background = { Color = colors.light } },
-      { Foreground = { Color = '#888888' } },
-      { Attribute = { Intensity = 'Half' } },
-      { Attribute = { Italic = true } },
-      { Text = ' ' .. index .. ' ' .. label .. ' ' },
+      { Background = { Color = colors.bg } },
+      { Foreground = { Color = '#ffffff' } },
+      { Text = '' .. index .. ' ' .. label .. ' ' },
     }
   end
 end)
