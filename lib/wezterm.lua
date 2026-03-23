@@ -90,7 +90,17 @@ end)
 -- ─── Scrollback & Performance ────────────────────────────────────────────────
 config.scrollback_lines = 10000
 config.animation_fps = 60
-config.front_end = 'WebGpu'           -- GPU acceleration
+-- Prefer WebGpu but fall back to OpenGL if Vulkan isn't available
+local function has_vulkan()
+  local f = io.popen('vulkaninfo --summary 2>/dev/null')
+  if f then
+    local out = f:read('*a')
+    f:close()
+    return out:find('deviceName') ~= nil
+  end
+  return false
+end
+config.front_end = has_vulkan() and 'WebGpu' or 'OpenGL'
 config.automatically_reload_config = true
 
 -- ─── Cursor ──────────────────────────────────────────────────────────────────
