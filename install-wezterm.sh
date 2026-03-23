@@ -108,11 +108,17 @@ else
     ok "WezTerm config deployed"
 fi
 
-# ── Bash hook for process name in tab titles ─────────────────────────────────
+# ── Bash hook for process name + cwd in tab titles ───────────────────────────
 BASHRC="${USER_HOME}/.bashrc"
-if [[ -f "$BASHRC" ]] && grep -q '__wezterm_set_user_var' "$BASHRC"; then
-    ok "WezTerm bash hook already present"
+touch "$BASHRC"
+chown "$REAL_USER:$REAL_USER" "$BASHRC"
+
+if grep -q '__wezterm_set_user_var' "$BASHRC" && grep -q '__wezterm_osc7' "$BASHRC"; then
+    ok "WezTerm bash hook already up to date"
 else
+    # Remove previous managed hook block before appending updated one.
+    sed -i "/^# ── WezTerm tab title: show running command /,/^PROMPT_COMMAND=.*__wezterm_preexec_fired=0'$/d" "$BASHRC"
+
     cat >> "$BASHRC" << 'WEZTERM_HOOK'
 
 # ── WezTerm tab title: show running command ──────────────────────────────────
@@ -138,7 +144,7 @@ __wezterm_osc7() {
 PROMPT_COMMAND="${PROMPT_COMMAND:-}"'; __wezterm_osc7; __wezterm_set_user_var cmd ""; __wezterm_preexec_fired=0'
 WEZTERM_HOOK
     chown "$REAL_USER:$REAL_USER" "$BASHRC"
-    ok "WezTerm bash hook added (process name in tab titles)"
+    ok "WezTerm bash hook added/updated (process name + cwd in tab titles)"
 fi
 
 # ── Summary ──────────────────────────────────────────────────────────────────

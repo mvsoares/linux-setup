@@ -18,7 +18,7 @@ config.initial_rows = 50
 
 -- ─── Tab Bar ─────────────────────────────────────────────────────────────────
 config.hide_tab_bar_if_only_one_tab = true
-config.use_fancy_tab_bar = true
+config.use_fancy_tab_bar = false
 config.tab_bar_at_bottom = true
 config.tab_max_width = 32
 config.window_frame = {

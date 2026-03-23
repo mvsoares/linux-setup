@@ -152,9 +152,17 @@ else
     ok "WezTerm config deployed (Monokai Remastered, JetBrainsMono Nerd Font)"
 fi
 
-# Append bash hook that feeds the running command name into WezTerm tab titles
+# Append/upgrade bash hook for running command + cwd in WezTerm tab titles
 BASHRC="${USER_HOME}/.bashrc"
-if [[ -f "$BASHRC" ]] && ! grep -q '__wezterm_set_user_var' "$BASHRC"; then
+touch "$BASHRC"
+chown "$REAL_USER:$REAL_USER" "$BASHRC"
+
+if grep -q '__wezterm_set_user_var' "$BASHRC" && grep -q '__wezterm_osc7' "$BASHRC"; then
+    skip "WezTerm bash hook (already up to date)"
+else
+    # Remove previous managed hook block before appending updated one.
+    sed -i "/^# ── WezTerm tab title: show running command /,/^PROMPT_COMMAND=.*__wezterm_preexec_fired=0'$/d" "$BASHRC"
+
     cat >> "$BASHRC" << 'WEZTERM_HOOK'
 
 # ── WezTerm tab title: show running command ──────────────────────────────────
@@ -179,9 +187,7 @@ __wezterm_osc7() {
 
 PROMPT_COMMAND="${PROMPT_COMMAND:-}"'; __wezterm_osc7; __wezterm_set_user_var cmd ""; __wezterm_preexec_fired=0'
 WEZTERM_HOOK
-    ok "WezTerm bash hook added (process name + cwd in tab titles)"
-else
-    skip "WezTerm bash hook (already in .bashrc)"
+    ok "WezTerm bash hook added/updated (process name + cwd in tab titles)"
 fi
 tick "WezTerm + config"
 
