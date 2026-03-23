@@ -173,9 +173,13 @@ __wezterm_debug() {
 }
 trap '__wezterm_debug' DEBUG
 
-PROMPT_COMMAND="${PROMPT_COMMAND:-}"'; __wezterm_set_user_var cmd ""; __wezterm_preexec_fired=0'
+__wezterm_osc7() {
+    printf "\033]7;file://%s%s\033\\" "${HOSTNAME}" "${PWD}"
+}
+
+PROMPT_COMMAND="${PROMPT_COMMAND:-}"'; __wezterm_osc7; __wezterm_set_user_var cmd ""; __wezterm_preexec_fired=0'
 WEZTERM_HOOK
-    ok "WezTerm bash hook added (process name in tab titles)"
+    ok "WezTerm bash hook added (process name + cwd in tab titles)"
 else
     skip "WezTerm bash hook (already in .bashrc)"
 fi

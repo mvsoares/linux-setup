@@ -35,50 +35,56 @@ local tab_colors = {
 
 wezterm.on('format-tab-title', function(tab)
   local pane = tab.active_pane
+  local index = tab.tab_index + 1
+  local colors = tab_colors[(tab.tab_index % #tab_colors) + 1]
+
+  -- Directory name from OSC 7 (needs shell integration) or fallback
   local cwd_uri = pane.current_working_dir
+  local dir
   if cwd_uri then
     local cwd = cwd_uri.file_path
-    local dir = cwd:match('([^/]+)/?$') or cwd
-    local index = tab.tab_index + 1
-    local colors = tab_colors[(tab.tab_index % #tab_colors) + 1]
+    dir = cwd:match('([^/]+)/?$') or cwd
+  else
+    -- Fallback: use the foreground process name when OSC 7 is unavailable
+    dir = pane.foreground_process_name:match('([^/]+)$') or '~'
+  end
 
-    -- Read the running command from user var (set by bash hook)
-    local process = pane.user_vars.cmd or ''
+  -- Read the running command from user var (set by bash hook)
+  local process = pane.user_vars.cmd or ''
 
-    -- Build label: "process|dir" or just "dir" if idle at shell
-    local label
-    if process ~= '' then
-      label = process .. '|' .. dir
-    else
-      label = dir
-    end
+  -- Build label: "process|dir" or just "dir" if idle at shell
+  local label
+  if process ~= '' then
+    label = process .. '|' .. dir
+  else
+    label = dir
+  end
 
-    if tab.is_active then
-      return wezterm.format {
-        { Background = { Color = colors.bg } },
-        { Foreground = { Color = '#ffffff' } },
-        { Attribute = { Intensity = 'Bold' } },
-        { Text = ' ' .. index .. ' ' },
-        { Background = { Color = colors.bg } },
-        { Foreground = { Color = '#ffffff' } },
-        { Attribute = { Intensity = 'Bold' } },
-        { Attribute = { Underline = 'Single' } },
-        { Text = ' ' .. label .. ' ' },
-      }
-    else
-      return wezterm.format {
-        { Background = { Color = colors.light } },
-        { Foreground = { Color = colors.bg } },
-        { Attribute = { Intensity = 'Half' } },
-        { Attribute = { Italic = true } },
-        { Text = ' ' .. index .. ' ' },
-        { Background = { Color = colors.light } },
-        { Foreground = { Color = '#888888' } },
-        { Attribute = { Intensity = 'Half' } },
-        { Attribute = { Italic = true } },
-        { Text = ' ' .. label .. ' ' },
-      }
-    end
+  if tab.is_active then
+    return wezterm.format {
+      { Background = { Color = colors.bg } },
+      { Foreground = { Color = '#ffffff' } },
+      { Attribute = { Intensity = 'Bold' } },
+      { Text = ' ' .. index .. ' ' },
+      { Background = { Color = colors.bg } },
+      { Foreground = { Color = '#ffffff' } },
+      { Attribute = { Intensity = 'Bold' } },
+      { Attribute = { Underline = 'Single' } },
+      { Text = ' ' .. label .. ' ' },
+    }
+  else
+    return wezterm.format {
+      { Background = { Color = colors.light } },
+      { Foreground = { Color = colors.bg } },
+      { Attribute = { Intensity = 'Half' } },
+      { Attribute = { Italic = true } },
+      { Text = ' ' .. index .. ' ' },
+      { Background = { Color = colors.light } },
+      { Foreground = { Color = '#888888' } },
+      { Attribute = { Intensity = 'Half' } },
+      { Attribute = { Italic = true } },
+      { Text = ' ' .. label .. ' ' },
+    }
   end
 end)
 
