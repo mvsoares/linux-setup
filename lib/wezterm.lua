@@ -10,6 +10,7 @@ config.line_height = 1.1
 config.color_scheme = 'Monokai Remastered'
 
 -- ─── Window ──────────────────────────────────────────────────────────────────
+config.enable_wayland = false
 config.window_background_opacity = 0.95
 config.window_decorations = 'RESIZE'  -- hide titlebar, keep resize border
 config.window_padding = { left = 10, right = 10, top = 10, bottom = 10 }
@@ -18,12 +19,12 @@ config.initial_rows = 50
 
 -- ─── Tab Bar ─────────────────────────────────────────────────────────────────
 config.hide_tab_bar_if_only_one_tab = true
-config.use_fancy_tab_bar = false
+config.use_fancy_tab_bar = true
 config.tab_bar_at_bottom = true
-config.tab_max_width = 32
+config.tab_max_width = 30
 config.window_frame = {
   font = wezterm.font('JetBrainsMono Nerd Font', { weight = 'Bold' }),
-  font_size = 14.0,
+  font_size = 12.5,
 }
 
 local tab_colors = {
@@ -40,24 +41,32 @@ wezterm.on('format-tab-title', function(tab)
 
   -- Directory name from OSC 7 (needs shell integration) or fallback
   local cwd_uri = pane.current_working_dir
-  local dir
+  local dir = '~'
   if cwd_uri then
     local cwd = cwd_uri.file_path
     dir = cwd:match('([^/]+)/?$') or cwd
-  else
-    -- Fallback: use the foreground process name when OSC 7 is unavailable
-    dir = pane.foreground_process_name:match('([^/]+)$') or '~'
   end
 
-  -- Read the running command from user var (set by bash hook)
-  local process = pane.user_vars.cmd or ''
+  -- Process name from bash hook (user_vars.cmd), fallback to foreground_process_name
+  local process = ''
+  local uv_cmd = (pane.user_vars or {}).cmd or ''
+  if uv_cmd ~= '' then
+    process = uv_cmd
+  else
+    local fg = pane.foreground_process_name or ''
+    process = fg:match('([^/\\]+)$') or ''
+  end
+
+  -- Hide common shells so the tab just shows the directory when idle
+  if process == 'bash' or process == 'zsh' or process == 'fish'
+      or process == 'tmux' or process == 'wezterm' or process == '' then
+    process = ''
+  end
 
   -- Build label: "process|dir" or just "dir" if idle at shell
-  local label
+  local label = dir
   if process ~= '' then
     label = process .. '|' .. dir
-  else
-    label = dir
   end
 
   if tab.is_active then
@@ -65,25 +74,15 @@ wezterm.on('format-tab-title', function(tab)
       { Background = { Color = colors.bg } },
       { Foreground = { Color = '#ffffff' } },
       { Attribute = { Intensity = 'Bold' } },
-      { Text = ' ' .. index .. ' ' },
-      { Background = { Color = colors.bg } },
-      { Foreground = { Color = '#ffffff' } },
-      { Attribute = { Intensity = 'Bold' } },
-      { Attribute = { Underline = 'Single' } },
-      { Text = ' ' .. label .. ' ' },
+      { Text = ' ' .. index .. ' ' .. label .. ' ' },
     }
   else
     return wezterm.format {
       { Background = { Color = colors.light } },
-      { Foreground = { Color = colors.bg } },
-      { Attribute = { Intensity = 'Half' } },
-      { Attribute = { Italic = true } },
-      { Text = ' ' .. index .. ' ' },
-      { Background = { Color = colors.light } },
       { Foreground = { Color = '#888888' } },
       { Attribute = { Intensity = 'Half' } },
       { Attribute = { Italic = true } },
-      { Text = ' ' .. label .. ' ' },
+      { Text = ' ' .. index .. ' ' .. label .. ' ' },
     }
   end
 end)

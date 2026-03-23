@@ -32,6 +32,7 @@ fail() { echo -e "  ${RED}✖${RESET}  $*"; exit 1; }
 REAL_USER="${SUDO_USER:-$(logname 2>/dev/null || echo "")}"
 [[ -z "$REAL_USER" ]] && REAL_USER="$(id -un 1000 2>/dev/null || echo "")"
 USER_HOME=$(getent passwd "$REAL_USER" | cut -d: -f6 2>/dev/null || echo "/root")
+REAL_GROUP=$(id -gn "$REAL_USER" 2>/dev/null || echo "$REAL_USER")
 
 LOG_FILE="/tmp/wezterm-install-$(date +%Y%m%d-%H%M%S).log"
 
@@ -97,28 +98,22 @@ if [[ -f "$WEZTERM_CFG" ]]; then
         # Back up existing config before overwriting
         cp "$WEZTERM_CFG" "${WEZTERM_CFG}.bak.$(date +%Y%m%d-%H%M%S)"
         cp "$SRC_CFG" "$WEZTERM_CFG"
-        chown "$REAL_USER:$REAL_USER" "$WEZTERM_CFG"
+        chown "$REAL_USER:$REAL_GROUP" "$WEZTERM_CFG"
         ok "WezTerm config updated (backup saved as .bak.*)"
     fi
 else
     info "Deploying WezTerm config..."
-    install -d -o "$REAL_USER" -g "$REAL_USER" "$(dirname "$WEZTERM_CFG")"
+    install -d -o "$REAL_USER" -g "$REAL_GROUP" "$(dirname "$WEZTERM_CFG")"
     cp "$SRC_CFG" "$WEZTERM_CFG"
-    chown "$REAL_USER:$REAL_USER" "$WEZTERM_CFG"
+    chown "$REAL_USER:$REAL_GROUP" "$WEZTERM_CFG"
     ok "WezTerm config deployed"
 fi
 
-# ── Bash hook for process name + cwd in tab titles ───────────────────────────
+# ── Bash hook for process name in tab titles ─────────────────────────────────
 BASHRC="${USER_HOME}/.bashrc"
-touch "$BASHRC"
-chown "$REAL_USER:$REAL_USER" "$BASHRC"
-
-if grep -q '__wezterm_set_user_var' "$BASHRC" && grep -q '__wezterm_osc7' "$BASHRC"; then
-    ok "WezTerm bash hook already up to date"
+if [[ -f "$BASHRC" ]] && grep -q '__wezterm_set_user_var' "$BASHRC"; then
+    ok "WezTerm bash hook already present"
 else
-    # Remove previous managed hook block before appending updated one.
-    sed -i "/^# ── WezTerm tab title: show running command /,/^PROMPT_COMMAND=.*__wezterm_preexec_fired=0'$/d" "$BASHRC"
-
     cat >> "$BASHRC" << 'WEZTERM_HOOK'
 
 # ── WezTerm tab title: show running command ──────────────────────────────────
@@ -130,28 +125,26 @@ __wezterm_preexec_fired=1
 __wezterm_debug() {
     [[ "$__wezterm_preexec_fired" == "1" ]] && return
     [[ -n "${COMP_LINE:-}" ]] && return
-    __wezterm_preexec_fired=1
     local cmd="${BASH_COMMAND%% *}"
     cmd="${cmd##*/}"
+    # Skip internal shell functions/hooks (e.g. __systemd_osc_context)
+    [[ "$cmd" == _* ]] && return
+    __wezterm_preexec_fired=1
     __wezterm_set_user_var cmd "$cmd"
 }
 trap '__wezterm_debug' DEBUG
 
-__wezterm_osc7() {
-    printf "\033]7;file://%s%s\033\\" "${HOSTNAME}" "${PWD}"
-}
-
-PROMPT_COMMAND="${PROMPT_COMMAND:-}"'; __wezterm_osc7; __wezterm_set_user_var cmd ""; __wezterm_preexec_fired=0'
+PROMPT_COMMAND="${PROMPT_COMMAND:-}"'; __wezterm_set_user_var cmd ""; __wezterm_preexec_fired=0'
 WEZTERM_HOOK
-    chown "$REAL_USER:$REAL_USER" "$BASHRC"
-    ok "WezTerm bash hook added/updated (process name + cwd in tab titles)"
+    chown "$REAL_USER:$REAL_GROUP" "$BASHRC"
+    ok "WezTerm bash hook added (process name in tab titles)"
 fi
 
 # ── Summary ──────────────────────────────────────────────────────────────────
 echo ""
 echo -e "  ${BOLD}Config highlights:${RESET}"
 echo -e "    Color scheme   Monokai Remastered"
-echo -e "    Font           JetBrainsMono Nerd Font 14pt"
+echo -e "    Font           JetBrainsMono Nerd Font 14pt (tabs 12.5pt)"
 echo -e "    Tab bar        Bottom, Google-colored, shows process|dir"
 echo -e "    Rendering      WebGpu accelerated"
 echo -e "    Opacity        95%"
