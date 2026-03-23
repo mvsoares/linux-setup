@@ -1,7 +1,7 @@
 # =============================================================================
 # Module 01 — Extra Repositories & NVIDIA Drivers
 # =============================================================================
-init_sub 10
+init_sub 11
 
 # ── Repositories ──────────────────────────────────────────────────────────────
 if ! command -v curl &>/dev/null; then
@@ -57,6 +57,21 @@ else
 https://packages.microsoft.com/repos/code stable main" \
         > /etc/apt/sources.list.d/vscode.list
     tick "VSCode repo added"
+fi
+
+# Google Chrome
+if command -v google-chrome &>/dev/null \
+        || { [[ -f /etc/apt/sources.list.d/google-chrome.list ]] \
+             && [[ -s /usr/share/keyrings/google-chrome.gpg ]]; }; then
+    tick "Google Chrome repo — already present"
+else
+    info "Adding Google Chrome repo..."
+    curl -fsSL https://dl.google.com/linux/linux_signing_key.pub \
+        | gpg --batch --yes --dearmor -o /usr/share/keyrings/google-chrome.gpg >> "$LOG_FILE" 2>&1 || warn "Chrome key failed"
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/google-chrome.gpg] \
+https://dl.google.com/linux/chrome/deb/ stable main" \
+        > /etc/apt/sources.list.d/google-chrome.list
+    tick "Google Chrome repo added"
 fi
 
 # Flatpak + Flathub

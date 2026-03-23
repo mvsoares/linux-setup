@@ -43,6 +43,10 @@ apt_quiet install nmap netcat-openbsd dnsutils rsync tree ranger fzf ripgrep fd-
 apt_each whois rclone mc eza screen ssh-askpass chafa remmina
 tick "Network & file tools"
 
+info "Installing browsers..."
+apt_each google-chrome-stable google-chrome-beta
+tick "Browsers (Google Chrome stable + beta)"
+
 info "Installing video & codecs..."
 apt_quiet install ffmpeg mpv celluloid colord yt-dlp
 apt_each vlc \

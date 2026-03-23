@@ -1,7 +1,7 @@
 # =============================================================================
 # Module 04 — Developer Fonts · GTK Themes · Icon Packs · Cursors
 # =============================================================================
-init_sub 8
+init_sub 9
 
 FONT_DIR="/usr/local/share/fonts/custom"
 mkdir -p "${FONT_DIR}/mono" "${FONT_DIR}/general"
@@ -272,5 +272,12 @@ else
     fi
 fi
 tick "Cursor themes (Bibata Modern Classic · Ice)"
+
+# ── 9. nwg-look (GTK settings editor) ───────────────────────────────────────
+if command -v nwg-look &>/dev/null; then
+    skip "nwg-look"
+else
+    apt_each nwg-look
+fi
 
 ok "Fonts, themes, icons & cursors complete"
