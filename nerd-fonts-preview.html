@@ -253,8 +253,8 @@
 
   <div class="topbar">
     <div class="title-block">
-      <h1>Nerd Fonts Preview</h1>
-      <div class="subtitle">20 patched monospace fonts — click to apply to WezTerm</div>
+      <h1>Font Preview</h1>
+      <div class="subtitle">Installed monospace &amp; Nerd fonts — click to apply to WezTerm</div>
     </div>
 
     <div class="controls">
@@ -307,6 +307,11 @@
     let activeEditor = null;
     let activeTab    = null;
 
+    /** Shorter label for badges (drops Nerd Font suffix; keeps full name otherwise). */
+    function shortFamilyName(family) {
+      return family.replace(/\s+Nerd Font$/, '');
+    }
+
     function setStatus(msg, cls) {
       statusEl.textContent = msg;
       statusEl.className = cls || '';
@@ -330,7 +335,7 @@
         if (activeEditor) activeEditor.classList.remove('active-editor');
         activeEditor = card;
         card.classList.add('active-editor');
-        badgeEditor.textContent = family.replace(' Nerd Font', '');
+        badgeEditor.textContent = shortFamilyName(family);
         setStatus('✔ ' + j.msg, 'ok');
       } else setStatus(j.msg, 'err');
     }
@@ -342,7 +347,7 @@
         if (activeTab) activeTab.classList.remove('active-tab');
         activeTab = card;
         card.classList.add('active-tab');
-        badgeTab.textContent = family.replace(' Nerd Font', '');
+        badgeTab.textContent = shortFamilyName(family);
         setStatus('✔ ' + j.msg, 'ok');
       } else setStatus(j.msg, 'err');
     }
@@ -383,7 +388,7 @@
       grid.innerHTML = '';
       Object.keys(cardMap).forEach(k => delete cardMap[k]);
       if (!fonts.length) {
-        grid.innerHTML = '<p style="color:var(--subtext);padding:2rem">No Nerd Fonts found — install fonts first (module 04) and restart the server.</p>';
+        grid.innerHTML = '<p style="color:var(--subtext);padding:2rem">No monospace fonts found — install fonts (e.g. module 04), run <code style="color:var(--accent)">fc-cache -fv</code>, refresh.</p>';
         return;
       }
       fonts.forEach(f => {
@@ -424,12 +429,12 @@
       if (j.font && cardMap[j.font]) {
         activeEditor = cardMap[j.font];
         activeEditor.classList.add('active-editor');
-        badgeEditor.textContent = j.font.replace(' Nerd Font', '');
+        badgeEditor.textContent = shortFamilyName(j.font);
       }
       if (j.tabFont && cardMap[j.tabFont]) {
         activeTab = cardMap[j.tabFont];
         activeTab.classList.add('active-tab');
-        badgeTab.textContent = j.tabFont.replace(' Nerd Font', '');
+        badgeTab.textContent = shortFamilyName(j.tabFont);
       }
       if (j.size)    editorSizeEl.value = j.size;
       if (j.tabSize) tabSizeEl.value    = j.tabSize;
@@ -442,7 +447,7 @@
       const fonts = await api('/fonts');
       if (!fonts) return;
       buildGrid(fonts);
-      setStatus(`${fonts.length} Nerd Font${fonts.length !== 1 ? 's' : ''} found`, 'ok');
+      setStatus(`${fonts.length} font${fonts.length !== 1 ? 's' : ''} found`, 'ok');
       await loadCurrent();
     }
 

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-Nerd Font Picker — serves the preview page and applies fonts/sizes to WezTerm config.
-Usage: python3 font-picker.py
-Then open: http://localhost:7777
+Font Picker — serves the preview page and applies fonts/sizes to WezTerm config.
+Lists all installed monospace fonts (Fontconfig) plus any Nerd Font families that
+might not be tagged as mono. Usage: python3 font-picker.py — then open http://localhost:7777
 """
 import http.server
 import json
@@ -54,35 +54,74 @@ _FONT_META = {
     "ZedMono Nerd Font":          ("Zed Industries",    "Built for the Zed editor. Clean and neutral, optimised for dense code display. Pairs beautifully with Zed's minimal UI."),
 }
 
+_GENERIC_NERD = (
+    "Nerd Font",
+    "A Nerd Font patched with icons, ligatures and developer glyphs for terminal and editor use.",
+)
+_GENERIC_MONO = (
+    "Monospace",
+    "A monospace font — suitable for code, terminals and aligned columns.",
+)
 
-def get_installed_nerd_fonts():
-    """Query fc-list for installed Nerd Fonts, return sorted list of {name, family, desc, text}."""
+
+def _fc_list_families(args):
+    """Run fc-list and yield first family name per line (comma = locale/weight variants)."""
     try:
         raw = subprocess.check_output(
-            ["fc-list", "--format=%{family}\\n"],
-            text=True, stderr=subprocess.DEVNULL,
+            ["fc-list", *args, "--format=%{family}\\n"],
+            text=True,
+            stderr=subprocess.DEVNULL,
         )
     except Exception:
-        return []
-
-    seen = set()
-    fonts = []
+        return
     for line in raw.splitlines():
-        # fc-list may return comma-separated locale variants — take the first
         family = line.split(",")[0].strip()
+        if family:
+            yield family
+
+
+def _skip_nerd_width_dup(family):
+    """Omit Nerd Font Mono/Propo rows when the base '… Nerd Font' face is listed separately."""
+    return family.endswith((" Nerd Font Mono", " Nerd Font Propo"))
+
+
+def _meta_for_family(family):
+    if family in _FONT_META:
+        return _FONT_META[family]
+    if "Nerd Font" in family:
+        return _GENERIC_NERD
+    return _GENERIC_MONO
+
+
+def get_installed_fonts():
+    """All monospace fonts (fc :spacing=mono) plus any Nerd Font families not tagged mono."""
+    seen = set()
+    order = []
+
+    def add(family):
+        if _skip_nerd_width_dup(family):
+            return
+        if family in seen:
+            return
+        seen.add(family)
+        order.append(family)
+
+    # 1) Fontconfig monospace — catches JetBrains Mono, Liberation Mono, Nerd faces, etc.
+    for family in _fc_list_families([":spacing=mono"]):
+        add(family)
+
+    # 2) Supplement: families whose name contains "Nerd Font" (some installs mis-report spacing)
+    for family in _fc_list_families([]):
         if "Nerd Font" not in family:
             continue
-        # Skip width-variant suffixes (Mono/Propo — same font, different cell width)
-        if family.endswith((" Nerd Font Mono", " Nerd Font Propo")):
-            continue
-        if family in seen:
-            continue
-        seen.add(family)
+        add(family)
 
-        desc, text = _FONT_META.get(family, ("Nerd Font", "A Nerd Font patched with icons, ligatures and developer glyphs for terminal and editor use."))
+    fonts = []
+    for family in order:
+        desc, text = _meta_for_family(family)
         fonts.append({"name": family, "family": family, "desc": desc, "text": text})
 
-    return sorted(fonts, key=lambda f: f["name"])
+    return sorted(fonts, key=lambda f: f["name"].casefold())
 
 
 def read_cfg():
@@ -187,7 +226,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             self._json(body)
 
         elif parsed.path == "/fonts":
-            self._json(json.dumps(get_installed_nerd_fonts()).encode())
+            self._json(json.dumps(get_installed_fonts()).encode())
 
         elif parsed.path == "/current":
             self._json(json.dumps(get_current()).encode())
