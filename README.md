@@ -33,6 +33,8 @@ The setup is split into **10 ordered modules**, each independently skippable and
 
 ## Usage
 
+**Tip (CI / many VMs):** GitHub’s API rate-limits unauthenticated requests. Export `GITHUB_TOKEN` (classic PAT, no scope needed for public repos) before `setup.sh` so GitHub release downloads stay reliable.
+
 ```bash
 # Run everything (resumes from last checkpoint)
 sudo bash setup.sh

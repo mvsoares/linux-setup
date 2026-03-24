@@ -1,7 +1,7 @@
 # =============================================================================
 # Module 07 — Language Runtimes & Version Managers
 # =============================================================================
-init_sub 6
+init_sub 7
 
 # ── nvm (Node Version Manager) ───────────────────────────────────────────────
 NVM_DIR="${USER_HOME}/.nvm"
@@ -112,6 +112,52 @@ else
         >> "$LOG_FILE" 2>&1 && ok "SDKMAN installed" || warn "SDKMAN install failed"
 fi
 tick "SDKMAN (Java/Gradle/Maven/Kotlin)"
+
+# ── JDK 21 + Maven via SDKMAN ────────────────────────────────────────────────
+if [[ -s "${SDKMAN_DIR}/bin/sdkman-init.sh" ]]; then
+    # JDK 21 (Temurin)
+    if as_user "source '${SDKMAN_DIR}/bin/sdkman-init.sh' && sdk list java 2>/dev/null | grep -q '21\..*tem.*installed'" 2>/dev/null; then
+        skip "JDK 21 (Temurin)"
+    else
+        info "Installing JDK 21 (Temurin)..."
+        JDK21_ID=$(as_user "source '${SDKMAN_DIR}/bin/sdkman-init.sh' && sdk list java 2>/dev/null" \
+            | grep -oE '[0-9]+\.[0-9.]+-tem' | grep '^21\.' | head -1 | tr -d '[:space:]')
+        if [[ -n "$JDK21_ID" ]]; then
+            as_user "source '${SDKMAN_DIR}/bin/sdkman-init.sh' && sdk install java '${JDK21_ID}'" \
+                >> "$LOG_FILE" 2>&1 && ok "JDK 21 (${JDK21_ID})" || warn "JDK 21 install failed"
+        else
+            warn "JDK 21 — could not find Temurin 21 in SDKMAN list"
+        fi
+    fi
+
+    # Maven
+    if as_user "source '${SDKMAN_DIR}/bin/sdkman-init.sh' && sdk list maven 2>/dev/null | grep -q 'installed'" 2>/dev/null; then
+        skip "Maven"
+    else
+        info "Installing Maven..."
+        as_user "source '${SDKMAN_DIR}/bin/sdkman-init.sh' && sdk install maven" \
+            >> "$LOG_FILE" 2>&1 && ok "Maven installed" || warn "Maven install failed"
+    fi
+    # ── Java + Maven env vars in .bashrc ─────────────────────────────────────
+    BASHRC="${USER_HOME}/.bashrc"
+    if ! grep -q 'JAVA_HOME' "$BASHRC" 2>/dev/null; then
+        cat >> "$BASHRC" << 'JAVABLOCK'
+
+# ── Java / Maven (SDKMAN managed) ─────────────────────────────────────────────
+export JAVA_HOME="${HOME}/.sdkman/candidates/java/current"
+export MAVEN_HOME="${HOME}/.sdkman/candidates/maven/current"
+export M2_HOME="${MAVEN_HOME}"
+export PATH="${JAVA_HOME}/bin:${MAVEN_HOME}/bin:${PATH}"
+JAVABLOCK
+        chown "$REAL_USER:$REAL_USER" "$BASHRC"
+        ok "JAVA_HOME + MAVEN_HOME + M2_HOME added to .bashrc"
+    else
+        skip "Java/Maven env vars (already in .bashrc)"
+    fi
+else
+    warn "SDKMAN not available — skipping JDK 21 and Maven (install manually with: sdk install java 21-tem && sdk install maven)"
+fi
+tick "JDK 21 (Temurin) + Maven"
 
 # ── Common pipx tools ────────────────────────────────────────────────────────
 if command -v pipx &>/dev/null; then

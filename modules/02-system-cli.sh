@@ -19,9 +19,11 @@ apt_quiet install btop htop iotop iftop ncdu
 apt_each nvtop nethogs lm-sensors fancontrol smartmontools inxi sysstat upower powertop
 # neofetch removed from Ubuntu 26+
 [[ "$UBUNTU_MAJOR" -lt 26 ]] && apt_each neofetch
-# fastfetch needs a PPA on Ubuntu 24.04
+# fastfetch: not in default repos on 22.04–24.04 — use PPA without noisy failed apt first
 if ! command -v fastfetch &>/dev/null; then
-    if ! apt_quiet install fastfetch 2>/dev/null; then
+    if apt-cache show fastfetch &>/dev/null; then
+        apt_quiet install fastfetch && ok "fastfetch"
+    else
         add-apt-repository -y ppa:zhangsongcui3371/fastfetch >> "$LOG_FILE" 2>&1 \
             && apt-get update -q >> "$LOG_FILE" 2>&1 \
             && apt_quiet install fastfetch \
@@ -135,12 +137,6 @@ else
     skip "procs $(procs --version 2>/dev/null)"
 fi
 
-# tokei (code stats)
-if ! command -v tokei &>/dev/null; then
-    install_github_tar "XAMPPRocky/tokei" "x86_64-unknown-linux-musl.tar.gz" "tokei" "tokei"
-else
-    skip "tokei $(tokei --version 2>/dev/null)"
-fi
 
 # duf (better df)
 if ! command -v duf &>/dev/null; then

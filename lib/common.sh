@@ -123,24 +123,49 @@ snap_install() {
 }
 
 # ── GitHub release helper ─────────────────────────────────────────────────────
+# Browser-like UA: GitHub HTML and API sometimes return empty/403 without it;
+# extensions.gnome.org rejects bare curl with 403/empty.
+CURL_UA='Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
+
+# Optional: export GITHUB_TOKEN for higher GitHub API rate limits (CI / many VMs).
+
 # Get latest release tag via redirect header (no API quota used)
 _github_latest_tag() {
-    local loc
-    loc=$(curl -sI "https://github.com/$1/releases/latest" 2>/dev/null \
-        | grep -i '^location:' | head -1)
-    echo "$loc" | sed 's|.*/tag/||; s/\r//; s/[[:space:]]//g'
+    local loc tag
+    loc=$(curl -sSIL -A "$CURL_UA" "https://github.com/$1/releases/latest" 2>/dev/null \
+        | grep -i '^location:' | tail -1)
+    tag=$(echo "$loc" | sed 's|.*/tag/||; s/\r//; s/[[:space:]]//g')
+    if [[ -z "$tag" ]]; then
+        tag=$(curl -sSf -A "$CURL_UA" ${GITHUB_TOKEN:+-H "Authorization: Bearer ${GITHUB_TOKEN}"} \
+            -H 'Accept: application/vnd.github+json' \
+            "https://api.github.com/repos/$1/releases/latest" 2>/dev/null \
+            | grep '"tag_name"' | head -1 | cut -d'"' -f4)
+    fi
+    echo "$tag"
 }
 
 # Find asset download URL from release HTML page (no API quota used)
 _github_asset_url() {
     local repo="$1" tag="$2" pattern="$3"
-    local url
-    url=$(curl -fsSL "https://github.com/${repo}/releases/expanded_assets/${tag}" 2>/dev/null \
-        | grep -oP 'href="\K[^"]*'"$pattern"'[^"]*' | head -1)
+    local html url line
+    html=$(curl -fsSL -A "$CURL_UA" -L "https://github.com/${repo}/releases/expanded_assets/${tag}" 2>/dev/null) || html=""
+    # Prefer Perl \K (fast); fall back to grep -E (no PCRE / uutils grep)
+    url=$(echo "$html" | grep -oP 'href="\K[^"]*'"$pattern"'[^"]*' 2>/dev/null | head -1)
+    [[ -z "$url" ]] && url=$(echo "$html" | grep -oE 'href="[^"]+"' | sed 's/^href="//;s/"$//' | grep -F "$pattern" | head -1)
     if [[ -n "$url" && ! "$url" =~ ^https ]]; then
-        url="https://github.com${url}"
+        [[ "$url" =~ ^// ]] && url="https:${url}"
+        [[ "$url" =~ ^/ ]] && url="https://github.com${url}"
     fi
     echo "$url"
+}
+
+# Reliable asset URL via GitHub API (uses GITHUB_TOKEN if set)
+_github_api_asset_url() {
+    local repo="$1" pattern="$2"
+    curl -sSf -A "$CURL_UA" ${GITHUB_TOKEN:+-H "Authorization: Bearer ${GITHUB_TOKEN}"} \
+        -H 'Accept: application/vnd.github+json' \
+        "https://api.github.com/repos/${repo}/releases/latest" 2>/dev/null \
+        | grep browser_download_url | grep -F "$pattern" | head -1 | cut -d'"' -f4
 }
 
 github_latest_version() {
@@ -150,8 +175,9 @@ github_latest_version() {
         echo "${tag#v}"
         return
     fi
-    # Fall back to API (counts against rate limit)
-    curl -sSf "https://api.github.com/repos/$1/releases/latest" 2>/dev/null \
+    curl -sSf -A "$CURL_UA" ${GITHUB_TOKEN:+-H "Authorization: Bearer ${GITHUB_TOKEN}"} \
+        -H 'Accept: application/vnd.github+json' \
+        "https://api.github.com/repos/$1/releases/latest" 2>/dev/null \
         | grep tag_name | cut -d'"' -f4 | sed 's/^v//'
 }
 
@@ -161,12 +187,10 @@ install_github_deb() {
     # Try redirect + HTML scrape (no API quota)
     tag=$(_github_latest_tag "$repo")
     [[ -n "$tag" ]] && url=$(_github_asset_url "$repo" "$tag" "$pattern")
-    # Fall back to API
-    [[ -z "$url" ]] && url=$(curl -sSf "https://api.github.com/repos/${repo}/releases/latest" 2>/dev/null \
-        | grep browser_download_url | grep "$pattern" | head -1 | cut -d'"' -f4)
+    [[ -z "$url" ]] && url=$(_github_api_asset_url "$repo" "$pattern")
     if [[ -n "$url" ]]; then
         local tmp=$(mktemp -d)
-        curl -sSfL "$url" -o "$tmp/pkg.deb" >> "$LOG_FILE" 2>&1 \
+        curl -sSfL -A "$CURL_UA" "$url" -o "$tmp/pkg.deb" >> "$LOG_FILE" 2>&1 \
             && dpkg -i "$tmp/pkg.deb" >> "$LOG_FILE" 2>&1 \
             && ok "$name installed" \
             || { apt-get install -f -y >> "$LOG_FILE" 2>&1; warn "$name install had issues"; }
@@ -178,16 +202,31 @@ install_github_deb() {
 
 install_github_tar() {
     local repo="$1" pattern="$2" binary="$3" name="$4"
-    local url tag
+    local url tag altpat
     # Try redirect + HTML scrape (no API quota)
     tag=$(_github_latest_tag "$repo")
     [[ -n "$tag" ]] && url=$(_github_asset_url "$repo" "$tag" "$pattern")
-    # Fall back to API
-    [[ -z "$url" ]] && url=$(curl -sSf "https://api.github.com/repos/${repo}/releases/latest" 2>/dev/null \
-        | grep browser_download_url | grep "$pattern" | head -1 | cut -d'"' -f4)
+    [[ -z "$url" ]] && url=$(_github_api_asset_url "$repo" "$pattern")
+    # Extra patterns (repos rename assets occasionally)
+    if [[ -z "$url" && "$pattern" == *'Linux_x86_64'* ]]; then
+        for altpat in 'linux_amd64' 'x86_64'; do
+            url=$(_github_asset_url "$repo" "$tag" "$altpat")
+            [[ -z "$url" ]] && url=$(_github_api_asset_url "$repo" "$altpat")
+            [[ -n "$url" ]] && break
+        done
+    fi
+    if [[ -z "$url" && "$pattern" == *'musl'* ]]; then
+        for altpat in 'x86_64-unknown-linux-gnu' 'linux-x86_64'; do
+            url=$(_github_asset_url "$repo" "$tag" "$altpat")
+            [[ -z "$url" ]] && url=$(_github_api_asset_url "$repo" "$altpat")
+            [[ -n "$url" ]] && break
+        done
+    fi
     if [[ -n "$url" ]]; then
         local tmp=$(mktemp -d)
-        curl -sSfL "$url" | tar xz -C "$tmp" 2>> "$LOG_FILE"
+        # Download to file first — tar can auto-detect compression from file but not from stdin pipe
+        curl -sSfL -A "$CURL_UA" "$url" -o "$tmp/archive" >> "$LOG_FILE" 2>&1
+        tar -xf "$tmp/archive" -C "$tmp" >> "$LOG_FILE" 2>&1
         local bin_path
         bin_path=$(find "$tmp" -name "$binary" -type f 2>/dev/null | head -1)
         if [[ -n "$bin_path" ]]; then

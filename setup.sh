@@ -177,8 +177,7 @@ printf "${BOLD}${GREEN}║${RESET}  %-64s${BOLD}${GREEN}║${RESET}\n" "✔ Repo
 printf "${BOLD}${GREEN}║${RESET}  %-64s${BOLD}${GREEN}║${RESET}\n" "✔ NVIDIA   : drivers · Vulkan · power rules"
 printf "${BOLD}${GREEN}║${RESET}  %-64s${BOLD}${GREEN}║${RESET}\n" "✔ CLI      : bat · eza · delta · fd · rg · fzf · zoxide · dust"
 printf "${BOLD}${GREEN}║${RESET}  %-64s${BOLD}${GREEN}║${RESET}\n" "✔ Shell    : Starship · synth-shell · aliases · completions"
-printf "${BOLD}${GREEN}║${RESET}  %-64s${BOLD}${GREEN}║${RESET}\n" "✔ Fonts    : 25+ Nerd Fonts · Inter · Monaspace · Geist"
-printf "${BOLD}${GREEN}║${RESET}  %-64s${BOLD}${GREEN}║${RESET}\n" "✔ Themes   : Dracula · Catppuccin · Papirus · Bibata"
+printf "${BOLD}${GREEN}║${RESET}  %-64s${BOLD}${GREEN}║${RESET}\n" "✔ Fonts    : 20+ Nerd Fonts · Inter · Geist (GTK themes: optional)"
 printf "${BOLD}${GREEN}║${RESET}  %-64s${BOLD}${GREEN}║${RESET}\n" "✔ GNOME    : 9 extensions · Dock · Blur · workspaces"
 printf "${BOLD}${GREEN}║${RESET}  %-64s${BOLD}${GREEN}║${RESET}\n" "✔ Cloud    : AWS · GCP · Azure · kubectl · helm · k9s"
 printf "${BOLD}${GREEN}║${RESET}  %-64s${BOLD}${GREEN}║${RESET}\n" "✔ Langs    : nvm · pyenv · rustup · Go · SDKMAN"
@@ -196,3 +195,24 @@ echo -e "  Finished  : ${YELLOW}$(date)${RESET}"
 echo -e "  Errors    : ${YELLOW}${ERRORS}${RESET}"
 echo -e "  Log       : ${YELLOW}${LOG_FILE}${RESET}"
 echo ""
+
+# ── Optional: GTK themes, icons & cursors ────────────────────────────────────
+THEMES_SCRIPT="${SCRIPT_DIR}/scripts/install-themes.sh"
+if [[ -f "$THEMES_SCRIPT" ]]; then
+    echo -e "${BOLD}${CYAN}┌─ Optional: GTK Themes · Icons · Cursors ───────────────────────┐${RESET}"
+    echo -e "${BOLD}${CYAN}│${RESET}  Dracula · Catppuccin Mocha · Orchis (purple)                   ${BOLD}${CYAN}│${RESET}"
+    echo -e "${BOLD}${CYAN}│${RESET}  Papirus · Tela icons   ·   Bibata Modern cursor                ${BOLD}${CYAN}│${RESET}"
+    echo -e "${BOLD}${CYAN}│${RESET}  Skipped during main install (slow — optional).                 ${BOLD}${CYAN}│${RESET}"
+    echo -e "${BOLD}${CYAN}└────────────────────────────────────────────────────────────────┘${RESET}"
+    echo ""
+    printf "  Install GTK themes now? [y/N] "
+    read -r -t 30 _gtk_ans || _gtk_ans="n"
+    echo ""
+    if [[ "${_gtk_ans,,}" == "y" ]]; then
+        echo -e "  ${CYAN}→  Starting GTK theme installer...${RESET}"
+        bash "$THEMES_SCRIPT"
+    else
+        echo -e "  Install later:  ${YELLOW}sudo bash scripts/install-themes.sh${RESET}"
+        echo ""
+    fi
+fi

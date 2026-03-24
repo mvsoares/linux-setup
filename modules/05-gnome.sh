@@ -19,6 +19,9 @@ if [[ -z "$SHELL_VER" ]]; then
     SHELL_VER="0"; SHELL_MAJOR="0"
 fi
 info "GNOME Shell version: ${BOLD}${SHELL_VER}${RESET}"
+if echo "$SHELL_VER" | grep -qiE 'alpha|beta|rc'; then
+    info "Pre-release GNOME — extensions.gnome.org may not offer compatible builds yet (expected)."
+fi
 
 install_extension() {
     local name="$1" uuid="$2" ext_id="$3"
@@ -34,7 +37,8 @@ install_extension() {
     for try_ver in "${SHELL_VER}" "${SHELL_MAJOR}.0" ""; do
         local qp="pk=${ext_id}"
         [[ -n "$try_ver" ]] && qp+="&shell_version=${try_ver}"
-        info_json=$(curl -fsSL "https://extensions.gnome.org/extension-info/?${qp}" 2>/dev/null)
+        info_json=$(curl -fsSL -A "${CURL_UA:-Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36}" \
+            "https://extensions.gnome.org/extension-info/?${qp}" 2>/dev/null)
         [[ -n "$info_json" ]] && echo "$info_json" | python3 -c "import sys,json; json.load(sys.stdin)" &>/dev/null && break
         info_json=""
     done
@@ -44,12 +48,12 @@ import sys, json
 try:
     d = json.load(sys.stdin)
     vsm = d.get('shell_version_map', {})
-    for key in ['${SHELL_VER}', '${SHELL_MAJOR}.0']:
+    for key in ['${SHELL_VER}', '${SHELL_MAJOR}.0', '${SHELL_MAJOR}']:
         if key in vsm:
-            print(vsm[key].get('version', '')); sys.exit(0)
+            print(vsm[key].get('pk', '')); sys.exit(0)
     if vsm:
         latest = sorted(vsm.keys(), key=lambda v: [int(x) for x in v.split('.')], reverse=True)
-        print(vsm[latest[0]].get('version', ''))
+        print(vsm[latest[0]].get('pk', ''))
 except: pass
 " 2>/dev/null || echo "")
 
@@ -59,7 +63,8 @@ except: pass
     fi
     local zip_url="https://extensions.gnome.org/download-extension/${uuid}.shell-extension.zip?version_tag=${version_tag}"
     local tmp_zip="/tmp/ext-${uuid}-$$.zip"
-    if curl -fsSL "$zip_url" -o "$tmp_zip" >> "$LOG_FILE" 2>&1; then
+    if curl -fsSL -A "${CURL_UA:-Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36}" \
+        "$zip_url" -o "$tmp_zip" >> "$LOG_FILE" 2>&1; then
         mkdir -p "$dest"
         if unzip -qo "$tmp_zip" -d "$dest" >> "$LOG_FILE" 2>&1; then
             find "$dest" -type f -exec chmod 644 {} \;

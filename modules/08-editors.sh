@@ -174,8 +174,9 @@ __wezterm_preexec_fired=1
 __wezterm_debug() {
     [[ "$__wezterm_preexec_fired" == "1" ]] && return
     [[ -n "${COMP_LINE:-}" ]] && return
-    __wezterm_preexec_fired=1
     local cmd="${BASH_COMMAND%% *}"
+    [[ "$cmd" == __* ]] && return   # skip internal shell functions (e.g. __fzf_history)
+    __wezterm_preexec_fired=1
     cmd="${cmd##*/}"
     __wezterm_set_user_var cmd "$cmd"
 }

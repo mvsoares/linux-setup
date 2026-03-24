@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nerd Fonts Preview</title>
+  <style>
+    :root {
+      --bg: #1e1e2e;
+      --surface: #2a2a3d;
+      --surface2: #313147;
+      --border: #3a3a5c;
+      --text: #cdd6f4;
+      --subtext: #a6adc8;
+      --accent: #89b4fa;
+      --green: #a6e3a1;
+      --yellow: #f9e2af;
+      --purple: #cba6f7;
+      --red: #f38ba8;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, sans-serif;
+      padding: 2rem;
+    }
+
+    /* ── Top bar ── */
+    .topbar {
+      display: flex;
+      align-items: center;
+      gap: 2rem;
+      flex-wrap: wrap;
+      margin-bottom: 1.6rem;
+    }
+
+    .title-block h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--accent);
+      letter-spacing: -0.02em;
+    }
+
+    .title-block .subtitle {
+      color: var(--subtext);
+      font-size: 0.82rem;
+      margin-top: 2px;
+    }
+
+    /* ── Controls ── */
+    .controls {
+      display: flex;
+      gap: 1.2rem;
+      flex-wrap: wrap;
+      align-items: flex-end;
+    }
+
+    .ctrl-group {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .ctrl-group label {
+      font-size: 0.68rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--subtext);
+    }
+
+    .ctrl-group label.editor-label { color: var(--accent); }
+    .ctrl-group label.tab-label    { color: var(--purple); }
+
+    .ctrl-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .font-badge {
+      font-size: 0.75rem;
+      color: var(--text);
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 4px 10px;
+      min-width: 200px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .font-badge.editor { border-color: var(--accent); color: var(--accent); }
+    .font-badge.tab    { border-color: var(--purple); color: var(--purple); }
+
+    .spinner-wrap {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      overflow: hidden;
+    }
+
+    .spinner-wrap.editor { border-color: var(--accent); }
+    .spinner-wrap.tab    { border-color: var(--purple); }
+
+    .spinner-val {
+      width: 42px;
+      background: var(--surface2);
+      color: var(--text);
+      border: none;
+      text-align: center;
+      font-size: 0.82rem;
+      padding: 4px 2px;
+      outline: none;
+    }
+
+    .spin-btn {
+      background: var(--surface2);
+      border: none;
+      color: var(--subtext);
+      width: 22px;
+      height: 28px;
+      cursor: pointer;
+      font-size: 0.75rem;
+      transition: background 0.1s, color 0.1s;
+    }
+
+    .spin-btn:hover { background: var(--border); color: var(--text); }
+    .spinner-wrap.editor .spin-btn:hover { color: var(--accent); }
+    .spinner-wrap.tab    .spin-btn:hover { color: var(--purple); }
+
+    /* ── Status ── */
+    #status {
+      margin-left: auto;
+      font-size: 0.78rem;
+      color: var(--subtext);
+      transition: color 0.3s;
+      white-space: nowrap;
+    }
+    #status.ok  { color: var(--green); }
+    #status.err { color: var(--red); }
+
+    /* ── Grid ── */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(480px, 1fr));
+      gap: 1.2rem;
+    }
+
+    /* ── Card ── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.1rem 1.3rem 2.4rem;
+      position: relative;
+      transition: border-color 0.15s, transform 0.1s;
+    }
+
+    .card:hover { transform: translateY(-1px); }
+
+    .card.active-editor { border-color: var(--accent); background: #252538; }
+    .card.active-tab    { border-top: 2px solid var(--purple); }
+    .card.active-editor.active-tab { border-color: var(--accent); }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.8rem;
+    }
+
+    .font-name {
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: var(--subtext);
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      transition: color 0.2s;
+    }
+
+    .card.active-editor .font-name { color: var(--accent); }
+
+    .badges { display: flex; gap: 0.35rem; align-items: center; }
+
+    .font-tag {
+      font-size: 0.67rem;
+      color: var(--subtext);
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 1px 6px;
+    }
+
+    .badge {
+      font-size: 0.62rem;
+      font-weight: 700;
+      border-radius: 4px;
+      padding: 1px 6px;
+      display: none;
+    }
+
+    .badge-editor { background: var(--accent);  color: var(--bg); }
+    .badge-tab    { background: var(--purple);   color: var(--bg); }
+
+    .card.active-editor .badge-editor { display: inline; }
+    .card.active-tab    .badge-tab    { display: inline; }
+
+    .sample    { font-size: 14px; line-height: 1.65; color: var(--text); }
+    .code-line { color: var(--yellow); font-size: 13px; margin-top: 0.5rem; opacity: 0.85; }
+    .icons     { font-size: 18px; margin-top: 0.5rem; color: var(--green); letter-spacing: 0.15em; }
+
+    /* ── Card action buttons ── */
+    .card-actions {
+      position: absolute;
+      bottom: 0.65rem;
+      right: 0.9rem;
+      display: flex;
+      gap: 0.4rem;
+      opacity: 0;
+      transition: opacity 0.15s;
+    }
+
+    .card:hover .card-actions,
+    .card.active-editor .card-actions,
+    .card.active-tab .card-actions { opacity: 1; }
+
+    .act-btn {
+      font-size: 0.65rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      border: none;
+      border-radius: 4px;
+      padding: 3px 9px;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+
+    .act-btn:hover { opacity: 0.8; }
+
+    .act-btn.editor { background: var(--accent);  color: var(--bg); }
+    .act-btn.tab    { background: var(--purple);  color: var(--bg); }
+  </style>
+</head>
+<body>
+
+  <div class="topbar">
+    <div class="title-block">
+      <h1>Nerd Fonts Preview</h1>
+      <div class="subtitle">20 patched monospace fonts — click to apply to WezTerm</div>
+    </div>
+
+    <div class="controls">
+      <!-- Editor font + size -->
+      <div class="ctrl-group">
+        <label class="editor-label">Editor Font</label>
+        <div class="ctrl-row">
+          <div class="font-badge editor" id="badge-editor">—</div>
+          <div class="spinner-wrap editor">
+            <button class="spin-btn" id="editor-dec">−</button>
+            <input  class="spinner-val" id="editor-size" type="text" value="14" readonly>
+            <button class="spin-btn" id="editor-inc">+</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab font + size -->
+      <div class="ctrl-group">
+        <label class="tab-label">Tab Font</label>
+        <div class="ctrl-row">
+          <div class="font-badge tab" id="badge-tab">—</div>
+          <div class="spinner-wrap tab">
+            <button class="spin-btn" id="tab-dec">−</button>
+            <input  class="spinner-val" id="tab-size" type="text" value="12.5" readonly>
+            <button class="spin-btn" id="tab-inc">+</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <span id="status">Connect: python3 font-picker.py</span>
+  </div>
+
+  <div class="grid" id="grid"></div>
+
+  <script>
+    const API = 'http://localhost:7777';
+
+    // fonts loaded dynamically from /fonts endpoint
+
+    const icons = "   ";
+
+    const statusEl    = document.getElementById('status');
+    const badgeEditor = document.getElementById('badge-editor');
+    const badgeTab    = document.getElementById('badge-tab');
+    const editorSizeEl = document.getElementById('editor-size');
+    const tabSizeEl    = document.getElementById('tab-size');
+    const grid = document.getElementById('grid');
+
+    let activeEditor = null;
+    let activeTab    = null;
+
+    function setStatus(msg, cls) {
+      statusEl.textContent = msg;
+      statusEl.className = cls || '';
+      if (cls) setTimeout(() => { statusEl.className = ''; statusEl.textContent = ''; }, 3000);
+    }
+
+    async function api(path) {
+      try {
+        const r = await fetch(API + path);
+        return await r.json();
+      } catch {
+        setStatus('Server offline — run: python3 font-picker.py', 'err');
+        return null;
+      }
+    }
+
+    async function applyEditorFont(family, card) {
+      const j = await api(`/apply?font=${encodeURIComponent(family)}`);
+      if (!j) return;
+      if (j.ok) {
+        if (activeEditor) activeEditor.classList.remove('active-editor');
+        activeEditor = card;
+        card.classList.add('active-editor');
+        badgeEditor.textContent = family.replace(' Nerd Font', '');
+        setStatus('✔ ' + j.msg, 'ok');
+      } else setStatus(j.msg, 'err');
+    }
+
+    async function applyTabFont(family, card) {
+      const j = await api(`/apply-tab?font=${encodeURIComponent(family)}`);
+      if (!j) return;
+      if (j.ok) {
+        if (activeTab) activeTab.classList.remove('active-tab');
+        activeTab = card;
+        card.classList.add('active-tab');
+        badgeTab.textContent = family.replace(' Nerd Font', '');
+        setStatus('✔ ' + j.msg, 'ok');
+      } else setStatus(j.msg, 'err');
+    }
+
+    async function applyEditorSize(size) {
+      const j = await api(`/apply-size?size=${size}`);
+      if (j?.ok) setStatus('✔ ' + j.msg, 'ok');
+    }
+
+    async function applyTabSize(size) {
+      const j = await api(`/apply-tab-size?size=${size}`);
+      if (j?.ok) setStatus('✔ ' + j.msg, 'ok');
+    }
+
+    // Spinner helpers
+    function makeSpinner(inputEl, step, applyFn) {
+      return (delta) => {
+        let v = parseFloat(inputEl.value) + delta * step;
+        v = Math.round(v * 10) / 10;
+        if (v < 6) v = 6;
+        if (v > 32) v = 32;
+        inputEl.value = v;
+        applyFn(v);
+      };
+    }
+
+    const stepEditor = makeSpinner(editorSizeEl, 0.5, applyEditorSize);
+    const stepTab    = makeSpinner(tabSizeEl,    0.5, applyTabSize);
+
+    document.getElementById('editor-dec').addEventListener('click', () => stepEditor(-1));
+    document.getElementById('editor-inc').addEventListener('click', () => stepEditor(+1));
+    document.getElementById('tab-dec').addEventListener('click',    () => stepTab(-1));
+    document.getElementById('tab-inc').addEventListener('click',    () => stepTab(+1));
+
+    // Build cards from font list
+    const cardMap = {};
+    function buildGrid(fonts) {
+      grid.innerHTML = '';
+      Object.keys(cardMap).forEach(k => delete cardMap[k]);
+      if (!fonts.length) {
+        grid.innerHTML = '<p style="color:var(--subtext);padding:2rem">No Nerd Fonts found — install fonts first (module 04) and restart the server.</p>';
+        return;
+      }
+      fonts.forEach(f => {
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.dataset.family = f.family;
+        card.innerHTML = `
+          <div class="card-header">
+            <span class="font-name">${f.name}</span>
+            <div class="badges">
+              <span class="badge badge-editor">EDITOR</span>
+              <span class="badge badge-tab">TABS</span>
+              <span class="font-tag">${f.desc}</span>
+            </div>
+          </div>
+          <div class="sample" style="font-family:'${f.family}',monospace">${f.text}</div>
+          <div class="code-line" style="font-family:'${f.family}',monospace">
+            const greet = (name) =&gt; \`Hello, <span style="color:#cba6f7">\${name}</span>!\`; // 0Oo1lI
+          </div>
+          <div class="icons" style="font-family:'${f.family}',monospace">${icons}</div>
+          <div class="card-actions">
+            <button class="act-btn editor">Editor</button>
+            <button class="act-btn tab">Tabs</button>
+          </div>
+        `;
+        card.querySelector('.act-btn.editor').addEventListener('click', e => { e.stopPropagation(); applyEditorFont(f.family, card); });
+        card.querySelector('.act-btn.tab').addEventListener('click',    e => { e.stopPropagation(); applyTabFont(f.family, card); });
+        card.addEventListener('click', () => applyEditorFont(f.family, card));
+        grid.appendChild(card);
+        cardMap[f.family] = card;
+      });
+    }
+
+    // Load current state and highlight active cards
+    async function loadCurrent() {
+      const j = await api('/current');
+      if (!j) return;
+      if (j.font && cardMap[j.font]) {
+        activeEditor = cardMap[j.font];
+        activeEditor.classList.add('active-editor');
+        badgeEditor.textContent = j.font.replace(' Nerd Font', '');
+      }
+      if (j.tabFont && cardMap[j.tabFont]) {
+        activeTab = cardMap[j.tabFont];
+        activeTab.classList.add('active-tab');
+        badgeTab.textContent = j.tabFont.replace(' Nerd Font', '');
+      }
+      if (j.size)    editorSizeEl.value = j.size;
+      if (j.tabSize) tabSizeEl.value    = j.tabSize;
+      statusEl.textContent = 'Ready';
+    }
+
+    // Boot: fetch font list, build grid, then highlight current
+    async function init() {
+      setStatus('Loading fonts…');
+      const fonts = await api('/fonts');
+      if (!fonts) return;
+      buildGrid(fonts);
+      setStatus(`${fonts.length} Nerd Font${fonts.length !== 1 ? 's' : ''} found`, 'ok');
+      await loadCurrent();
+    }
+
+    init();
+  </script>
+</body>
+</html>

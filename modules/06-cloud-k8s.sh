@@ -27,9 +27,12 @@ if command -v eksctl &>/dev/null; then
 else
     info "Installing eksctl..."
     EKSCTL_ARCH=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')
+    local_tmp=$(mktemp -d)
     curl -fsSL "https://github.com/eksctl-io/eksctl/releases/latest/download/eksctl_Linux_${EKSCTL_ARCH}.tar.gz" \
-        | tar xz -C /usr/local/bin eksctl >> "$LOG_FILE" 2>&1 \
+        -o "${local_tmp}/eksctl.tar.gz" >> "$LOG_FILE" 2>&1 \
+        && tar xzf "${local_tmp}/eksctl.tar.gz" -C /usr/local/bin eksctl >> "$LOG_FILE" 2>&1 \
         && ok "eksctl installed" || warn "eksctl install failed"
+    rm -rf "$local_tmp"
 fi
 
 # AWS Session Manager plugin
@@ -155,14 +158,16 @@ else
     _kubectx_ver="v$(github_latest_version ahmetb/kubectx)"
     _kubectx_arch=$(uname -m)
     curl -fsSL "https://github.com/ahmetb/kubectx/releases/latest/download/kubectx_${_kubectx_ver}_linux_${_kubectx_arch}.tar.gz" \
-        | tar xz -C "$local_tmp" >> "$LOG_FILE" 2>&1
+        -o "$local_tmp/kubectx.tar.gz" >> "$LOG_FILE" 2>&1
+    tar xzf "$local_tmp/kubectx.tar.gz" -C "$local_tmp" >> "$LOG_FILE" 2>&1
     if [[ -f "$local_tmp/kubectx" ]]; then
         install "$local_tmp/kubectx" /usr/local/bin/kubectx
     else
         warn "kubectx — binary not found in archive"
     fi
     curl -fsSL "https://github.com/ahmetb/kubectx/releases/latest/download/kubens_${_kubectx_ver}_linux_${_kubectx_arch}.tar.gz" \
-        | tar xz -C "$local_tmp" >> "$LOG_FILE" 2>&1
+        -o "$local_tmp/kubens.tar.gz" >> "$LOG_FILE" 2>&1
+    tar xzf "$local_tmp/kubens.tar.gz" -C "$local_tmp" >> "$LOG_FILE" 2>&1
     if [[ -f "$local_tmp/kubens" ]]; then
         install "$local_tmp/kubens" /usr/local/bin/kubens
     else
