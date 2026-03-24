@@ -263,6 +263,17 @@
         <label class="editor-label">Editor Font</label>
         <div class="ctrl-row">
           <div class="font-badge editor" id="badge-editor">—</div>
+          <select class="spinner-val" id="editor-weight" style="width: auto; padding: 4px; border: 1px solid var(--border); border-radius: 6px;">
+            <option value="Thin">Thin</option>
+            <option value="ExtraLight">ExtraLight</option>
+            <option value="Light">Light</option>
+            <option value="Regular" selected>Regular</option>
+            <option value="Medium">Medium</option>
+            <option value="SemiBold">SemiBold</option>
+            <option value="Bold">Bold</option>
+            <option value="ExtraBold">ExtraBold</option>
+            <option value="Black">Black</option>
+          </select>
           <div class="spinner-wrap editor">
             <button class="spin-btn" id="editor-dec">−</button>
             <input  class="spinner-val" id="editor-size" type="text" value="14" readonly>
@@ -276,6 +287,17 @@
         <label class="tab-label">Tab Font</label>
         <div class="ctrl-row">
           <div class="font-badge tab" id="badge-tab">—</div>
+          <select class="spinner-val" id="tab-weight" style="width: auto; padding: 4px; border: 1px solid var(--border); border-radius: 6px;">
+            <option value="Thin">Thin</option>
+            <option value="ExtraLight">ExtraLight</option>
+            <option value="Light">Light</option>
+            <option value="Regular" selected>Regular</option>
+            <option value="Medium">Medium</option>
+            <option value="SemiBold">SemiBold</option>
+            <option value="Bold">Bold</option>
+            <option value="ExtraBold">ExtraBold</option>
+            <option value="Black">Black</option>
+          </select>
           <div class="spinner-wrap tab">
             <button class="spin-btn" id="tab-dec">−</button>
             <input  class="spinner-val" id="tab-size" type="text" value="12.5" readonly>
@@ -302,6 +324,8 @@
     const badgeTab    = document.getElementById('badge-tab');
     const editorSizeEl = document.getElementById('editor-size');
     const tabSizeEl    = document.getElementById('tab-size');
+    const editorWeightEl = document.getElementById('editor-weight');
+    const tabWeightEl    = document.getElementById('tab-weight');
     const grid = document.getElementById('grid');
 
     let activeEditor = null;
@@ -328,8 +352,9 @@
       }
     }
 
-    async function applyEditorFont(family, card) {
-      const j = await api(`/apply?font=${encodeURIComponent(family)}`);
+    async function applyEditorFont(family, card, weight = null) {
+      if (!weight) weight = editorWeightEl.value;
+      const j = await api(`/apply?font=${encodeURIComponent(family)}&weight=${encodeURIComponent(weight)}`);
       if (!j) return;
       if (j.ok) {
         if (activeEditor) activeEditor.classList.remove('active-editor');
@@ -340,8 +365,9 @@
       } else setStatus(j.msg, 'err');
     }
 
-    async function applyTabFont(family, card) {
-      const j = await api(`/apply-tab?font=${encodeURIComponent(family)}`);
+    async function applyTabFont(family, card, weight = null) {
+      if (!weight) weight = tabWeightEl.value;
+      const j = await api(`/apply-tab?font=${encodeURIComponent(family)}&weight=${encodeURIComponent(weight)}`);
       if (!j) return;
       if (j.ok) {
         if (activeTab) activeTab.classList.remove('active-tab');
@@ -351,6 +377,21 @@
         setStatus('✔ ' + j.msg, 'ok');
       } else setStatus(j.msg, 'err');
     }
+
+    async function applyEditorWeight() {
+      if (activeEditor) {
+        applyEditorFont(activeEditor.dataset.family, activeEditor, editorWeightEl.value);
+      }
+    }
+
+    async function applyTabWeight() {
+      if (activeTab) {
+        applyTabFont(activeTab.dataset.family, activeTab, tabWeightEl.value);
+      }
+    }
+
+    editorWeightEl.addEventListener('change', applyEditorWeight);
+    tabWeightEl.addEventListener('change', applyTabWeight);
 
     async function applyEditorSize(size) {
       const j = await api(`/apply-size?size=${size}`);
@@ -438,6 +479,8 @@
       }
       if (j.size)    editorSizeEl.value = j.size;
       if (j.tabSize) tabSizeEl.value    = j.tabSize;
+      if (j.weight)    editorWeightEl.value = j.weight;
+      if (j.tabWeight) tabWeightEl.value    = j.tabWeight;
       statusEl.textContent = 'Ready';
     }
 

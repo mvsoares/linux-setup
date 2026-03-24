@@ -130,27 +130,29 @@ def read_cfg():
 def write_cfg(src):
     WEZTERM_CFG.write_text(src)
 
-def apply_font(family):
+def apply_font(family, weight="Regular"):
     src = read_cfg()
+    weight_str = f", {{ weight = '{weight}' }}" if weight else ""
     src = re.sub(
-        r"(config\.font\s*=\s*wezterm\.font\(')[^']+(')",
-        rf"\g<1>{family}\g<2>",
+        r"config\.font\s*=\s*wezterm\.font\([^)]+\)",
+        f"config.font = wezterm.font('{family}'{weight_str})",
         src,
     )
     write_cfg(src)
-    return f"Editor font → {family}"
+    return f"Editor font → {family} ({weight})"
 
-def apply_tab_font(family):
+def apply_tab_font(family, weight="Regular"):
     src = read_cfg()
+    weight_str = f", {{ weight = '{weight}' }}" if weight else ""
     # Match font inside window_frame block
     src = re.sub(
-        r"(config\.window_frame\s*=\s*\{[^}]*font\s*=\s*wezterm\.font\(')[^']+(')",
-        rf"\g<1>{family}\g<2>",
+        r"(config\.window_frame\s*=\s*\{[^}]*font\s*=\s*wezterm\.font\()[^)]+(\))",
+        rf"\g<1>'{family}'{weight_str}\g<2>",
         src,
         flags=re.DOTALL,
     )
     write_cfg(src)
-    return f"Tab font → {family}"
+    return f"Tab font → {family} ({weight})"
 
 def apply_size(size):
     src = read_cfg()
@@ -178,9 +180,12 @@ def get_current():
     src = read_cfg()
     font = tab_font = ""
     size = tab_size = ""
+    weight = tab_weight = "Regular"
 
-    m = re.search(r"config\.font\s*=\s*wezterm\.font\('([^']+)'", src)
-    if m: font = m.group(1)
+    m = re.search(r"config\.font\s*=\s*wezterm\.font\('([^']+)'(?:,\s*\{\s*weight\s*=\s*'([^']+)'\s*\})?", src)
+    if m:
+        font = m.group(1)
+        if m.group(2): weight = m.group(2)
 
     m = re.search(r"config\.font_size\s*=\s*([\d.]+)", src)
     if m: size = m.group(1)
@@ -188,17 +193,19 @@ def get_current():
     frame = re.search(r"config\.window_frame\s*=\s*\{([^}]+)\}", src, re.DOTALL)
     if frame:
         block = frame.group(1)
-        m = re.search(r"font\s*=\s*wezterm\.font\('([^']+)'", block)
-        if m: tab_font = m.group(1)
+        m = re.search(r"font\s*=\s*wezterm\.font\('([^']+)'(?:,\s*\{\s*weight\s*=\s*'([^']+)'\s*\})?", block)
+        if m:
+            tab_font = m.group(1)
+            if m.group(2): tab_weight = m.group(2)
         m = re.search(r"font_size\s*=\s*([\d.]+)", block)
         if m: tab_size = m.group(1)
 
-    return {"font": font, "size": size, "tabFont": tab_font, "tabSize": tab_size}
+    return {"font": font, "size": size, "weight": weight, "tabFont": tab_font, "tabSize": tab_size, "tabWeight": tab_weight}
 
 
 DISPATCH = {
-    "/apply":          lambda p: apply_font(p.get("font", [""])[0]),
-    "/apply-tab":      lambda p: apply_tab_font(p.get("font", [""])[0]),
+    "/apply":          lambda p: apply_font(p.get("font", [""])[0], p.get("weight", ["Regular"])[0]),
+    "/apply-tab":      lambda p: apply_tab_font(p.get("font", [""])[0], p.get("weight", ["Regular"])[0]),
     "/apply-size":     lambda p: apply_size(p.get("size", ["14"])[0]),
     "/apply-tab-size": lambda p: apply_tab_size(p.get("size", ["12.5"])[0]),
 }
