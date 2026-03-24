@@ -6,12 +6,21 @@ init_sub 6
 # ── Git config ────────────────────────────────────────────────────────────────
 info "Applying git config improvements..."
 
-GIT_CRED_DIR="/usr/share/doc/git/contrib/credential/libsecret"
-if [[ -f "$GIT_CRED_DIR/git-credential-libsecret" ]]; then
-    as_user "git config --global credential.helper '${GIT_CRED_DIR}/git-credential-libsecret'"
-    ok "Git credential helper → libsecret (GNOME keyring)"
+if is_fedora; then
+    if command -v git-credential-libsecret &>/dev/null; then
+        as_user "git config --global credential.helper /usr/libexec/git-core/git-credential-libsecret"
+        ok "Git credential helper → libsecret (GNOME keyring)"
+    else
+        info "git-credential-libsecret not available — keeping current helper"
+    fi
 else
-    info "git-credential-libsecret not available — keeping current helper"
+    GIT_CRED_DIR="/usr/share/doc/git/contrib/credential/libsecret"
+    if [[ -f "$GIT_CRED_DIR/git-credential-libsecret" ]]; then
+        as_user "git config --global credential.helper '${GIT_CRED_DIR}/git-credential-libsecret'"
+        ok "Git credential helper → libsecret (GNOME keyring)"
+    else
+        info "git-credential-libsecret not available — keeping current helper"
+    fi
 fi
 
 as_user "git config --global init.defaultBranch main"
@@ -175,7 +184,7 @@ tick "tmux config + TPM"
 if command -v direnv &>/dev/null; then
     ok "direnv already installed"
 else
-    apt_each direnv
+    pkg_install direnv
 fi
 
 # direnv default .envrc template

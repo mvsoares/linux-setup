@@ -2,16 +2,37 @@
 # =============================================================================
 # common.sh — Shared functions for the master setup script
 # Source this before any module.
+# Supports: Ubuntu 24+, Fedora 43+
 # =============================================================================
 
 # ── Colors ────────────────────────────────────────────────────────────────────
-# ── OS version ────────────────────────────────────────────────────────────────
-UBUNTU_VERSION_ID=$(. /etc/os-release 2>/dev/null && echo "${VERSION_ID}" || echo "0")
-UBUNTU_MAJOR="${UBUNTU_VERSION_ID%%.*}"
-
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
 BLUE='\033[0;34m'; CYAN='\033[0;36m'; MAGENTA='\033[0;35m'
 BOLD='\033[1m'; DIM='\033[2m'; RESET='\033[0m'
+
+# ── OS Detection ──────────────────────────────────────────────────────────────
+if [[ -f /etc/os-release ]]; then
+    . /etc/os-release
+    DISTRO_ID="${ID:-unknown}"
+    DISTRO_VERSION="${VERSION_ID:-0}"
+    DISTRO_NAME="${NAME:-Unknown}"
+else
+    DISTRO_ID="unknown"
+    DISTRO_VERSION="0"
+    DISTRO_NAME="Unknown"
+fi
+
+DISTRO_MAJOR="${DISTRO_VERSION%%.*}"
+export DISTRO_ID DISTRO_VERSION DISTRO_MAJOR DISTRO_NAME
+
+# Legacy compatibility
+UBUNTU_VERSION_ID="$DISTRO_VERSION"
+UBUNTU_MAJOR="$DISTRO_MAJOR"
+
+is_ubuntu() { [[ "$DISTRO_ID" == "ubuntu" ]]; }
+is_fedora() { [[ "$DISTRO_ID" == "fedora" ]]; }
+is_debian_based() { [[ -f /etc/debian_version ]]; }
+is_rpm_based() { command -v rpm &>/dev/null && [[ -f /etc/redhat-release || "$DISTRO_ID" == "fedora" ]]; }
 
 # ── Logging ───────────────────────────────────────────────────────────────────
 ok()     { echo -e "  ${GREEN}✔${RESET}  $*"; }
@@ -66,6 +87,42 @@ detect_user() {
     export REAL_USER USER_HOME USER_ID
 }
 
+# pipx / rustup / zoxide install to ~/.local/bin — non-interactive subshells need PATH
+ensure_user_local_bin_path() {
+    [[ -z "${REAL_USER:-}" || -z "${USER_HOME:-}" ]] && return 0
+    local marker='# linux-setup: ~/.local/bin (pipx, cargo, user tools)'
+    local rc="${USER_HOME}/.bashrc"
+    [[ -f "$rc" ]] || touch "$rc"
+    chown "$REAL_USER:$REAL_USER" "$rc" 2>/dev/null || true
+    if grep -qF "$marker" "$rc" 2>/dev/null; then
+        return 0
+    fi
+    cat >> "$rc" << 'EOF'
+
+# linux-setup: ~/.local/bin (pipx, cargo, user tools)
+[[ -d "$HOME/.local/bin" ]] && case ":$PATH:" in *":$HOME/.local/bin:"*) ;; *) export PATH="$HOME/.local/bin:$PATH" ;; esac
+EOF
+    chown "$REAL_USER:$REAL_USER" "$rc"
+    ok "~/.local/bin PATH block added to ${REAL_USER}'s .bashrc"
+}
+
+# Fedora: avoid "can't create transaction lock" when PackageKit/another dnf holds RPM
+wait_for_rpm_lock() {
+    is_fedora || return 0
+    command -v fuser &>/dev/null || return 0
+    local max=120 i=0
+    while fuser /usr/lib/sysimage/rpm/.rpm.lock &>/dev/null \
+        || fuser /var/lib/rpm/.rpm.lock &>/dev/null; do
+        [[ $i -eq 0 ]] && info "Waiting for other RPM/dnf process to release the lock..."
+        i=$((i + 1))
+        if [[ $i -ge $max ]]; then
+            warn "RPM lock still held after ${max}s — continuing (may see transient dnf errors)"
+            return 0
+        fi
+        sleep 1
+    done
+}
+
 as_user() {
     local cmd="$*"
     local bus_addr=""
@@ -79,16 +136,20 @@ as_user() {
                 | grep '^DBUS_SESSION_BUS_ADDRESS=' | cut -d= -f2- || echo "")
         fi
     fi
+    # Prepend ~/.local/bin so pipx/rustup installs work in same run as setup (non-login shell)
+    local _path="${USER_HOME}/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
     if [[ -n "$bus_addr" ]]; then
         sudo -u "$REAL_USER" \
             DBUS_SESSION_BUS_ADDRESS="$bus_addr" \
             XDG_RUNTIME_DIR="/run/user/${USER_ID}" \
             HOME="$USER_HOME" \
+            PATH="$_path" \
             bash -c "$cmd" 2>> "$LOG_FILE"
     else
         sudo -u "$REAL_USER" \
             XDG_RUNTIME_DIR="/run/user/${USER_ID}" \
             HOME="$USER_HOME" \
+            PATH="$_path" \
             bash -c "$cmd" 2>> "$LOG_FILE"
     fi
 }
@@ -102,7 +163,7 @@ gset() {
         || warn "gsettings failed: ${schema} ${key}"
 }
 
-# ── APT helpers ───────────────────────────────────────────────────────────────
+# ── APT helpers (Debian/Ubuntu) ───────────────────────────────────────────────
 apt_quiet() {
     local rc=0
     DEBIAN_FRONTEND=noninteractive apt-get -y -q "$@" >> "$LOG_FILE" 2>&1 || rc=$?
@@ -120,6 +181,116 @@ apt_each() {
 
 snap_install() {
     snap install "$@" >> "$LOG_FILE" 2>&1 || warn "snap install $* — skipped"
+}
+
+# ── DNF helpers (Fedora/RHEL) ─────────────────────────────────────────────────
+dnf_quiet() {
+    local rc=0
+    local attempt
+    for attempt in 1 2 3; do
+        wait_for_rpm_lock
+        dnf -y -q "$@" >> "$LOG_FILE" 2>&1 && return 0
+        rc=$?
+        # dnf check-update uses exit 100 when updates exist — not an error
+        [[ "$1" == "check-update" && $rc -eq 100 ]] && return 0
+        [[ $attempt -lt 3 ]] && sleep 3
+    done
+    [[ $rc -ne 0 ]] && warn "dnf $* → exit ${rc} (see log)"
+    return $rc
+}
+
+dnf_each() {
+    for pkg in "$@"; do
+        local rc=0
+        wait_for_rpm_lock
+        dnf -y -q install "$pkg" >> "$LOG_FILE" 2>&1 || rc=$?
+        # Transient RPM DB lock (PackageKit, etc.) — one retry after short wait
+        if [[ $rc -ne 0 ]]; then
+            wait_for_rpm_lock
+            sleep 3
+            dnf -y -q install "$pkg" >> "$LOG_FILE" 2>&1 && rc=0 || rc=$?
+        fi
+        if [[ $rc -eq 0 ]]; then ok "${pkg}"; else warn "${pkg} — not found / failed (skipped)"; fi
+    done
+}
+
+# ── Distro-agnostic package helpers ───────────────────────────────────────────
+pkg_install() {
+    if is_fedora; then
+        dnf_each "$@"
+    else
+        apt_each "$@"
+    fi
+}
+
+pkg_quiet() {
+    if is_fedora; then
+        dnf_quiet "$@"
+    else
+        apt_quiet "$@"
+    fi
+}
+
+pkg_update() {
+    if is_fedora; then
+        dnf_quiet check-update || true
+    else
+        apt_quiet update
+    fi
+}
+
+# Get system architecture in a portable way
+get_arch() {
+    local arch
+    arch=$(uname -m)
+    case "$arch" in
+        x86_64)  echo "amd64" ;;
+        aarch64) echo "arm64" ;;
+        *)       echo "$arch" ;;
+    esac
+}
+
+# Get architecture for dpkg/rpm compatibility
+get_pkg_arch() {
+    if is_fedora; then
+        uname -m
+    else
+        dpkg --print-architecture 2>/dev/null || uname -m
+    fi
+}
+
+# Last step of setup.sh: refresh indexes and upgrade so post-reboot session is current
+final_repo_upgrade() {
+    echo ""
+    echo -e "${BOLD}${BLUE}┌─ Final: package refresh & upgrade (reboot readiness) ────────────┐${RESET}"
+    echo -e "${BOLD}${BLUE}│${RESET} ${CYAN}apt/dnf · flatpak · snap${RESET}"
+    echo -e "${BOLD}${BLUE}└────────────────────────────────────────────────────────────────┘${RESET}"
+    info "Refreshing repositories and upgrading installed packages..."
+    if is_fedora; then
+        local _ug _ok=0
+        for _ug in 1 2 3; do
+            wait_for_rpm_lock
+            if dnf -y upgrade >> "$LOG_FILE" 2>&1; then
+                _ok=1
+                break
+            fi
+            [[ $_ug -lt 3 ]] && sleep 6 && info "Retrying dnf upgrade (attempt $((_ug + 1))/3)…"
+        done
+        [[ $_ok -eq 1 ]] || warn "dnf upgrade — see ${LOG_FILE}"
+        dnf -y autoremove >> "$LOG_FILE" 2>&1 || true
+    else
+        apt-get update -q >> "$LOG_FILE" 2>&1 || warn "apt-get update — see ${LOG_FILE}"
+        DEBIAN_FRONTEND=noninteractive apt-get -y -q upgrade >> "$LOG_FILE" 2>&1 \
+            || warn "apt-get upgrade — see ${LOG_FILE}"
+        DEBIAN_FRONTEND=noninteractive apt-get -y -q autoremove >> "$LOG_FILE" 2>&1 || true
+    fi
+    if command -v flatpak &>/dev/null; then
+        flatpak update -y >> "$LOG_FILE" 2>&1 || true
+    fi
+    if command -v snap &>/dev/null; then
+        snap refresh >> "$LOG_FILE" 2>&1 || true
+    fi
+    ok "Repositories updated — system packages are current (reboot when ready)"
 }
 
 # ── GitHub release helper ─────────────────────────────────────────────────────
@@ -184,7 +355,6 @@ github_latest_version() {
 install_github_deb() {
     local repo="$1" pattern="$2" name="$3"
     local url tag
-    # Try redirect + HTML scrape (no API quota)
     tag=$(_github_latest_tag "$repo")
     [[ -n "$tag" ]] && url=$(_github_asset_url "$repo" "$tag" "$pattern")
     [[ -z "$url" ]] && url=$(_github_api_asset_url "$repo" "$pattern")
@@ -197,6 +367,33 @@ install_github_deb() {
         rm -rf "$tmp"
     else
         warn "$name — could not find release"
+    fi
+}
+
+install_github_rpm() {
+    local repo="$1" pattern="$2" name="$3"
+    local url tag
+    tag=$(_github_latest_tag "$repo")
+    [[ -n "$tag" ]] && url=$(_github_asset_url "$repo" "$tag" "$pattern")
+    [[ -z "$url" ]] && url=$(_github_api_asset_url "$repo" "$pattern")
+    if [[ -n "$url" ]]; then
+        local tmp=$(mktemp -d)
+        curl -sSfL -A "$CURL_UA" "$url" -o "$tmp/pkg.rpm" >> "$LOG_FILE" 2>&1 \
+            && dnf install -y "$tmp/pkg.rpm" >> "$LOG_FILE" 2>&1 \
+            && ok "$name installed" \
+            || warn "$name install had issues"
+        rm -rf "$tmp"
+    else
+        warn "$name — could not find release"
+    fi
+}
+
+install_github_pkg() {
+    local repo="$1" deb_pattern="$2" rpm_pattern="$3" name="$4"
+    if is_fedora; then
+        install_github_rpm "$repo" "$rpm_pattern" "$name"
+    else
+        install_github_deb "$repo" "$deb_pattern" "$name"
     fi
 }
 

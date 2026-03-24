@@ -28,11 +28,17 @@ if [[ -d "$PYENV_ROOT" ]]; then
     skip "pyenv"
 else
     info "Installing pyenv build dependencies..."
-    apt_quiet install \
-        make build-essential libssl-dev zlib1g-dev \
-        libbz2-dev libreadline-dev libsqlite3-dev wget llvm \
-        libncursesw5-dev xz-utils tk-dev libxml2-dev libxmlsec1-dev \
-        libffi-dev liblzma-dev
+    if is_fedora; then
+        dnf_quiet install \
+            make gcc zlib-devel bzip2 bzip2-devel readline-devel sqlite sqlite-devel \
+            openssl-devel tk-devel libffi-devel xz-devel libuuid-devel gdbm-devel libnsl2-devel
+    else
+        apt_quiet install \
+            make build-essential libssl-dev zlib1g-dev \
+            libbz2-dev libreadline-dev libsqlite3-dev wget llvm \
+            libncursesw5-dev xz-utils tk-dev libxml2-dev libxmlsec1-dev \
+            libffi-dev liblzma-dev
+    fi
 
     info "Installing pyenv..."
     as_user "curl -fsSL https://pyenv.run | bash" >> "$LOG_FILE" 2>&1 \
@@ -61,7 +67,7 @@ fi
 if command -v pipx &>/dev/null; then
     skip "pipx"
 else
-    apt_each pipx
+    pkg_install pipx
     as_user "pipx ensurepath" >> "$LOG_FILE" 2>&1 || true
 fi
 tick "pyenv + pipx"
@@ -83,7 +89,7 @@ else
     info "Installing latest Go..."
     GO_VER=$(curl -fsSL "https://go.dev/VERSION?m=text" 2>/dev/null | head -1)
     if [[ -n "$GO_VER" ]]; then
-        GO_ARCH=$(dpkg --print-architecture)
+        GO_ARCH=$(get_arch)
         rm -rf /usr/local/go
         curl -fsSL "https://go.dev/dl/${GO_VER}.linux-${GO_ARCH}.tar.gz" \
             | tar xz -C /usr/local >> "$LOG_FILE" 2>&1 \

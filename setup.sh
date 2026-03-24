@@ -6,7 +6,8 @@
 #  ██║╚██╔╝██║██╔══██║╚════██║   ██║   ██╔══╝  ██╔══██╗
 #  ██║ ╚═╝ ██║██║  ██║███████║   ██║   ███████╗██║  ██║
 #  ╚═╝     ╚═╝╚═╝  ╚═╝╚══════╝   ╚═╝   ╚══════╝╚═╝  ╚═╝
-#       Ubuntu Workstation Setup — Full Dev Environment
+#       Linux Workstation Setup — Full Dev Environment
+#       Supports: Ubuntu 24+ / Fedora 43+
 # =============================================================================
 # Idempotent, checkpoint-based — safe to re-run at any time.
 #
@@ -119,10 +120,11 @@ cat << 'BANNER'
   ██║███╗██║██║   ██║██╔══██╗██╔═██╗ ╚════██║   ██║   ██╔══██║   ██║   ██║██║   ██║██║╚██╗██║
   ╚███╔███╔╝╚██████╔╝██║  ██║██║  ██╗███████║   ██║   ██║  ██║   ██║   ██║╚██████╔╝██║ ╚████║
    ╚══╝╚══╝  ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝╚══════╝   ╚═╝   ╚═╝  ╚═╝   ╚═╝   ╚═╝ ╚═════╝ ╚═╝  ╚═══╝
-            Ubuntu Dev Workstation — Full Environment Setup
+            Linux Dev Workstation — Full Environment Setup
 
 BANNER
 echo -e "${RESET}"
+echo -e "  Distro    : ${YELLOW}${DISTRO_NAME} ${DISTRO_VERSION}${RESET}"
 echo -e "  Log       : ${YELLOW}${LOG_FILE}${RESET}"
 echo -e "  State     : ${YELLOW}${STATE_DIR}${RESET}"
 echo -e "  Modules   : ${YELLOW}${#MODULES[@]}${RESET}"
@@ -132,6 +134,7 @@ echo ""
 require_root
 detect_user
 info "Configuring for user: ${BOLD}${REAL_USER}${RESET} (${USER_HOME})"
+ensure_user_local_bin_path
 
 # Keep sudo alive
 while true; do sudo -n true; sleep 55; kill -0 "$$" || exit; done 2>/dev/null &
@@ -216,3 +219,6 @@ if [[ -f "$THEMES_SCRIPT" ]]; then
         echo ""
     fi
 fi
+
+# ── Final upgrade: indexes + upgrades so the next boot is on a fully current system
+final_repo_upgrade

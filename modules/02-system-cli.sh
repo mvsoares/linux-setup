@@ -4,81 +4,124 @@
 init_sub 8
 
 info "Installing system essentials..."
-apt_quiet install \
-    build-essential cmake ninja-build pkg-config \
-    git git-lfs git-extras curl wget aria2 \
-    gnupg2 ca-certificates software-properties-common apt-transport-https \
-    unzip p7zip-full unrar-free xclip xdotool dconf-editor preload bc
-apt_each gparted stacer libsecret-1-0 libsecret-1-dev
-# p7zip-rar removed from Ubuntu 26+
-[[ "$UBUNTU_MAJOR" -lt 26 ]] && apt_each p7zip-rar
+if is_fedora; then
+    dnf_quiet install \
+        @development-tools cmake ninja-build pkgconf-pkg-config \
+        git git-lfs curl wget aria2 \
+        gnupg2 ca-certificates \
+        unzip p7zip p7zip-plugins xclip xdotool dconf-editor bc
+    dnf_each gparted libsecret libsecret-devel
+else
+    apt_quiet install \
+        build-essential cmake ninja-build pkg-config \
+        git git-lfs git-extras curl wget aria2 \
+        gnupg2 ca-certificates software-properties-common apt-transport-https \
+        unzip p7zip-full unrar-free xclip xdotool dconf-editor preload bc
+    apt_each gparted stacer libsecret-1-0 libsecret-1-dev
+    [[ "$DISTRO_MAJOR" -lt 26 ]] && apt_each p7zip-rar
+fi
 tick "System essentials"
 
 info "Installing monitors & diagnostics..."
-apt_quiet install btop htop iotop iftop ncdu
-apt_each nvtop nethogs lm-sensors fancontrol smartmontools inxi sysstat upower powertop
-# neofetch removed from Ubuntu 26+
-[[ "$UBUNTU_MAJOR" -lt 26 ]] && apt_each neofetch
-# fastfetch: not in default repos on 22.04–24.04 — use PPA without noisy failed apt first
-if ! command -v fastfetch &>/dev/null; then
-    if apt-cache show fastfetch &>/dev/null; then
-        apt_quiet install fastfetch && ok "fastfetch"
-    else
-        add-apt-repository -y ppa:zhangsongcui3371/fastfetch >> "$LOG_FILE" 2>&1 \
-            && apt-get update -q >> "$LOG_FILE" 2>&1 \
-            && apt_quiet install fastfetch \
-            && ok "fastfetch (via PPA)" \
-            || warn "fastfetch — not available (install manually from GitHub)"
+if is_fedora; then
+    dnf_quiet install btop htop iotop iftop ncdu
+    dnf_each nvtop nethogs lm_sensors smartmontools inxi sysstat upower powertop fastfetch
+else
+    apt_quiet install btop htop iotop iftop ncdu
+    apt_each nvtop nethogs lm-sensors fancontrol smartmontools inxi sysstat upower powertop
+    [[ "$DISTRO_MAJOR" -lt 26 ]] && apt_each neofetch
+    if ! command -v fastfetch &>/dev/null; then
+        if apt-cache show fastfetch &>/dev/null; then
+            apt_quiet install fastfetch && ok "fastfetch"
+        else
+            add-apt-repository -y ppa:zhangsongcui3371/fastfetch >> "$LOG_FILE" 2>&1 \
+                && apt-get update -q >> "$LOG_FILE" 2>&1 \
+                && apt_quiet install fastfetch \
+                && ok "fastfetch (via PPA)" \
+                || warn "fastfetch — not available (install manually from GitHub)"
+        fi
     fi
 fi
 tick "System monitors & diagnostics"
 
 info "Installing developer tools..."
-apt_quiet install gh python3 python3-pip python3-venv python3-dev nodejs jq
-apt_each podman podman-compose buildah skopeo \
-         yq direnv mkcert pipx redis-tools
+if is_fedora; then
+    dnf_quiet install gh python3 python3-pip python3-devel nodejs jq
+    dnf_each podman podman-compose buildah skopeo \
+             yq direnv mkcert pipx
+else
+    apt_quiet install gh python3 python3-pip python3-venv python3-dev nodejs jq
+    apt_each podman podman-compose buildah skopeo \
+             yq direnv mkcert pipx redis-tools
+fi
 tick "Developer tools (podman, gh, python, node)"
 
 info "Installing network & file tools..."
-apt_quiet install nmap netcat-openbsd dnsutils rsync tree ranger fzf ripgrep fd-find bat tmux mosh \
-    strace tcpdump
-apt_each whois rclone mc eza screen ssh-askpass chafa remmina
+if is_fedora; then
+    dnf_quiet install nmap nmap-ncat bind-utils rsync tree ranger fzf ripgrep fd-find bat tmux mosh \
+        strace tcpdump
+    dnf_each whois rclone mc eza screen openssh-askpass chafa remmina
+else
+    apt_quiet install nmap netcat-openbsd dnsutils rsync tree ranger fzf ripgrep fd-find bat tmux mosh \
+        strace tcpdump
+    apt_each whois rclone mc eza screen ssh-askpass chafa remmina
+fi
 tick "Network & file tools"
 
 info "Installing browsers..."
-apt_each google-chrome-stable google-chrome-beta
-tick "Browsers (Google Chrome stable + beta)"
+if is_fedora; then
+    dnf_each google-chrome-stable
+else
+    apt_each google-chrome-stable google-chrome-beta
+fi
+tick "Browsers (Google Chrome)"
 
 info "Installing video & codecs..."
-apt_quiet install ffmpeg mpv celluloid colord yt-dlp
-apt_each vlc \
-    gstreamer1.0-plugins-base gstreamer1.0-plugins-good \
-    gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly \
-    gstreamer1.0-libav gstreamer1.0-vaapi libavcodec-extra
+if is_fedora; then
+    dnf_quiet install ffmpeg mpv celluloid colord yt-dlp
+    dnf_each vlc \
+        gstreamer1-plugins-base gstreamer1-plugins-good \
+        gstreamer1-plugins-bad-free gstreamer1-plugins-ugly-free \
+        gstreamer1-plugin-libav gstreamer1-vaapi
+else
+    apt_quiet install ffmpeg mpv celluloid colord yt-dlp
+    apt_each vlc \
+        gstreamer1.0-plugins-base gstreamer1.0-plugins-good \
+        gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly \
+        gstreamer1.0-libav gstreamer1.0-vaapi libavcodec-extra
+fi
 tick "Video players & codecs"
 
-info "Installing snap apps..."
-snap_install "code" --classic
-snap_install "onefetch"
-tick "Snap apps"
+if ! is_fedora; then
+    info "Installing snap apps..."
+    snap_install "code" --classic
+    snap_install "onefetch"
+    tick "Snap apps"
+else
+    info "Installing Fedora packages (VSCode, onefetch)..."
+    dnf_each code onefetch
+    tick "Fedora packages"
+fi
 
 # ── Modern CLI tools from GitHub ──────────────────────────────────────────────
 info "Installing modern CLI tools from GitHub releases..."
 
-# bat symlink (Ubuntu names it batcat)
-if command -v batcat &>/dev/null && ! command -v bat &>/dev/null; then
-    install -d -o "$REAL_USER" -g "$REAL_USER" "${USER_HOME}/.local/bin"
-    ln -sf "$(command -v batcat)" "${USER_HOME}/.local/bin/bat"
-    chown "$REAL_USER:$REAL_USER" "${USER_HOME}/.local/bin/bat"
-    ok "bat → batcat symlink"
-fi
+# bat symlink (Ubuntu names it batcat, Fedora uses bat directly)
+if ! is_fedora; then
+    if command -v batcat &>/dev/null && ! command -v bat &>/dev/null; then
+        install -d -o "$REAL_USER" -g "$REAL_USER" "${USER_HOME}/.local/bin"
+        ln -sf "$(command -v batcat)" "${USER_HOME}/.local/bin/bat"
+        chown "$REAL_USER:$REAL_USER" "${USER_HOME}/.local/bin/bat"
+        ok "bat → batcat symlink"
+    fi
 
-# fd symlink (Ubuntu names it fdfind)
-if command -v fdfind &>/dev/null && ! command -v fd &>/dev/null; then
-    install -d -o "$REAL_USER" -g "$REAL_USER" "${USER_HOME}/.local/bin"
-    ln -sf "$(command -v fdfind)" "${USER_HOME}/.local/bin/fd"
-    chown "$REAL_USER:$REAL_USER" "${USER_HOME}/.local/bin/fd"
-    ok "fd → fdfind symlink"
+    # fd symlink (Ubuntu names it fdfind, Fedora uses fd directly)
+    if command -v fdfind &>/dev/null && ! command -v fd &>/dev/null; then
+        install -d -o "$REAL_USER" -g "$REAL_USER" "${USER_HOME}/.local/bin"
+        ln -sf "$(command -v fdfind)" "${USER_HOME}/.local/bin/fd"
+        chown "$REAL_USER:$REAL_USER" "${USER_HOME}/.local/bin/fd"
+        ok "fd → fdfind symlink"
+    fi
 fi
 
 # zoxide (install as user so it goes to ~/.local/bin)
@@ -91,7 +134,11 @@ fi
 
 # git-delta
 if ! command -v delta &>/dev/null; then
-    install_github_deb "dandavison/delta" "$(dpkg --print-architecture).deb" "git-delta"
+    if is_fedora; then
+        install_github_rpm "dandavison/delta" "x86_64.rpm" "git-delta"
+    else
+        install_github_deb "dandavison/delta" "$(dpkg --print-architecture).deb" "git-delta"
+    fi
 else
     skip "delta $(delta --version 2>/dev/null | head -1)"
 fi
@@ -140,21 +187,33 @@ fi
 
 # duf (better df)
 if ! command -v duf &>/dev/null; then
-    install_github_deb "muesli/duf" "$(dpkg --print-architecture).deb" "duf"
+    if is_fedora; then
+        install_github_rpm "muesli/duf" "x86_64.rpm" "duf"
+    else
+        install_github_deb "muesli/duf" "$(dpkg --print-architecture).deb" "duf"
+    fi
 else
     skip "duf"
 fi
 
 # glow (terminal markdown renderer)
 if ! command -v glow &>/dev/null; then
-    install_github_deb "charmbracelet/glow" "$(dpkg --print-architecture).deb" "glow"
+    if is_fedora; then
+        install_github_rpm "charmbracelet/glow" "x86_64.rpm" "glow"
+    else
+        install_github_deb "charmbracelet/glow" "$(dpkg --print-architecture).deb" "glow"
+    fi
 else
     skip "glow"
 fi
 
 # bottom (btm — better top)
 if ! command -v btm &>/dev/null; then
-    install_github_deb "ClementTsang/bottom" "$(dpkg --print-architecture).deb" "bottom"
+    if is_fedora; then
+        install_github_rpm "ClementTsang/bottom" "x86_64.rpm" "bottom"
+    else
+        install_github_deb "ClementTsang/bottom" "$(dpkg --print-architecture).deb" "bottom"
+    fi
 else
     skip "bottom (btm)"
 fi
@@ -168,7 +227,11 @@ fi
 
 # hyperfine (benchmarking)
 if ! command -v hyperfine &>/dev/null; then
-    install_github_deb "sharkdp/hyperfine" "$(dpkg --print-architecture).deb" "hyperfine"
+    if is_fedora; then
+        install_github_rpm "sharkdp/hyperfine" "x86_64.rpm" "hyperfine"
+    else
+        install_github_deb "sharkdp/hyperfine" "$(dpkg --print-architecture).deb" "hyperfine"
+    fi
 else
     skip "hyperfine"
 fi
@@ -188,10 +251,12 @@ else
 fi
 tick "pre-commit"
 
-# Build git-credential-libsecret if not already built
-GIT_CRED_DIR="/usr/share/doc/git/contrib/credential/libsecret"
-if [[ -d "$GIT_CRED_DIR" ]] && [[ ! -f "$GIT_CRED_DIR/git-credential-libsecret" ]]; then
-    make -C "$GIT_CRED_DIR" 2>/dev/null >> "$LOG_FILE" 2>&1 || warn "Could not build git-credential-libsecret"
+# Build git-credential-libsecret if not already built (Ubuntu only)
+if ! is_fedora; then
+    GIT_CRED_DIR="/usr/share/doc/git/contrib/credential/libsecret"
+    if [[ -d "$GIT_CRED_DIR" ]] && [[ ! -f "$GIT_CRED_DIR/git-credential-libsecret" ]]; then
+        make -C "$GIT_CRED_DIR" 2>/dev/null >> "$LOG_FILE" 2>&1 || warn "Could not build git-credential-libsecret"
+    fi
 fi
 
 ok "System utilities & modern CLI tools complete"

@@ -4,8 +4,12 @@
 init_sub 9
 
 # ── Dependencies ──────────────────────────────────────────────────────────────
-apt_each gnome-tweaks gnome-shell-extensions gnome-shell-extension-manager \
-         gnome-shell-extension-appindicator dconf-editor
+if is_fedora; then
+    dnf_each gnome-tweaks gnome-extensions-app gnome-shell-extension-appindicator dconf-editor
+else
+    apt_each gnome-tweaks gnome-shell-extensions gnome-shell-extension-manager \
+             gnome-shell-extension-appindicator dconf-editor
+fi
 gtk-update-icon-cache -f /usr/share/icons/hicolor 2>/dev/null || true
 tick "GNOME dependencies"
 
@@ -92,12 +96,21 @@ install_extension "Clipboard Indicator" "clipboard-indicator@tudmotu.com"       
 install_extension "Vitals"             "Vitals@CoreCoding.com"                                  1460
 install_extension "Space Bar"          "space-bar@luchrioh"                                     5090
 
-# AppIndicator via apt
-if dpkg -s gnome-shell-extension-appindicator &>/dev/null 2>&1; then
-    ENABLED_EXTS+=("appindicatorsupport@rgcjonas.gmail.com")
-    ok "AppIndicator (via apt)"
+# AppIndicator via package manager
+if is_fedora; then
+    if rpm -q gnome-shell-extension-appindicator &>/dev/null 2>&1; then
+        ENABLED_EXTS+=("appindicatorsupport@rgcjonas.gmail.com")
+        ok "AppIndicator (via dnf)"
+    else
+        install_extension "AppIndicator" "appindicatorsupport@rgcjonas.gmail.com" 615
+    fi
 else
-    install_extension "AppIndicator" "appindicatorsupport@rgcjonas.gmail.com" 615
+    if dpkg -s gnome-shell-extension-appindicator &>/dev/null 2>&1; then
+        ENABLED_EXTS+=("appindicatorsupport@rgcjonas.gmail.com")
+        ok "AppIndicator (via apt)"
+    else
+        install_extension "AppIndicator" "appindicatorsupport@rgcjonas.gmail.com" 615
+    fi
 fi
 tick "GNOME Shell extensions (9)"
 

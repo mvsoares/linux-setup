@@ -114,11 +114,17 @@ install_nerd_font "ZedMono"       "ZedMono"
 install_nerd_font "Recursive"     "Recursive"
 tick "20+ Nerd Fonts (mono, patched with icons)"
 
-# ── 2. APT monospace fonts ───────────────────────────────────────────────────
-info "APT mono fonts..."
-apt_each fonts-firacode fonts-hack fonts-ubuntu fonts-roboto fonts-noto-mono \
-         fonts-jetbrains-mono fonts-cascadia-code
-tick "APT monospace fonts"
+# ── 2. Package manager monospace fonts ───────────────────────────────────────
+info "Package manager mono fonts..."
+if is_fedora; then
+    # Fedora ships Hack as source-foundry-hack-fonts (not hack-fonts)
+    dnf_each fira-code-fonts source-foundry-hack-fonts google-roboto-mono-fonts \
+             google-noto-mono-fonts jetbrains-mono-fonts cascadia-code-fonts
+else
+    apt_each fonts-firacode fonts-hack fonts-ubuntu fonts-roboto fonts-noto-mono \
+             fonts-jetbrains-mono fonts-cascadia-code
+fi
+tick "Package manager monospace fonts"
 
 # ── 3. General / display fonts via Google Fonts ──────────────────────────────
 info "Installing general/display fonts..."
@@ -135,12 +141,18 @@ install_google_font "Outfit"
 install_google_font "Geist"
 tick "General/display fonts (Google Fonts)"
 
-# ── 4. APT general fonts ─────────────────────────────────────────────────────
-info "APT general fonts..."
-apt_each fonts-inter fonts-lato fonts-open-sans fonts-urw-base35 \
-         fonts-cantarell fonts-noto fonts-liberation fonts-freefont-ttf \
-         fonts-noto-color-emoji fonts-font-awesome
-tick "APT general fonts"
+# ── 4. Package manager general fonts ─────────────────────────────────────────
+info "Package manager general fonts..."
+if is_fedora; then
+    dnf_each lato-fonts open-sans-fonts urw-base35-fonts \
+             abattis-cantarell-fonts google-noto-fonts-common liberation-fonts \
+             google-noto-color-emoji-fonts fontawesome-fonts
+else
+    apt_each fonts-inter fonts-lato fonts-open-sans fonts-urw-base35 \
+             fonts-cantarell fonts-noto fonts-liberation fonts-freefont-ttf \
+             fonts-noto-color-emoji fonts-font-awesome
+fi
+tick "Package manager general fonts"
 
 # ── 5. Rebuild font cache ────────────────────────────────────────────────────
 info "Rebuilding font cache..."

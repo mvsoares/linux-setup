@@ -37,29 +37,42 @@ tick "Services: preload + fstrim"
 sensors-detect --auto >> "$LOG_FILE" 2>&1 || true
 tick "Hardware sensors detected"
 
-# ── UFW firewall ──────────────────────────────────────────────────────────────
-if command -v ufw &>/dev/null; then
-    if ! ufw status | grep -q "Status: active"; then
-        info "Configuring UFW firewall..."
-        ufw default deny incoming >> "$LOG_FILE" 2>&1
-        ufw default allow outgoing >> "$LOG_FILE" 2>&1
-        ufw allow ssh >> "$LOG_FILE" 2>&1
-        ufw --force enable >> "$LOG_FILE" 2>&1 \
-            && ok "UFW enabled (deny incoming, allow SSH)" \
-            || warn "UFW enable failed"
+# ── Firewall ──────────────────────────────────────────────────────────────────
+if is_fedora; then
+    # Fedora uses firewalld
+    if systemctl is-active --quiet firewalld; then
+        ok "firewalld already active"
     else
-        ok "UFW already active"
+        systemctl enable --now firewalld >> "$LOG_FILE" 2>&1 || true
     fi
+    firewall-cmd --permanent --add-service=ssh >> "$LOG_FILE" 2>&1 || true
+    firewall-cmd --reload >> "$LOG_FILE" 2>&1 || true
+    tick "firewalld (SSH allowed)"
 else
-    apt_each ufw
+    # Ubuntu uses UFW
     if command -v ufw &>/dev/null; then
-        ufw default deny incoming >> "$LOG_FILE" 2>&1
-        ufw default allow outgoing >> "$LOG_FILE" 2>&1
-        ufw allow ssh >> "$LOG_FILE" 2>&1
-        ufw --force enable >> "$LOG_FILE" 2>&1 || true
+        if ! ufw status | grep -q "Status: active"; then
+            info "Configuring UFW firewall..."
+            ufw default deny incoming >> "$LOG_FILE" 2>&1
+            ufw default allow outgoing >> "$LOG_FILE" 2>&1
+            ufw allow ssh >> "$LOG_FILE" 2>&1
+            ufw --force enable >> "$LOG_FILE" 2>&1 \
+                && ok "UFW enabled (deny incoming, allow SSH)" \
+                || warn "UFW enable failed"
+        else
+            ok "UFW already active"
+        fi
+    else
+        apt_each ufw
+        if command -v ufw &>/dev/null; then
+            ufw default deny incoming >> "$LOG_FILE" 2>&1
+            ufw default allow outgoing >> "$LOG_FILE" 2>&1
+            ufw allow ssh >> "$LOG_FILE" 2>&1
+            ufw --force enable >> "$LOG_FILE" 2>&1 || true
+        fi
     fi
+    tick "UFW firewall"
 fi
-tick "UFW firewall"
 
 # ── Display setup helper ─────────────────────────────────────────────────────
 cat > /usr/local/bin/display-setup << 'DISP'
@@ -117,7 +130,7 @@ cat > /usr/local/bin/sysreport << 'SYSREPORT'
 BOLD='\033[1m'; CYAN='\033[0;36m'; GREEN='\033[0;32m'; RESET='\033[0m'
 echo -e "${BOLD}${CYAN}System Report${RESET}"
 echo -e "${BOLD}─────────────────────────────────────────${RESET}"
-echo -e "${GREEN}OS:${RESET}       $(lsb_release -ds 2>/dev/null || cat /etc/os-release | head -1)"
+echo -e "${GREEN}OS:${RESET}       $(lsb_release -ds 2>/dev/null || grep '^PRETTY_NAME' /etc/os-release | cut -d= -f2 | tr -d '\"')"
 echo -e "${GREEN}Kernel:${RESET}   $(uname -r)"
 echo -e "${GREEN}Shell:${RESET}    $SHELL"
 echo -e "${GREEN}User:${RESET}     $(whoami)@$(hostname)"
@@ -137,14 +150,19 @@ tick "Helper scripts (display-setup, sysreport)"
 
 # ── Cleanup ───────────────────────────────────────────────────────────────────
 info "Running cleanup..."
-apt_quiet autoremove
-apt_quiet autoclean
-# Remove orphan snaps
-snap list --all 2>/dev/null | awk '/disabled/{print $1, $3}' | while read snapname revision; do
-    snap remove "$snapname" --revision="$revision" >> "$LOG_FILE" 2>&1 || true
-done
+if is_fedora; then
+    dnf_quiet autoremove
+    dnf_quiet clean all
+else
+    apt_quiet autoremove
+    apt_quiet autoclean
+    # Remove orphan snaps
+    snap list --all 2>/dev/null | awk '/disabled/{print $1, $3}' | while read snapname revision; do
+        snap remove "$snapname" --revision="$revision" >> "$LOG_FILE" 2>&1 || true
+    done
+fi
 # Clean old journal logs (keep 7 days)
 journalctl --vacuum-time=7d >> "$LOG_FILE" 2>&1 || true
-tick "apt autoremove + autoclean + journal vacuum"
+tick "Package cleanup + journal vacuum"
 
 ok "System tweaks & cleanup complete"

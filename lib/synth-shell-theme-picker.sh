@@ -2,6 +2,7 @@
 # synth-shell-theme-picker.sh — numbered gallery themes for workstation setup
 # Theme snippets live in lib/synth-shell-themes/ (paired with synth-shell-color-preview.html).
 # Override: SYNTH_SHELL_THEME=1..20 to skip the menu. Default when non-interactive: 2.
+# Interactive prompt: 10s timeout → same default (see resolve_theme_choice).
 
 _synth_themes_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/synth-shell-themes"
 
@@ -37,7 +38,7 @@ synth_shell_print_theme_gallery() {
     local dir="${_synth_themes_dir}"
     local f n title sw
     echo ""
-    echo -e "  ${BOLD}synth-shell prompt — pick a theme (1–20)${RESET}"
+    echo -e "  ${BOLD}synth-shell prompt — pick a theme (1–20), or wait 10s for default (2)${RESET}"
     echo -e "  ${DIM}Swatches: host · pwd · Git (256-color). Gallery: repo/synth-shell-color-preview.html${RESET}"
     echo ""
     for f in $(printf '%s\n' "${dir}"/[0-9][0-9]-*.conf | sort); do
@@ -62,16 +63,18 @@ synth_shell_resolve_theme_choice() {
         return 0
     fi
     local choice=""
+    local read_rc=0
     if [[ -t 0 ]]; then
-        read -r -p "  Theme number [1–20, default ${default}]: " choice
+        read -r -t 10 -p "  Theme number [1–20, default ${default}] (10s → ${default}): " choice || read_rc=$?
     elif [[ -r /dev/tty ]]; then
-        read -r -p "  Theme number [1–20, default ${default}]: " choice < /dev/tty > /dev/tty 2>/dev/tty || true
+        read -r -t 10 -p "  Theme number [1–20, default ${default}] (10s → ${default}): " choice < /dev/tty > /dev/tty 2>/dev/tty || read_rc=$?
     else
         printf '%s\n' "$default"
         return 0
     fi
     choice=$(echo "$choice" | tr -d '[:space:]')
     if [[ -z "$choice" ]]; then
+        [[ "$read_rc" -ne 0 ]] && echo "" && info "No selection within 10s — using theme ${default}"
         printf '%s\n' "$default"
         return 0
     fi

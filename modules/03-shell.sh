@@ -50,9 +50,10 @@ if command -v duf &>/dev/null; then
 fi
 command -v btm &>/dev/null && alias top='btm'
 
-# fzf keybindings
+# fzf keybindings (paths differ between distros)
 [[ -f /usr/share/doc/fzf/examples/key-bindings.bash ]] && source /usr/share/doc/fzf/examples/key-bindings.bash
-[[ -f /usr/share/bash-completion/completions/fzf ]]     && source /usr/share/bash-completion/completions/fzf
+[[ -f /usr/share/fzf/shell/key-bindings.bash ]] && source /usr/share/fzf/shell/key-bindings.bash
+[[ -f /usr/share/bash-completion/completions/fzf ]] && source /usr/share/bash-completion/completions/fzf
 
 # Navigation
 alias ..='cd ..'; alias ...='cd ../..'; alias ....='cd ../../..'
@@ -71,7 +72,12 @@ alias please='sudo'; alias ports='ss -tulpn'
 alias myip='curl -s ifconfig.me'
 alias sysinfo='fastfetch 2>/dev/null || neofetch 2>/dev/null || inxi -Fxz 2>/dev/null'
 alias weather='curl -s wttr.in/?format=3'
-alias update='sudo apt update && sudo apt upgrade -y && sudo snap refresh && flatpak update -y 2>/dev/null'
+# Distro-specific update alias
+if [[ -f /etc/fedora-release ]]; then
+    alias update='sudo dnf upgrade -y && flatpak update -y 2>/dev/null'
+else
+    alias update='sudo apt update && sudo apt upgrade -y && sudo snap refresh && flatpak update -y 2>/dev/null'
+fi
 alias fonts-list='fc-list | sort'; alias fonts-mono='fc-list :spacing=mono | sort'
 alias pbcopy='xclip -selection clipboard'; alias pbpaste='xclip -selection clipboard -o'
 
