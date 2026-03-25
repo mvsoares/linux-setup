@@ -1,0 +1,29 @@
+---
+# tasks/main.yml
+- name: Ensure APT dependencies for Ansible modules
+  ansible.builtin.apt:
+    name:
+      - gnupg
+      - curl
+      - jq
+    state: present
+    update_cache: yes
+  when: ansible_os_family == 'Debian'
+
+- name: Install Base Core Packages (Debian)
+  ansible.builtin.apt:
+    name: "{{ packages.core }}"
+    state: present
+  when: ansible_os_family == 'Debian'
+
+- name: Install Base Core Packages (RedHat/Fedora)
+  ansible.builtin.dnf:
+    name: "{{ packages.core }}"
+    state: present
+  when: ansible_os_family == 'RedHat'
+
+- name: Install CLI Tools
+  package:
+    name: "{{ item }}"
+    state: present
+  loop: "{{ packages.cli_tools }}"

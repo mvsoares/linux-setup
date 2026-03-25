@@ -172,11 +172,15 @@ apt_quiet() {
 }
 
 apt_each() {
-    for pkg in "$@"; do
-        local rc=0
-        DEBIAN_FRONTEND=noninteractive apt-get -y -q install "$pkg" >> "$LOG_FILE" 2>&1 || rc=$?
-        if [[ $rc -eq 0 ]]; then ok "${pkg}"; else warn "${pkg} — not found / failed (skipped)"; fi
-    done
+    if DEBIAN_FRONTEND=noninteractive apt-get -y -q install "$@" >> "$LOG_FILE" 2>&1; then
+        for pkg in "$@"; do ok "${pkg}"; done
+    else
+        for pkg in "$@"; do
+            local rc=0
+            DEBIAN_FRONTEND=noninteractive apt-get -y -q install "$pkg" >> "$LOG_FILE" 2>&1 || rc=$?
+            if [[ $rc -eq 0 ]]; then ok "${pkg}"; else warn "${pkg} — not found / failed (skipped)"; fi
+        done
+    fi
 }
 
 snap_install() {
@@ -200,18 +204,23 @@ dnf_quiet() {
 }
 
 dnf_each() {
-    for pkg in "$@"; do
-        local rc=0
-        wait_for_rpm_lock
-        dnf -y -q install "$pkg" >> "$LOG_FILE" 2>&1 || rc=$?
-        # Transient RPM DB lock (PackageKit, etc.) — one retry after short wait
-        if [[ $rc -ne 0 ]]; then
+    wait_for_rpm_lock
+    if dnf -y -q install "$@" >> "$LOG_FILE" 2>&1; then
+        for pkg in "$@"; do ok "${pkg}"; done
+    else
+        for pkg in "$@"; do
+            local rc=0
             wait_for_rpm_lock
-            sleep 3
-            dnf -y -q install "$pkg" >> "$LOG_FILE" 2>&1 && rc=0 || rc=$?
-        fi
-        if [[ $rc -eq 0 ]]; then ok "${pkg}"; else warn "${pkg} — not found / failed (skipped)"; fi
-    done
+            dnf -y -q install "$pkg" >> "$LOG_FILE" 2>&1 || rc=$?
+            # Transient RPM DB lock (PackageKit, etc.) — one retry after short wait
+            if [[ $rc -ne 0 ]]; then
+                wait_for_rpm_lock
+                sleep 3
+                dnf -y -q install "$pkg" >> "$LOG_FILE" 2>&1 && rc=0 || rc=$?
+            fi
+            if [[ $rc -eq 0 ]]; then ok "${pkg}"; else warn "${pkg} — not found / failed (skipped)"; fi
+        done
+    fi
 }
 
 # ── Distro-agnostic package helpers ───────────────────────────────────────────
@@ -300,43 +309,35 @@ CURL_UA='Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) 
 
 # Optional: export GITHUB_TOKEN for higher GitHub API rate limits (CI / many VMs).
 
-# Get latest release tag via redirect header (no API quota used)
+# Ensure jq is installed
+if ! command -v jq &>/dev/null; then
+    if is_fedora; then
+        dnf -y -q install jq >> "$LOG_FILE" 2>&1 || true
+    else
+        DEBIAN_FRONTEND=noninteractive apt-get -y -q install jq >> "$LOG_FILE" 2>&1 || true
+    fi
+fi
+
+# Get latest release tag using GitHub API
 _github_latest_tag() {
-    local loc tag
-    loc=$(curl -sSIL -A "$CURL_UA" "https://github.com/$1/releases/latest" 2>/dev/null \
-        | grep -i '^location:' | tail -1)
-    tag=$(echo "$loc" | sed 's|.*/tag/||; s/\r//; s/[[:space:]]//g')
-    if [[ -z "$tag" ]]; then
-        tag=$(curl -sSf -A "$CURL_UA" ${GITHUB_TOKEN:+-H "Authorization: Bearer ${GITHUB_TOKEN}"} \
-            -H 'Accept: application/vnd.github+json' \
-            "https://api.github.com/repos/$1/releases/latest" 2>/dev/null \
-            | grep '"tag_name"' | head -1 | cut -d'"' -f4)
-    fi
-    echo "$tag"
+    curl -sSf -A "$CURL_UA" ${GITHUB_TOKEN:+-H "Authorization: Bearer ${GITHUB_TOKEN}"} \
+        -H 'Accept: application/vnd.github+json' \
+        "https://api.github.com/repos/$1/releases/latest" 2>/dev/null \
+        | jq -r '.tag_name // empty'
 }
 
-# Find asset download URL from release HTML page (no API quota used)
-_github_asset_url() {
-    local repo="$1" tag="$2" pattern="$3"
-    local html url line
-    html=$(curl -fsSL -A "$CURL_UA" -L "https://github.com/${repo}/releases/expanded_assets/${tag}" 2>/dev/null) || html=""
-    # Prefer Perl \K (fast); fall back to grep -E (no PCRE / uutils grep)
-    url=$(echo "$html" | grep -oP 'href="\K[^"]*'"$pattern"'[^"]*' 2>/dev/null | head -1)
-    [[ -z "$url" ]] && url=$(echo "$html" | grep -oE 'href="[^"]+"' | sed 's/^href="//;s/"$//' | grep -F "$pattern" | head -1)
-    if [[ -n "$url" && ! "$url" =~ ^https ]]; then
-        [[ "$url" =~ ^// ]] && url="https:${url}"
-        [[ "$url" =~ ^/ ]] && url="https://github.com${url}"
-    fi
-    echo "$url"
-}
-
-# Reliable asset URL via GitHub API (uses GITHUB_TOKEN if set)
+# Reliable asset URL via GitHub API
 _github_api_asset_url() {
     local repo="$1" pattern="$2"
     curl -sSf -A "$CURL_UA" ${GITHUB_TOKEN:+-H "Authorization: Bearer ${GITHUB_TOKEN}"} \
         -H 'Accept: application/vnd.github+json' \
         "https://api.github.com/repos/${repo}/releases/latest" 2>/dev/null \
-        | grep browser_download_url | grep -F "$pattern" | head -1 | cut -d'"' -f4
+        | jq -r ".assets[] | select(.browser_download_url | contains(\"$pattern\")) | .browser_download_url" | head -1
+}
+
+# Wrapper for retro-compatibility in the script
+_github_asset_url() {
+    _github_api_asset_url "$1" "$3"
 }
 
 github_latest_version() {

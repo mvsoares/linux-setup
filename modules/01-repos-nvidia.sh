@@ -155,11 +155,17 @@ https://dl.google.com/linux/chrome/deb/ stable main" \
     fi
 
     # NodeSource LTS
-    if command -v node &>/dev/null; then
+    if command -v node &>/dev/null \
+            || { [[ -f /etc/apt/sources.list.d/nodesource.list ]] \
+                 && [[ -s /etc/apt/keyrings/nodesource.gpg ]]; }; then
         tick "NodeSource — already present"
     else
         info "Adding NodeSource LTS repo..."
-        curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - >> "$LOG_FILE" 2>&1 || warn "NodeSource setup had errors"
+        mkdir -p /etc/apt/keyrings
+        curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key \
+            | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg >> "$LOG_FILE" 2>&1 || warn "NodeSource key failed"
+        echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_20.x nodistro main" \
+            > /etc/apt/sources.list.d/nodesource.list
         tick "NodeSource LTS repo added"
     fi
 

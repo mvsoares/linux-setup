@@ -19,7 +19,7 @@
 #   sudo bash setup.sh --list          — list all steps
 #   sudo bash setup.sh --skip 2        — skip NVIDIA (e.g., if no GPU)
 # =============================================================================
-set -uo pipefail
+set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 

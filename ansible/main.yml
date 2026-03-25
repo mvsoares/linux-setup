@@ -1,0 +1,12 @@
+---
+- name: Workstation Full Setup
+  hosts: localhost
+  connection: local
+  become: yes
+
+  vars_files:
+    - group_vars/all.yml
+
+  roles:
+    - role: system_core
+      tags: ['core', 'repos']

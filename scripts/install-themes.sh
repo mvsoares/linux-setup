@@ -46,14 +46,12 @@ if [[ -d "$CATPPUCCIN_DEST" ]] || ls /usr/share/themes/catppuccin-* &>/dev/null 
 else
     info "Installing Catppuccin Mocha GTK theme..."
     local_tmp=$(mktemp -d)
-    CAPP_URL=$(curl -sSf "https://api.github.com/repos/catppuccin/gtk/releases/latest" 2>/dev/null \
-        | grep browser_download_url | grep -i "mocha" | grep -i "mauve" | head -1 | cut -d'"' -f4 || echo "")
-    if [[ -n "$CAPP_URL" ]]; then
-        curl -fsSL "$CAPP_URL" -o "${local_tmp}/catppuccin.zip" >> "$LOG_FILE" 2>&1
+    CAPP_URL="https://github.com/catppuccin/gtk/releases/latest/download/catppuccin-mocha-mauve-standard+default.zip"
+    if curl -fsSL "$CAPP_URL" -o "${local_tmp}/catppuccin.zip" >> "$LOG_FILE" 2>&1; then
         unzip -qo "${local_tmp}/catppuccin.zip" -d /usr/share/themes/ >> "$LOG_FILE" 2>&1 \
             && ok "Catppuccin Mocha GTK theme" || warn "Catppuccin GTK unzip failed"
     else
-        warn "Catppuccin GTK — release URL not found"
+        warn "Catppuccin GTK — download failed"
     fi
     rm -rf "$local_tmp"
 fi
@@ -114,32 +112,30 @@ if [[ -d /usr/share/icons/Bibata-Modern-Classic ]]; then
     skip "Bibata Modern Classic cursor"
 else
     info "Installing Bibata Modern cursor..."
-    BIBATA_URL=$(curl -sSf "https://api.github.com/repos/ful1e5/Bibata_Cursor/releases/latest" 2>/dev/null \
-        | grep browser_download_url | grep "Bibata-Modern-Classic.tar.xz" | head -1 | cut -d'"' -f4 || echo "")
-    if [[ -n "$BIBATA_URL" ]]; then
-        local_tmp=$(mktemp -d)
-        curl -fsSL "$BIBATA_URL" -o "${local_tmp}/bibata.tar.xz" >> "$LOG_FILE" 2>&1
+    BIBATA_URL="https://github.com/ful1e5/Bibata_Cursor/releases/latest/download/Bibata-Modern-Classic.tar.xz"
+    local_tmp=$(mktemp -d)
+    if curl -fsSL "$BIBATA_URL" -o "${local_tmp}/bibata.tar.xz" >> "$LOG_FILE" 2>&1; then
         tar xf "${local_tmp}/bibata.tar.xz" -C /usr/share/icons/ >> "$LOG_FILE" 2>&1 \
             && ok "Bibata Modern Classic cursor" || warn "Bibata extract failed"
-        rm -rf "$local_tmp"
     else
-        warn "Bibata cursor — release not found"
+        warn "Bibata cursor (Classic) — download failed"
     fi
+    rm -rf "$local_tmp"
 fi
 
 # Bibata Modern Ice
 if [[ -d /usr/share/icons/Bibata-Modern-Ice ]]; then
     skip "Bibata Modern Ice cursor"
 else
-    BIBATA_ICE_URL=$(curl -sSf "https://api.github.com/repos/ful1e5/Bibata_Cursor/releases/latest" 2>/dev/null \
-        | grep browser_download_url | grep "Bibata-Modern-Ice.tar.xz" | head -1 | cut -d'"' -f4 || echo "")
-    if [[ -n "$BIBATA_ICE_URL" ]]; then
-        local_tmp=$(mktemp -d)
-        curl -fsSL "$BIBATA_ICE_URL" -o "${local_tmp}/bibata-ice.tar.xz" >> "$LOG_FILE" 2>&1
+    BIBATA_ICE_URL="https://github.com/ful1e5/Bibata_Cursor/releases/latest/download/Bibata-Modern-Ice.tar.xz"
+    local_tmp=$(mktemp -d)
+    if curl -fsSL "$BIBATA_ICE_URL" -o "${local_tmp}/bibata-ice.tar.xz" >> "$LOG_FILE" 2>&1; then
         tar xf "${local_tmp}/bibata-ice.tar.xz" -C /usr/share/icons/ >> "$LOG_FILE" 2>&1 \
             && ok "Bibata Modern Ice cursor" || warn "Bibata Ice extract failed"
-        rm -rf "$local_tmp"
+    else
+        warn "Bibata cursor (Ice) — download failed"
     fi
+    rm -rf "$local_tmp"
 fi
 
 echo ""
