@@ -78,7 +78,14 @@ tick "Browsers (Google Chrome)"
 
 info "Installing video & codecs..."
 if is_fedora; then
-    dnf_quiet install ffmpeg mpv celluloid colord yt-dlp
+    # ffmpeg-free (Fedora default) conflicts with full ffmpeg from RPM Fusion — swap it
+    if rpm -q ffmpeg-free &>/dev/null; then
+        dnf -y -q swap ffmpeg-free ffmpeg --allowerasing >> "$LOG_FILE" 2>&1 \
+            || warn "ffmpeg swap failed"
+    else
+        dnf_quiet install ffmpeg
+    fi
+    dnf_quiet install mpv celluloid colord yt-dlp
     dnf_each vlc \
         gstreamer1-plugins-base gstreamer1-plugins-good \
         gstreamer1-plugins-bad-free gstreamer1-plugins-ugly-free \
@@ -169,13 +176,16 @@ if ! command -v procs &>/dev/null; then
     _procs_tag=$(_github_latest_tag "dalance/procs")
     _procs_url=""
     [[ -n "$_procs_tag" ]] && _procs_url=$(_github_asset_url "dalance/procs" "$_procs_tag" "x86_64-linux.zip")
-    [[ -z "$_procs_url" ]] && _procs_url=$(curl -sSf "https://api.github.com/repos/dalance/procs/releases/latest" 2>/dev/null \
-        | grep browser_download_url | grep "x86_64-linux.zip" | head -1 | cut -d'"' -f4)
+    [[ -z "$_procs_url" ]] && _procs_url=$(safe_curl_json "https://api.github.com/repos/dalance/procs/releases/latest" \
+        | jq -r '.assets[].browser_download_url | select(contains("x86_64-linux.zip"))' | head -1)
     if [[ -n "$_procs_url" ]]; then
         _procs_tmp=$(mktemp -d)
-        curl -sSfL "$_procs_url" -o "$_procs_tmp/procs.zip" >> "$LOG_FILE" 2>&1
-        unzip -q "$_procs_tmp/procs.zip" -d "$_procs_tmp" >> "$LOG_FILE" 2>&1
-        install "$_procs_tmp/procs" /usr/local/bin/procs && ok "procs installed" || warn "procs install failed"
+        if safe_download "$_procs_url" "$_procs_tmp/procs.zip" \
+                && unzip -q "$_procs_tmp/procs.zip" -d "$_procs_tmp" >> "$LOG_FILE" 2>&1; then
+            install "$_procs_tmp/procs" /usr/local/bin/procs && ok "procs installed" || warn "procs install failed"
+        else
+            warn "procs — download/extract failed"
+        fi
         rm -rf "$_procs_tmp"
     else
         warn "procs — could not find release"

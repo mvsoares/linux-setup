@@ -88,19 +88,23 @@ if command -v nvim &>/dev/null; then
     skip "Neovim"
 else
     info "Installing Neovim (latest stable)..."
-    NVIM_URL=$(curl -sSf "https://api.github.com/repos/neovim/neovim/releases/latest" 2>/dev/null \
-        | grep browser_download_url | grep "nvim-linux-$(uname -m).tar.gz" | head -1 | cut -d'"' -f4 || echo "")
+    NVIM_URL=$(safe_curl_json "https://api.github.com/repos/neovim/neovim/releases/latest" \
+        | jq -r ".assets[].browser_download_url | select(contains(\"nvim-linux-$(uname -m).tar.gz\"))" | head -1)
     if [[ -n "$NVIM_URL" ]]; then
         local_tmp=$(mktemp -d)
-        curl -fsSL "$NVIM_URL" | tar xz -C "$local_tmp" >> "$LOG_FILE" 2>&1
-        NVIM_DIR=$(ls -d "$local_tmp"/nvim-linux* 2>/dev/null | head -1)
-        if [[ -d "$NVIM_DIR" ]]; then
-            rm -rf /opt/nvim
-            mv "$NVIM_DIR" /opt/nvim
-            ln -sf /opt/nvim/bin/nvim /usr/local/bin/nvim
-            ok "Neovim installed to /opt/nvim"
+        if safe_download "$NVIM_URL" "$local_tmp/nvim.tar.gz" \
+                && tar xz -C "$local_tmp" -f "$local_tmp/nvim.tar.gz" >> "$LOG_FILE" 2>&1; then
+            NVIM_DIR=$(ls -d "$local_tmp"/nvim-linux* 2>/dev/null | head -1)
+            if [[ -d "$NVIM_DIR" ]]; then
+                rm -rf /opt/nvim
+                mv "$NVIM_DIR" /opt/nvim
+                ln -sf /opt/nvim/bin/nvim /usr/local/bin/nvim
+                ok "Neovim installed to /opt/nvim"
+            else
+                warn "Neovim — extracted dir not found"
+            fi
         else
-            warn "Neovim — extracted dir not found"
+            warn "Neovim — download/extract failed"
         fi
         rm -rf "$local_tmp"
     else

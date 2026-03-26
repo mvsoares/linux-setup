@@ -29,7 +29,9 @@ sysctl --system >> "$LOG_FILE" 2>&1 || warn "sysctl errors"
 tick "Kernel parameters (swappiness=10, inotify, network)"
 
 # ── Services ──────────────────────────────────────────────────────────────────
-systemctl enable preload     >> "$LOG_FILE" 2>&1 && ok "preload enabled"     || true
+if ! is_fedora; then
+    systemctl enable preload >> "$LOG_FILE" 2>&1 && ok "preload enabled" || true
+fi
 systemctl enable fstrim.timer >> "$LOG_FILE" 2>&1 && ok "fstrim.timer enabled" || true
 tick "Services: preload + fstrim"
 
@@ -151,11 +153,11 @@ tick "Helper scripts (display-setup, sysreport)"
 # ── Cleanup ───────────────────────────────────────────────────────────────────
 info "Running cleanup..."
 if is_fedora; then
-    dnf_quiet autoremove
-    dnf_quiet clean all
+    dnf_quiet autoremove || true
+    dnf_quiet clean all || true
 else
-    apt_quiet autoremove
-    apt_quiet autoclean
+    apt_quiet autoremove || true
+    apt_quiet autoclean || true
     # Remove orphan snaps
     snap list --all 2>/dev/null | awk '/disabled/{print $1, $3}' | while read snapname revision; do
         snap remove "$snapname" --revision="$revision" >> "$LOG_FILE" 2>&1 || true

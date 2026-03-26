@@ -176,7 +176,12 @@ if command -v kubectl &>/dev/null; then
     skip "kubectl"
 else
     info "Installing kubectl..."
-    KUBECTL_VER=$(curl -fsSL https://dl.k8s.io/release/stable.txt 2>/dev/null)
+    if [[ "${USE_PINNED_VERSIONS:-}" == "true" ]]; then
+        KUBECTL_VER="${KUBECTL_VER_PIN:-}"
+    else
+        KUBECTL_VER=$(safe_curl_text "https://dl.k8s.io/release/stable.txt")
+        [[ -z "$KUBECTL_VER" ]] && KUBECTL_VER="${KUBECTL_VER_PIN:-}"
+    fi
     if [[ -n "$KUBECTL_VER" ]]; then
         curl -fsSL "https://dl.k8s.io/release/${KUBECTL_VER}/bin/linux/$(get_arch)/kubectl" \
             -o /usr/local/bin/kubectl >> "$LOG_FILE" 2>&1
@@ -217,24 +222,28 @@ else
     local_tmp=$(mktemp -d)
     _kubectx_ver="v$(github_latest_version ahmetb/kubectx)"
     _kubectx_arch=$(uname -m)
-    curl -fsSL "https://github.com/ahmetb/kubectx/releases/latest/download/kubectx_${_kubectx_ver}_linux_${_kubectx_arch}.tar.gz" \
-        -o "$local_tmp/kubectx.tar.gz" >> "$LOG_FILE" 2>&1
-    tar xzf "$local_tmp/kubectx.tar.gz" -C "$local_tmp" >> "$LOG_FILE" 2>&1
-    if [[ -f "$local_tmp/kubectx" ]]; then
-        install "$local_tmp/kubectx" /usr/local/bin/kubectx
+    if [[ "$_kubectx_ver" == "v" ]]; then
+        warn "kubectx — could not determine version"; rm -rf "$local_tmp"
     else
-        warn "kubectx — binary not found in archive"
+        if curl -fsSL "https://github.com/ahmetb/kubectx/releases/latest/download/kubectx_${_kubectx_ver}_linux_${_kubectx_arch}.tar.gz" \
+            -o "$local_tmp/kubectx.tar.gz" >> "$LOG_FILE" 2>&1 && \
+           tar xzf "$local_tmp/kubectx.tar.gz" -C "$local_tmp" >> "$LOG_FILE" 2>&1 && \
+           [[ -f "$local_tmp/kubectx" ]]; then
+            install "$local_tmp/kubectx" /usr/local/bin/kubectx
+        else
+            warn "kubectx — download/extract failed"
+        fi
+        if curl -fsSL "https://github.com/ahmetb/kubectx/releases/latest/download/kubens_${_kubectx_ver}_linux_${_kubectx_arch}.tar.gz" \
+            -o "$local_tmp/kubens.tar.gz" >> "$LOG_FILE" 2>&1 && \
+           tar xzf "$local_tmp/kubens.tar.gz" -C "$local_tmp" >> "$LOG_FILE" 2>&1 && \
+           [[ -f "$local_tmp/kubens" ]]; then
+            install "$local_tmp/kubens" /usr/local/bin/kubens
+        else
+            warn "kubens — download/extract failed"
+        fi
+        rm -rf "$local_tmp"
+        ok "kubectx + kubens"
     fi
-    curl -fsSL "https://github.com/ahmetb/kubectx/releases/latest/download/kubens_${_kubectx_ver}_linux_${_kubectx_arch}.tar.gz" \
-        -o "$local_tmp/kubens.tar.gz" >> "$LOG_FILE" 2>&1
-    tar xzf "$local_tmp/kubens.tar.gz" -C "$local_tmp" >> "$LOG_FILE" 2>&1
-    if [[ -f "$local_tmp/kubens" ]]; then
-        install "$local_tmp/kubens" /usr/local/bin/kubens
-    else
-        warn "kubens — binary not found in archive"
-    fi
-    rm -rf "$local_tmp"
-    ok "kubectx + kubens"
 fi
 
 # kustomize

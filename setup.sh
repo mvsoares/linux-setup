@@ -110,7 +110,7 @@ should_run_step() {
 }
 
 # ── Banner ────────────────────────────────────────────────────────────────────
-clear
+clear 2>/dev/null || true
 echo -e "${BOLD}${CYAN}"
 cat << 'BANNER'
 
@@ -134,6 +134,13 @@ echo ""
 require_root
 detect_user
 info "Configuring for user: ${BOLD}${REAL_USER}${RESET} (${USER_HOME})"
+if [[ -z "${GITHUB_TOKEN:-}" ]]; then
+    warn "GITHUB_TOKEN not set — GitHub API limited to 60 req/hr (may cause skipped installs)"
+    info "  To fix: export GITHUB_TOKEN=ghp_xxx before running, or set in /etc/environment"
+fi
+if [[ "${USE_PINNED_VERSIONS:-}" == "true" ]]; then
+    info "USE_PINNED_VERSIONS=true — skipping API version lookups, using versions.conf pins"
+fi
 ensure_user_local_bin_path
 
 # Keep sudo alive

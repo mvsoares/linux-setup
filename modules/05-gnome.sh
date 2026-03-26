@@ -41,8 +41,7 @@ install_extension() {
     for try_ver in "${SHELL_VER}" "${SHELL_MAJOR}.0" ""; do
         local qp="pk=${ext_id}"
         [[ -n "$try_ver" ]] && qp+="&shell_version=${try_ver}"
-        info_json=$(curl -fsSL -A "${CURL_UA:-Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36}" \
-            "https://extensions.gnome.org/extension-info/?${qp}" 2>/dev/null)
+        info_json=$(safe_curl_text "https://extensions.gnome.org/extension-info/?${qp}")
         [[ -n "$info_json" ]] && echo "$info_json" | python3 -c "import sys,json; json.load(sys.stdin)" &>/dev/null && break
         info_json=""
     done

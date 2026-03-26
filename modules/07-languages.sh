@@ -9,9 +9,13 @@ if [[ -d "$NVM_DIR" ]]; then
     skip "nvm"
 else
     info "Installing nvm..."
-    NVM_VER=$(curl -fsSL "https://api.github.com/repos/nvm-sh/nvm/releases/latest" 2>/dev/null \
-        | grep tag_name | cut -d'"' -f4)
-    [[ -z "$NVM_VER" ]] && NVM_VER="v0.40.1"
+    if [[ "${USE_PINNED_VERSIONS:-}" == "true" ]]; then
+        NVM_VER="${NVM_VER_PIN:-v0.40.1}"
+    else
+        NVM_VER=$(safe_curl_json "https://api.github.com/repos/nvm-sh/nvm/releases/latest" \
+            | jq -r '.tag_name // empty')
+        [[ -z "$NVM_VER" ]] && NVM_VER="${NVM_VER_PIN:-v0.40.1}"
+    fi
     as_user "curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/${NVM_VER}/install.sh | bash" \
         >> "$LOG_FILE" 2>&1 && ok "nvm ${NVM_VER}" || warn "nvm install failed"
     # Install latest LTS node via nvm
@@ -87,7 +91,12 @@ if command -v go &>/dev/null; then
     skip "Go ($(go version 2>/dev/null | awk '{print $3}'))"
 else
     info "Installing latest Go..."
-    GO_VER=$(curl -fsSL "https://go.dev/VERSION?m=text" 2>/dev/null | head -1)
+    if [[ "${USE_PINNED_VERSIONS:-}" == "true" ]]; then
+        GO_VER="${GO_VER_PIN:-}"
+    else
+        GO_VER=$(safe_curl_text "https://go.dev/VERSION?m=text" | head -1)
+        [[ -z "$GO_VER" ]] && GO_VER="${GO_VER_PIN:-}"
+    fi
     if [[ -n "$GO_VER" ]]; then
         GO_ARCH=$(get_arch)
         rm -rf /usr/local/go

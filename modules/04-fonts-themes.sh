@@ -7,9 +7,13 @@ FONT_DIR="/usr/local/share/fonts/custom"
 mkdir -p "${FONT_DIR}/mono" "${FONT_DIR}/general"
 
 # ── Nerd Font installer ──────────────────────────────────────────────────────
-NERD_FONT_VER=$(curl -sSf "https://api.github.com/repos/ryanoasis/nerd-fonts/releases/latest" 2>/dev/null \
-    | grep tag_name | cut -d'"' -f4)
-[[ -z "$NERD_FONT_VER" ]] && NERD_FONT_VER="v3.3.0"
+if [[ "${USE_PINNED_VERSIONS:-}" == "true" ]]; then
+    NERD_FONT_VER="${NERD_FONT_VER_PIN:-v3.3.0}"
+else
+    NERD_FONT_VER=$(safe_curl_json "https://api.github.com/repos/ryanoasis/nerd-fonts/releases/latest" \
+        | jq -r '.tag_name // empty')
+    [[ -z "$NERD_FONT_VER" ]] && NERD_FONT_VER="${NERD_FONT_VER_PIN:-v3.3.0}"
+fi
 
 install_nerd_font() {
     local name="$1" slug="$2"
@@ -19,15 +23,33 @@ install_nerd_font() {
         return
     fi
     local url="https://github.com/ryanoasis/nerd-fonts/releases/download/${NERD_FONT_VER}/${slug}.zip"
-    if curl -fsSL "$url" -o "/tmp/${slug}.zip" >> "$LOG_FILE" 2>&1; then
+    local zipfile="/tmp/nerd-${slug}-$$.zip"
+    if safe_download "$url" "$zipfile"; then
         mkdir -p "$dest"
-        unzip -qo "/tmp/${slug}.zip" -d "$dest" >> "$LOG_FILE" 2>&1 || true
-        rm -f "/tmp/${slug}.zip"
+        unzip -qo "$zipfile" -d "$dest" >> "$LOG_FILE" 2>&1 || true
+        rm -f "$zipfile"
         find "$dest" -name "*Windows*" -delete 2>/dev/null || true
         ok "${name} Nerd Font"
     else
+        rm -f "$zipfile"
         warn "${name} download failed"
     fi
+}
+
+# Parallel wrapper: download up to 4 Nerd Fonts concurrently
+_NERD_PIDS=()
+_nerd_font_bg() {
+    install_nerd_font "$1" "$2" &
+    _NERD_PIDS+=($!)
+    # Throttle: max 4 concurrent downloads
+    if [[ ${#_NERD_PIDS[@]} -ge 4 ]]; then
+        wait "${_NERD_PIDS[0]}" 2>/dev/null || true
+        _NERD_PIDS=("${_NERD_PIDS[@]:1}")
+    fi
+}
+_nerd_font_wait() {
+    for pid in "${_NERD_PIDS[@]}"; do wait "$pid" 2>/dev/null || true; done
+    _NERD_PIDS=()
 }
 
 # ── Google Font installer ────────────────────────────────────────────────────
@@ -40,7 +62,7 @@ install_google_font() {
     fi
     local encoded="${name// /+}"
     local manifest
-    manifest=$(curl -fsSL "https://fonts.google.com/download/list?family=${encoded}" 2>/dev/null | tail -n +2)
+    manifest=$(safe_curl_text "https://fonts.google.com/download/list?family=${encoded}" | tail -n +2)
     if [[ -z "$manifest" ]]; then
         warn "${name} — manifest fetch failed"
         return
@@ -75,43 +97,48 @@ install_github_font() {
         return
     fi
     local url
-    url=$(curl -sSf "https://api.github.com/repos/${repo}/releases/latest" 2>/dev/null \
-        | grep browser_download_url | grep "$pattern" | head -1 | cut -d'"' -f4)
+    url=$(safe_curl_json "https://api.github.com/repos/${repo}/releases/latest" \
+        | jq -r ".assets[].browser_download_url | select(contains(\"$pattern\"))" | head -1)
     if [[ -n "$url" ]]; then
         mkdir -p "$dest"
         local tmp="/tmp/font-${name}.zip"
-        curl -fsSL "$url" -o "$tmp" >> "$LOG_FILE" 2>&1
-        unzip -qo "$tmp" -d "$dest" >> "$LOG_FILE" 2>&1 || true
-        rm -f "$tmp"
-        find "$dest" -name "*Windows*" -delete 2>/dev/null || true
-        ok "${name}"
+        if curl -fsSL "$url" -o "$tmp" >> "$LOG_FILE" 2>&1; then
+            unzip -qo "$tmp" -d "$dest" >> "$LOG_FILE" 2>&1 || true
+            rm -f "$tmp"
+            find "$dest" -name "*Windows*" -delete 2>/dev/null || true
+            ok "${name}"
+        else
+            rm -f "$tmp"
+            warn "${name} — download failed"
+        fi
     else
         warn "${name} — release not found"
     fi
 }
 
 # ── 1. Nerd Fonts (monospace, patched with icons) ────────────────────────────
-info "Installing Nerd Fonts (patched monospace)..."
-install_nerd_font "JetBrainsMono" "JetBrainsMono"
-install_nerd_font "FiraCode"      "FiraCode"
-install_nerd_font "CascadiaCode"  "CascadiaCode"
-install_nerd_font "Hack"          "Hack"
-install_nerd_font "Inconsolata"   "Inconsolata"
-install_nerd_font "Meslo"         "Meslo"
-install_nerd_font "Iosevka"       "Iosevka"
-install_nerd_font "IosevkaTerm"   "IosevkaTerm"
-install_nerd_font "SpaceMono"     "SpaceMono"
-install_nerd_font "VictorMono"    "VictorMono"
-install_nerd_font "IBMPlexMono"   "IBMPlexMono"
-install_nerd_font "SourceCodePro" "SourceCodePro"
-install_nerd_font "UbuntuMono"    "UbuntuMono"
-install_nerd_font "RobotoMono"    "RobotoMono"
-install_nerd_font "CommitMono"    "CommitMono"
-install_nerd_font "Monaspace"     "Monaspace"
-install_nerd_font "GeistMono"     "GeistMono"
-install_nerd_font "0xProto"       "0xProto"
-install_nerd_font "ZedMono"       "ZedMono"
-install_nerd_font "Recursive"     "Recursive"
+info "Installing Nerd Fonts (patched monospace, 4 parallel downloads)..."
+_nerd_font_bg "JetBrainsMono" "JetBrainsMono"
+_nerd_font_bg "FiraCode"      "FiraCode"
+_nerd_font_bg "CascadiaCode"  "CascadiaCode"
+_nerd_font_bg "Hack"          "Hack"
+_nerd_font_bg "Inconsolata"   "Inconsolata"
+_nerd_font_bg "Meslo"         "Meslo"
+_nerd_font_bg "Iosevka"       "Iosevka"
+_nerd_font_bg "IosevkaTerm"   "IosevkaTerm"
+_nerd_font_bg "SpaceMono"     "SpaceMono"
+_nerd_font_bg "VictorMono"    "VictorMono"
+_nerd_font_bg "IBMPlexMono"   "IBMPlexMono"
+_nerd_font_bg "SourceCodePro" "SourceCodePro"
+_nerd_font_bg "UbuntuMono"    "UbuntuMono"
+_nerd_font_bg "RobotoMono"    "RobotoMono"
+_nerd_font_bg "CommitMono"    "CommitMono"
+_nerd_font_bg "Monaspace"     "Monaspace"
+_nerd_font_bg "GeistMono"     "GeistMono"
+_nerd_font_bg "0xProto"       "0xProto"
+_nerd_font_bg "ZedMono"       "ZedMono"
+_nerd_font_bg "Recursive"     "Recursive"
+_nerd_font_wait
 tick "20+ Nerd Fonts (mono, patched with icons)"
 
 # ── 2. Package manager monospace fonts ───────────────────────────────────────

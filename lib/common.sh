@@ -307,7 +307,30 @@ final_repo_upgrade() {
 # extensions.gnome.org rejects bare curl with 403/empty.
 CURL_UA='Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
 
-# Optional: export GITHUB_TOKEN for higher GitHub API rate limits (CI / many VMs).
+# ── Pinned versions (fallback defaults) ──────────────────────────────────────
+if [[ -f "${SCRIPT_DIR}/versions.conf" ]]; then
+    # shellcheck source=../versions.conf
+    source "${SCRIPT_DIR}/versions.conf"
+fi
+
+# ── Safe curl wrappers ───────────────────────────────────────────────────────
+# These never crash the script under set -euo pipefail.
+
+# Returns JSON body on success, '{}' on failure. Safe for piping to jq.
+safe_curl_json() {
+    curl -sSf -A "$CURL_UA" ${GITHUB_TOKEN:+-H "Authorization: Bearer ${GITHUB_TOKEN}"} \
+        -H 'Accept: application/vnd.github+json' "$1" 2>/dev/null || echo '{}'
+}
+
+# Returns text body on success, empty string on failure.
+safe_curl_text() {
+    curl -fsSL "$1" 2>/dev/null || true
+}
+
+# Downloads a file. Returns 0 on success, 1 on failure.
+safe_download() {
+    curl -fsSL -A "$CURL_UA" "$1" -o "$2" >> "$LOG_FILE" 2>&1
+}
 
 # Ensure jq is installed
 if ! command -v jq &>/dev/null; then
@@ -320,19 +343,16 @@ fi
 
 # Get latest release tag using GitHub API
 _github_latest_tag() {
-    curl -sSf -A "$CURL_UA" ${GITHUB_TOKEN:+-H "Authorization: Bearer ${GITHUB_TOKEN}"} \
-        -H 'Accept: application/vnd.github+json' \
-        "https://api.github.com/repos/$1/releases/latest" 2>/dev/null \
+    safe_curl_json "https://api.github.com/repos/$1/releases/latest" \
         | jq -r '.tag_name // empty'
 }
 
 # Reliable asset URL via GitHub API
 _github_api_asset_url() {
     local repo="$1" pattern="$2"
-    curl -sSf -A "$CURL_UA" ${GITHUB_TOKEN:+-H "Authorization: Bearer ${GITHUB_TOKEN}"} \
-        -H 'Accept: application/vnd.github+json' \
-        "https://api.github.com/repos/${repo}/releases/latest" 2>/dev/null \
-        | jq -r ".assets[] | select(.browser_download_url | contains(\"$pattern\")) | .browser_download_url" | head -1
+    safe_curl_json "https://api.github.com/repos/${repo}/releases/latest" \
+        | jq -r ".assets[] | select(.browser_download_url | contains(\"$pattern\")) | .browser_download_url" \
+        | head -1
 }
 
 # Wrapper for retro-compatibility in the script
@@ -341,30 +361,32 @@ _github_asset_url() {
 }
 
 github_latest_version() {
-    local tag
+    local tag=""
     tag=$(_github_latest_tag "$1")
     if [[ -n "$tag" ]]; then
         echo "${tag#v}"
         return
     fi
-    curl -sSf -A "$CURL_UA" ${GITHUB_TOKEN:+-H "Authorization: Bearer ${GITHUB_TOKEN}"} \
-        -H 'Accept: application/vnd.github+json' \
-        "https://api.github.com/repos/$1/releases/latest" 2>/dev/null \
+    # Fallback: grep (no jq dependency)
+    safe_curl_json "https://api.github.com/repos/$1/releases/latest" \
         | grep tag_name | cut -d'"' -f4 | sed 's/^v//'
 }
 
 install_github_deb() {
     local repo="$1" pattern="$2" name="$3"
-    local url tag
+    local url="" tag=""
     tag=$(_github_latest_tag "$repo")
     [[ -n "$tag" ]] && url=$(_github_asset_url "$repo" "$tag" "$pattern")
     [[ -z "$url" ]] && url=$(_github_api_asset_url "$repo" "$pattern")
     if [[ -n "$url" ]]; then
         local tmp=$(mktemp -d)
-        curl -sSfL -A "$CURL_UA" "$url" -o "$tmp/pkg.deb" >> "$LOG_FILE" 2>&1 \
-            && dpkg -i "$tmp/pkg.deb" >> "$LOG_FILE" 2>&1 \
-            && ok "$name installed" \
-            || { apt-get install -f -y >> "$LOG_FILE" 2>&1; warn "$name install had issues"; }
+        if safe_download "$url" "$tmp/pkg.deb" \
+                && dpkg -i "$tmp/pkg.deb" >> "$LOG_FILE" 2>&1; then
+            ok "$name installed"
+        else
+            apt-get install -f -y >> "$LOG_FILE" 2>&1 || true
+            warn "$name install had issues"
+        fi
         rm -rf "$tmp"
     else
         warn "$name — could not find release"
@@ -373,16 +395,18 @@ install_github_deb() {
 
 install_github_rpm() {
     local repo="$1" pattern="$2" name="$3"
-    local url tag
+    local url="" tag=""
     tag=$(_github_latest_tag "$repo")
     [[ -n "$tag" ]] && url=$(_github_asset_url "$repo" "$tag" "$pattern")
     [[ -z "$url" ]] && url=$(_github_api_asset_url "$repo" "$pattern")
     if [[ -n "$url" ]]; then
         local tmp=$(mktemp -d)
-        curl -sSfL -A "$CURL_UA" "$url" -o "$tmp/pkg.rpm" >> "$LOG_FILE" 2>&1 \
-            && dnf install -y "$tmp/pkg.rpm" >> "$LOG_FILE" 2>&1 \
-            && ok "$name installed" \
-            || warn "$name install had issues"
+        if safe_download "$url" "$tmp/pkg.rpm" \
+                && dnf install -y "$tmp/pkg.rpm" >> "$LOG_FILE" 2>&1; then
+            ok "$name installed"
+        else
+            warn "$name install had issues"
+        fi
         rm -rf "$tmp"
     else
         warn "$name — could not find release"
@@ -400,7 +424,7 @@ install_github_pkg() {
 
 install_github_tar() {
     local repo="$1" pattern="$2" binary="$3" name="$4"
-    local url tag altpat
+    local url="" tag="" altpat=""
     # Try redirect + HTML scrape (no API quota)
     tag=$(_github_latest_tag "$repo")
     [[ -n "$tag" ]] && url=$(_github_asset_url "$repo" "$tag" "$pattern")
@@ -422,9 +446,12 @@ install_github_tar() {
     fi
     if [[ -n "$url" ]]; then
         local tmp=$(mktemp -d)
-        # Download to file first — tar can auto-detect compression from file but not from stdin pipe
-        curl -sSfL -A "$CURL_UA" "$url" -o "$tmp/archive" >> "$LOG_FILE" 2>&1
-        tar -xf "$tmp/archive" -C "$tmp" >> "$LOG_FILE" 2>&1
+        if ! safe_download "$url" "$tmp/archive"; then
+            warn "$name — download failed"; rm -rf "$tmp"; return 0
+        fi
+        if ! tar -xf "$tmp/archive" -C "$tmp" >> "$LOG_FILE" 2>&1; then
+            warn "$name — extraction failed"; rm -rf "$tmp"; return 0
+        fi
         local bin_path
         bin_path=$(find "$tmp" -name "$binary" -type f 2>/dev/null | head -1)
         if [[ -n "$bin_path" ]]; then
