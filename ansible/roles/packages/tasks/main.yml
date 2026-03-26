@@ -1,0 +1,49 @@
+---
+# Role: packages — Install system packages by category.
+
+# Build the combined package list for this distro family
+- name: Build package list
+  ansible.builtin.set_fact:
+    _pkg_list: >-
+      {{
+        (system_packages | dict2items | map(attribute='value') | map(attribute='common') | flatten) +
+        (system_packages | dict2items | map(attribute='value')
+          | map(attribute=('debian' if ansible_os_family == 'Debian' else 'redhat'))
+          | flatten)
+      }}
+
+- name: Install system packages (Debian)
+  ansible.builtin.apt:
+    name: "{{ _pkg_list }}"
+    state: present
+    update_cache: yes
+    cache_valid_time: 3600
+  when: ansible_os_family == 'Debian'
+
+- name: Install system packages (RedHat)
+  ansible.builtin.dnf:
+    name: "{{ _pkg_list }}"
+    state: present
+  when: ansible_os_family == 'RedHat'
+
+# ── Snap packages (Ubuntu only) ────────────────────────────────────────────
+- name: Install snap packages (Ubuntu)
+  community.general.snap:
+    name: "{{ item.name }}"
+    classic: "{{ item.classic }}"
+    state: present
+  loop: "{{ snap_packages }}"
+  when:
+    - ansible_os_family == 'Debian'
+    - snap_packages is defined
+    - snap_packages | length > 0
+  failed_when: false
+
+# ── Fedora extras (replaces snaps) ─────────────────────────────────────────
+- name: Install Fedora extras
+  ansible.builtin.dnf:
+    name: "{{ fedora_extras }}"
+    state: present
+  when:
+    - ansible_os_family == 'RedHat'
+    - fedora_extras is defined

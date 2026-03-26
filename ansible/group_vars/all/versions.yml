@@ -1,0 +1,16 @@
+---
+# Pinned tool versions — used as fallbacks when API lookups fail,
+# or as fixed pins when use_pinned_versions: true.
+# Override: ansible-playbook main.yml -e use_pinned_versions=true
+
+use_pinned_versions: false
+
+pinned_versions:
+  nerd_font: "v3.3.0"
+  nvm: "v0.40.1"
+  go: "go1.23.4"
+  kubectl: "v1.31.3"
+
+# Optional GitHub PAT for higher API rate limits (5000 vs 60 req/hr)
+# Override: ansible-playbook main.yml -e github_token=ghp_xxx
+# github_token: ""

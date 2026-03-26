@@ -1,0 +1,65 @@
+---
+# Font configuration — Nerd Fonts, Google Fonts, and package manager fonts.
+
+font_dir: /usr/local/share/fonts/custom
+
+nerd_fonts:
+  - JetBrainsMono
+  - FiraCode
+  - CascadiaCode
+  - Hack
+  - Inconsolata
+  - Meslo
+  - Iosevka
+  - IosevkaTerm
+  - SpaceMono
+  - VictorMono
+  - IBMPlexMono
+  - SourceCodePro
+  - UbuntuMono
+  - RobotoMono
+  - CommitMono
+  - Monaspace
+  - GeistMono
+  - 0xProto
+  - ZedMono
+  - Recursive
+
+google_fonts:
+  - Inter
+  - Nunito
+  - Poppins
+  - Raleway
+  - Montserrat
+  - "Playfair Display"
+  - Merriweather
+  - "Work Sans"
+  - "DM Sans"
+  - Outfit
+  - Geist
+
+package_fonts:
+  debian:
+    - fonts-firacode
+    - fonts-hack
+    - fonts-ubuntu
+    - fonts-roboto
+    - fonts-noto-mono
+    - fonts-jetbrains-mono
+    - fonts-cascadia-code
+    - fonts-inter
+    - fonts-lato
+    - fonts-open-sans
+    - fonts-liberation
+    - fonts-liberation2
+  redhat:
+    - fira-code-fonts
+    - source-foundry-hack-fonts
+    - google-roboto-mono-fonts
+    - google-noto-mono-fonts
+    - jetbrains-mono-fonts
+    - cascadia-code-fonts
+    - lato-fonts
+    - open-sans-fonts
+    - liberation-mono-fonts
+    - liberation-sans-fonts

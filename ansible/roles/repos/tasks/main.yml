@@ -1,0 +1,190 @@
+---
+# Role: repos — Add 3rd-party package repositories.
+
+# ── Ensure curl is available ────────────────────────────────────────────────
+- name: Ensure curl is installed
+  ansible.builtin.package:
+    name: curl
+    state: present
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# DEBIAN / UBUNTU
+# ═══════════════════════════════════════════════════════════════════════════════
+- name: Enable universe / multiverse / restricted (Ubuntu)
+  ansible.builtin.shell: add-apt-repository -y -n {{ item }}
+  loop: [universe, multiverse, restricted]
+  changed_when: false
+  when: ansible_os_family == 'Debian'
+
+# ── Remove stale/conflicting source files (Debian) ────────────────────────
+# DEB822 .sources files from prior installs conflict with our .list files
+# when Signed-By paths differ. Remove them so apt_repository wins cleanly.
+- name: Remove conflicting stale DEB822 source files (Debian)
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /etc/apt/sources.list.d/vscode.sources
+    - /etc/apt/sources.list.d/google-chrome.sources
+    - /usr/share/keyrings/microsoft.gpg
+  when: ansible_os_family == 'Debian'
+
+# ── Signing keys (Debian) ──────────────────────────────────────────────────
+- name: Create /etc/apt/keyrings directory
+  ansible.builtin.file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: "0755"
+  when: ansible_os_family == 'Debian'
+
+- name: Add GitHub CLI GPG key (Debian)
+  ansible.builtin.get_url:
+    url: https://cli.github.com/packages/githubcli-archive-keyring.gpg
+    dest: /usr/share/keyrings/githubcli-archive-keyring.gpg
+    mode: "0644"
+  when: ansible_os_family == 'Debian'
+
+- name: Add GitHub CLI repo (Debian)
+  ansible.builtin.apt_repository:
+    repo: "deb [arch={{ ansible_architecture | regex_replace('x86_64', 'amd64') }} signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main"
+    filename: github-cli
+    state: present
+  when: ansible_os_family == 'Debian'
+
+- name: Add Google Chrome GPG key (Debian)
+  ansible.builtin.shell: >
+    curl -fsSL https://dl.google.com/linux/linux_signing_key.pub
+    | gpg --batch --yes --dearmor -o /usr/share/keyrings/google-chrome.gpg
+  args:
+    creates: /usr/share/keyrings/google-chrome.gpg
+  when: ansible_os_family == 'Debian'
+
+- name: Add Google Chrome repo (Debian)
+  ansible.builtin.apt_repository:
+    repo: "deb [arch={{ ansible_architecture | regex_replace('x86_64', 'amd64') }} signed-by=/usr/share/keyrings/google-chrome.gpg] https://dl.google.com/linux/chrome/deb/ stable main"
+    filename: google-chrome
+    state: present
+  when: ansible_os_family == 'Debian'
+
+- name: Add Microsoft VSCode GPG key (Debian)
+  ansible.builtin.shell: >
+    curl -fsSL https://packages.microsoft.com/keys/microsoft.asc
+    | gpg --batch --yes --dearmor -o /etc/apt/keyrings/microsoft.gpg
+  args:
+    creates: /etc/apt/keyrings/microsoft.gpg
+  when: ansible_os_family == 'Debian'
+
+- name: Add VSCode repo (Debian)
+  ansible.builtin.apt_repository:
+    repo: "deb [arch={{ ansible_architecture | regex_replace('x86_64', 'amd64') }} signed-by=/etc/apt/keyrings/microsoft.gpg] https://packages.microsoft.com/repos/code stable main"
+    filename: vscode
+    state: present
+  when: ansible_os_family == 'Debian'
+
+- name: Add Brave Browser GPG key (Debian)
+  ansible.builtin.get_url:
+    url: https://brave-browser-apt-release.s3.brave.com/brave-browser-archive-keyring.gpg
+    dest: /usr/share/keyrings/brave-browser-archive-keyring.gpg
+    mode: "0644"
+  when: ansible_os_family == 'Debian'
+
+- name: Add Brave Browser repo (Debian)
+  ansible.builtin.apt_repository:
+    repo: "deb [signed-by=/usr/share/keyrings/brave-browser-archive-keyring.gpg] https://brave-browser-apt-release.s3.brave.com/ stable main"
+    filename: brave-browser-release
+    state: present
+  when: ansible_os_family == 'Debian'
+
+- name: Add NodeSource GPG key (Debian)
+  ansible.builtin.shell: >
+    curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key
+    | gpg --batch --yes --dearmor -o /etc/apt/keyrings/nodesource.gpg
+  args:
+    creates: /etc/apt/keyrings/nodesource.gpg
+  when: ansible_os_family == 'Debian'
+
+- name: Add NodeSource LTS repo (Debian)
+  ansible.builtin.apt_repository:
+    repo: "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_20.x nodistro main"
+    filename: nodesource
+    state: present
+  when: ansible_os_family == 'Debian'
+
+- name: Install Flatpak (Debian)
+  ansible.builtin.apt:
+    name: [flatpak, gnome-software-plugin-flatpak]
+    state: present
+  when: ansible_os_family == 'Debian'
+
+- name: Add Flathub remote
+  ansible.builtin.command: flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+  changed_when: false
+  failed_when: false
+
+- name: Update apt cache
+  ansible.builtin.apt:
+    update_cache: yes
+    cache_valid_time: 3600
+  when: ansible_os_family == 'Debian'
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# REDHAT / FEDORA
+# ═══════════════════════════════════════════════════════════════════════════════
+- name: Enable RPM Fusion free (Fedora)
+  ansible.builtin.dnf:
+    name: "https://download1.rpmfusion.org/free/fedora/rpmfusion-free-release-{{ ansible_distribution_major_version }}.noarch.rpm"
+    state: present
+    disable_gpg_check: yes
+  when: ansible_os_family == 'RedHat'
+  failed_when: false
+
+- name: Enable RPM Fusion nonfree (Fedora)
+  ansible.builtin.dnf:
+    name: "https://download1.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-{{ ansible_distribution_major_version }}.noarch.rpm"
+    state: present
+    disable_gpg_check: yes
+  when: ansible_os_family == 'RedHat'
+  failed_when: false
+
+- name: Add GitHub CLI repo (Fedora)
+  ansible.builtin.command: >
+    dnf config-manager addrepo
+    --from-repofile=https://cli.github.com/packages/rpm/gh-cli.repo
+  args:
+    creates: /etc/yum.repos.d/gh-cli.repo
+  when: ansible_os_family == 'RedHat'
+
+- name: Import Microsoft GPG key (Fedora)
+  ansible.builtin.rpm_key:
+    key: https://packages.microsoft.com/keys/microsoft.asc
+    state: present
+  when: ansible_os_family == 'RedHat'
+
+- name: Add VSCode repo (Fedora)
+  ansible.builtin.yum_repository:
+    name: code
+    description: Visual Studio Code
+    baseurl: https://packages.microsoft.com/yumrepos/vscode
+    gpgcheck: yes
+    gpgkey: https://packages.microsoft.com/keys/microsoft.asc
+  when: ansible_os_family == 'RedHat'
+
+- name: Add Google Chrome repo (Fedora)
+  ansible.builtin.yum_repository:
+    name: google-chrome
+    description: Google Chrome
+    baseurl: https://dl.google.com/linux/chrome/rpm/stable/x86_64
+    gpgcheck: yes
+    gpgkey: https://dl.google.com/linux/linux_signing_key.pub
+  when: ansible_os_family == 'RedHat'
+
+- name: Add Flathub remote (Fedora)
+  ansible.builtin.command: flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+  changed_when: false
+  failed_when: false
+  when: ansible_os_family == 'RedHat'
+
+- name: Refresh dnf cache
+  ansible.builtin.dnf:
+    update_cache: yes
+  when: ansible_os_family == 'RedHat'

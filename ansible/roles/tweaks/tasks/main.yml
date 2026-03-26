@@ -1,0 +1,98 @@
+---
+# Role: tweaks — sysctl tuning, services, firewall, helper scripts.
+
+# ── Sysctl parameters ──────────────────────────────────────────────────────
+- name: Apply sysctl workstation tuning
+  ansible.posix.sysctl:
+    name: "{{ item.key }}"
+    value: "{{ item.value }}"
+    sysctl_file: /etc/sysctl.d/99-workstation.conf
+    reload: yes
+    state: present
+  loop: "{{ sysctl_params | dict2items }}"
+
+# ── Enable common services ─────────────────────────────────────────────────
+- name: Enable common services
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    enabled: yes
+    state: started
+  loop: "{{ services_enable.common }}"
+  failed_when: false
+
+- name: Enable distro-specific services (Debian)
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    enabled: yes
+    state: started
+  loop: "{{ services_enable.debian }}"
+  when: ansible_os_family == 'Debian'
+  failed_when: false
+
+- name: Enable distro-specific services (RedHat)
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    enabled: yes
+    state: started
+  loop: "{{ services_enable.redhat }}"
+  when: ansible_os_family == 'RedHat'
+  failed_when: false
+
+# ── Firewall — UFW (Debian) ────────────────────────────────────────────────
+- name: Install UFW (Debian)
+  ansible.builtin.apt:
+    name: ufw
+    state: present
+  when: ansible_os_family == 'Debian'
+
+- name: Set UFW default deny incoming
+  community.general.ufw:
+    direction: incoming
+    policy: deny
+  when: ansible_os_family == 'Debian'
+
+- name: Set UFW default allow outgoing
+  community.general.ufw:
+    direction: outgoing
+    policy: allow
+  when: ansible_os_family == 'Debian'
+
+- name: Allow SSH through UFW
+  community.general.ufw:
+    rule: allow
+    name: OpenSSH
+  when: ansible_os_family == 'Debian'
+
+- name: Enable UFW
+  community.general.ufw:
+    state: enabled
+  when: ansible_os_family == 'Debian'
+
+# ── Firewall — firewalld (Fedora) ──────────────────────────────────────────
+- name: Ensure firewalld is running (Fedora)
+  ansible.builtin.systemd:
+    name: firewalld
+    enabled: yes
+    state: started
+  when: ansible_os_family == 'RedHat'
+
+- name: Allow SSH through firewalld
+  ansible.posix.firewalld:
+    service: ssh
+    permanent: yes
+    immediate: yes
+    state: enabled
+  when: ansible_os_family == 'RedHat'
+
+# ── Helper scripts ─────────────────────────────────────────────────────────
+- name: Install display-setup helper script
+  ansible.builtin.template:
+    src: display-setup.sh.j2
+    dest: /usr/local/bin/display-setup
+    mode: "0755"
+
+- name: Install sysreport helper script
+  ansible.builtin.template:
+    src: sysreport.sh.j2
+    dest: /usr/local/bin/sysreport
+    mode: "0755"

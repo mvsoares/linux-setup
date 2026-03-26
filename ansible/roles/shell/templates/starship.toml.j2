@@ -1,0 +1,78 @@
+"$schema" = 'https://starship.rs/config-schema.json'
+format = """
+[╭─](bold blue)$os$username$hostname$directory$git_branch$git_status$python$nodejs$rust$golang$java$docker_context$kubernetes$aws$gcloud
+[╰─](bold blue)$character"""
+
+[os]
+disabled = false
+style = "bold cyan"
+
+[username]
+show_always = false
+format = "[$user]($style)@"
+style_user = "bold green"
+
+[hostname]
+ssh_only = true
+format = "[$hostname]($style) "
+style = "bold blue"
+
+[directory]
+style = "bold cyan"
+truncation_length = 4
+truncate_to_repo = false
+
+[git_branch]
+format = " [$symbol$branch]($style)"
+style = "bold purple"
+
+[git_status]
+format = '([$all_status$ahead_behind]($style) )'
+style = "bold red"
+
+[character]
+success_symbol = "[❯](bold green)"
+error_symbol = "[❯](bold red)"
+
+[cmd_duration]
+min_time = 2_000
+format = " [$duration]($style)"
+style = "bold yellow"
+
+[python]
+format = ' [${symbol}${pyenv_prefix}(${version})(\($virtualenv\))]($style)'
+symbol = " "
+
+[nodejs]
+format = ' [$symbol($version)]($style)'
+symbol = " "
+
+[rust]
+format = ' [$symbol($version)]($style)'
+symbol = " "
+
+[golang]
+format = ' [$symbol($version)]($style)'
+symbol = " "
+
+[java]
+format = ' [$symbol($version)]($style)'
+symbol = " "
+
+[docker_context]
+format = ' [$symbol$context]($style)'
+symbol = " "
+
+[kubernetes]
+disabled = false
+format = ' [$symbol$context(\($namespace\))]($style)'
+symbol = "☸ "
+detect_folders = ["k8s", "kube", "kubernetes"]
+
+[aws]
+format = ' [$symbol($profile)(\($region\))]($style)'
+symbol = "  "
+
+[gcloud]
+format = ' [$symbol($project)]($style)'
+symbol = " "

@@ -1,0 +1,66 @@
+---
+# Language runtimes, version managers, and CLI tools.
+
+# Python build dependencies (for pyenv)
+pyenv_deps:
+  debian:
+    - make
+    - build-essential
+    - libssl-dev
+    - zlib1g-dev
+    - libbz2-dev
+    - libreadline-dev
+    - libsqlite3-dev
+    - wget
+    - llvm
+    - libncursesw5-dev
+    - xz-utils
+    - tk-dev
+    - libxml2-dev
+    - libxmlsec1-dev
+    - libffi-dev
+    - liblzma-dev
+  redhat:
+    - make
+    - gcc
+    - zlib-devel
+    - bzip2
+    - readline-devel
+    - sqlite
+    - openssl-devel
+    - tk-devel
+    - libffi-devel
+    - xz-devel
+    - libuuid-devel
+    - gdbm-devel
+    - libnsl2-devel
+
+# pipx CLI tools to install
+pipx_tools:
+  - black
+  - ruff
+  - mypy
+  - poetry
+  - httpie
+  - tldr
+  - cookiecutter
+
+# NVM / Node
+nvm_install_url: "https://raw.githubusercontent.com/nvm-sh/nvm"
+node_lts: true
+
+# Pyenv
+pyenv_install_url: "https://pyenv.run"
+
+# Rust
+rustup_install_url: "https://sh.rustup.rs"
+
+# Go
+go_download_url: "https://go.dev/dl"
+go_version_url: "https://go.dev/VERSION?m=text"
+
+# SDKMAN
+sdkman_install_url: "https://get.sdkman.io"
+sdkman_jdk: "21-tem"
+sdkman_tools:
+  - maven

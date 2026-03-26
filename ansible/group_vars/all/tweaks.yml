@@ -1,0 +1,25 @@
+---
+# System tweaks — sysctl, services, firewall.
+
+sysctl_params:
+  vm.swappiness: 10
+  vm.vfs_cache_pressure: 50
+  vm.dirty_ratio: 15
+  vm.dirty_background_ratio: 5
+  net.core.rmem_max: 16777216
+  net.core.wmem_max: 16777216
+  net.ipv4.tcp_fastopen: 3
+  net.core.netdev_max_backlog: 5000
+  fs.inotify.max_user_watches: 524288
+  fs.inotify.max_user_instances: 512
+  fs.file-max: 2097152
+
+services_enable:
+  common:
+    - fstrim.timer
+  debian:
+    - preload
+  redhat: []
+
+firewall_allow:
+  - ssh

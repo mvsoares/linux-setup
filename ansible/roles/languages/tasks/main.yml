@@ -1,0 +1,223 @@
+---
+# Role: languages — nvm/Node, pyenv/Python, Rust, Go, SDKMAN/Java.
+
+# ── GitHub API headers (shared across all API calls in this role) ───────────
+- name: Set GitHub API headers
+  ansible.builtin.set_fact:
+    _github_headers: >-
+      {{
+        {'Accept': 'application/vnd.github+json'} |
+        combine(
+          (github_token is defined and github_token | length > 0) |
+          ternary({'Authorization': 'Bearer ' + (github_token | default(''))}, {})
+        )
+      }}
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Node.js via NVM
+# ═══════════════════════════════════════════════════════════════════════════════
+- name: Check if nvm is installed
+  ansible.builtin.stat:
+    path: "{{ target_home }}/.nvm/nvm.sh"
+  register: _nvm_check
+
+- name: Install NVM and Node LTS
+  when: not _nvm_check.stat.exists
+  block:
+    - name: Determine NVM version
+      ansible.builtin.set_fact:
+        _nvm_ver: "{{ (use_pinned_versions | default(false) | bool) | ternary(pinned_versions.nvm, _nvm_api_ver | default(pinned_versions.nvm)) }}"
+
+    - name: Get latest NVM version from API
+      ansible.builtin.uri:
+        url: "https://api.github.com/repos/nvm-sh/nvm/releases/latest"
+        headers: "{{ _github_headers }}"
+        return_content: yes
+      register: _nvm_release
+      failed_when: false
+      when: not (use_pinned_versions | default(false) | bool)
+
+    - name: Set NVM version from API
+      ansible.builtin.set_fact:
+        _nvm_ver: "{{ (_nvm_release.json | default({})).tag_name | default(pinned_versions.nvm) }}"
+      when: not (use_pinned_versions | default(false) | bool)
+
+    - name: Install NVM
+      ansible.builtin.shell: >
+        curl -fsSL {{ nvm_install_url }}/{{ _nvm_ver }}/install.sh | bash
+      become_user: "{{ target_user }}"
+      environment:
+        HOME: "{{ target_home }}"
+      args:
+        creates: "{{ target_home }}/.nvm/nvm.sh"
+
+    - name: Install Node LTS via NVM
+      ansible.builtin.shell: |
+        export NVM_DIR="{{ target_home }}/.nvm"
+        source "$NVM_DIR/nvm.sh"
+        nvm install --lts
+      become_user: "{{ target_user }}"
+      environment:
+        HOME: "{{ target_home }}"
+      args:
+        executable: /bin/bash
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Python via pyenv
+# ═══════════════════════════════════════════════════════════════════════════════
+- name: Install pyenv build dependencies (Debian)
+  ansible.builtin.apt:
+    name: "{{ pyenv_deps.debian }}"
+    state: present
+  when: ansible_os_family == 'Debian'
+
+- name: Install pyenv build dependencies (Fedora)
+  ansible.builtin.dnf:
+    name: "{{ pyenv_deps.redhat }}"
+    state: present
+  when: ansible_os_family == 'RedHat'
+
+- name: Check if pyenv is installed
+  ansible.builtin.stat:
+    path: "{{ target_home }}/.pyenv/bin/pyenv"
+  register: _pyenv_check
+
+- name: Install pyenv
+  ansible.builtin.shell: curl -fsSL {{ pyenv_install_url }} | bash
+  become_user: "{{ target_user }}"
+  environment:
+    HOME: "{{ target_home }}"
+  when: not _pyenv_check.stat.exists
+
+# ── pipx tools ─────────────────────────────────────────────────────────────
+- name: Ensure pipx is available
+  ansible.builtin.command: which pipx
+  register: _pipx_check
+  changed_when: false
+  failed_when: false
+
+- name: Install pipx tools
+  community.general.pipx:
+    name: "{{ item }}"
+    state: present
+  loop: "{{ pipx_tools }}"
+  become_user: "{{ target_user }}"
+  environment:
+    HOME: "{{ target_home }}"
+  when: _pipx_check.rc == 0
+  failed_when: false
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Rust via rustup
+# ═══════════════════════════════════════════════════════════════════════════════
+- name: Check if rustup is installed
+  ansible.builtin.stat:
+    path: "{{ target_home }}/.cargo/bin/rustup"
+  register: _rustup_check
+
+- name: Install Rust via rustup
+  ansible.builtin.shell: curl -fsSL {{ rustup_install_url }} | sh -s -- -y
+  become_user: "{{ target_user }}"
+  environment:
+    HOME: "{{ target_home }}"
+  when: not _rustup_check.stat.exists
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Go
+# ═══════════════════════════════════════════════════════════════════════════════
+- name: Check if Go is installed
+  ansible.builtin.command: /usr/local/go/bin/go version
+  register: _go_check
+  changed_when: false
+  failed_when: false
+
+- name: Install Go
+  when: _go_check.rc != 0
+  block:
+    - name: Get latest Go version
+      ansible.builtin.uri:
+        url: "{{ go_version_url }}"
+        return_content: yes
+      register: _go_ver_resp
+      failed_when: false
+      when: not (use_pinned_versions | default(false) | bool)
+
+    - name: Set Go version
+      ansible.builtin.set_fact:
+        _go_ver: "{{ (use_pinned_versions | default(false) | bool) | ternary(pinned_versions.go, (_go_ver_resp.content | default(pinned_versions.go) | trim).split('\n') | first) }}"
+
+    - name: Download Go
+      ansible.builtin.get_url:
+        url: "{{ go_download_url }}/{{ _go_ver }}.linux-amd64.tar.gz"
+        dest: /tmp/go.tar.gz
+        mode: "0644"
+
+    - name: Extract Go to /usr/local
+      ansible.builtin.unarchive:
+        src: /tmp/go.tar.gz
+        dest: /usr/local
+        remote_src: yes
+
+    - name: Cleanup Go archive
+      ansible.builtin.file:
+        path: /tmp/go.tar.gz
+        state: absent
+
+- name: Deploy Go PATH profile
+  ansible.builtin.copy:
+    dest: /etc/profile.d/98-golang.sh
+    mode: "0755"
+    content: |
+      #!/usr/bin/env bash
+      export GOROOT=/usr/local/go
+      export GOPATH="$HOME/go"
+      export PATH="$GOPATH/bin:$GOROOT/bin:$PATH"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# SDKMAN + JDK + Maven
+# ═══════════════════════════════════════════════════════════════════════════════
+- name: Check if SDKMAN is installed
+  ansible.builtin.stat:
+    path: "{{ target_home }}/.sdkman/bin/sdkman-init.sh"
+  register: _sdkman_check
+
+- name: Install SDKMAN
+  ansible.builtin.shell: curl -fsSL {{ sdkman_install_url }} | bash
+  become_user: "{{ target_user }}"
+  environment:
+    HOME: "{{ target_home }}"
+  when: not _sdkman_check.stat.exists
+
+- name: Check if JDK is already installed via SDKMAN
+  ansible.builtin.stat:
+    path: "{{ target_home }}/.sdkman/candidates/java/current/bin/java"
+  register: _jdk_check
+
+- name: Install JDK via SDKMAN
+  ansible.builtin.shell: |
+    source {{ target_home }}/.sdkman/bin/sdkman-init.sh
+    sdk install java {{ sdkman_jdk }} <<< "y" 2>&1 || true
+  become_user: "{{ target_user }}"
+  environment:
+    HOME: "{{ target_home }}"
+  args:
+    executable: /bin/bash
+  when: not _jdk_check.stat.exists
+  changed_when: true
+  failed_when: false
+
+- name: Install SDKMAN tools (Maven etc)
+  ansible.builtin.shell: |
+    source {{ target_home }}/.sdkman/bin/sdkman-init.sh
+    out=$(sdk install {{ item }} <<< "y" 2>&1) || true
+    echo "$out"
+    echo "$out" | grep -q "already installed" || echo sdk_changed
+  become_user: "{{ target_user }}"
+  environment:
+    HOME: "{{ target_home }}"
+  args:
+    executable: /bin/bash
+  loop: "{{ sdkman_tools }}"
+  register: _sdk_tool_out
+  changed_when: "'sdk_changed' in _sdk_tool_out.stdout"
+  failed_when: false

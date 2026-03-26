@@ -1,0 +1,73 @@
+---
+# Role: nvidia — Conditional GPU detection and driver setup.
+
+- name: Check for NVIDIA GPU
+  ansible.builtin.command: nvidia-smi
+  register: _nvidia_check
+  changed_when: false
+  failed_when: false
+
+- name: NVIDIA GPU setup
+  when: _nvidia_check.rc == 0
+  block:
+    - name: Get NVIDIA driver version
+      ansible.builtin.shell: nvidia-smi --query-gpu=driver_version --format=csv,noheader | head -1
+      register: _nvidia_ver
+      changed_when: false
+
+    - name: Show NVIDIA driver version
+      ansible.builtin.debug:
+        msg: "Detected NVIDIA driver: {{ _nvidia_ver.stdout }}"
+
+    # Debian NVIDIA packages
+    - name: Install NVIDIA support packages (Debian)
+      ansible.builtin.apt:
+        name:
+          - nvidia-settings
+          - nvidia-prime
+          - libvulkan1
+          - vulkan-tools
+          - mesa-vulkan-drivers
+          - vdpauinfo
+          - vainfo
+          - mesa-utils
+          - mesa-opencl-icd
+        state: present
+      when: ansible_os_family == 'Debian'
+
+    # Fedora NVIDIA packages
+    - name: Install NVIDIA support packages (Fedora)
+      ansible.builtin.dnf:
+        name:
+          - akmod-nvidia
+          - xorg-x11-drv-nvidia-cuda
+          - vulkan
+          - vdpauinfo
+          - libva-utils
+          - mesa-vulkan-drivers
+        state: present
+      when: ansible_os_family == 'RedHat'
+
+    # nvidia-persistenced
+    - name: Enable nvidia-persistenced
+      ansible.builtin.systemd:
+        name: nvidia-persistenced
+        enabled: yes
+        state: started
+      failed_when: false
+
+    # Power management udev rules
+    - name: Install NVIDIA power management udev rules
+      ansible.builtin.copy:
+        dest: /etc/udev/rules.d/80-nvidia-pm.rules
+        mode: "0644"
+        content: |
+          ACTION=="add", SUBSYSTEM=="pci", ATTR{vendor}=="0x10de", ATTR{class}=="0x030200", TEST=="power/control", ATTR{power/control}="auto"
+          ACTION=="add", SUBSYSTEM=="pci", ATTR{vendor}=="0x10de", ATTR{class}=="0x030000", TEST=="power/control", ATTR{power/control}="auto"
+          ACTION=="add", SUBSYSTEM=="pci", ATTR{vendor}=="0x10de", ATTR{class}=="0x040300", TEST=="power/control", ATTR{power/control}="auto"
+      notify: reload udev
+
+- name: Skip NVIDIA (no GPU detected)
+  ansible.builtin.debug:
+    msg: "No NVIDIA GPU detected — skipping"
+  when: _nvidia_check.rc != 0

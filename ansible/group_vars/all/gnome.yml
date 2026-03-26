@@ -1,0 +1,140 @@
+---
+# GNOME Shell extensions and settings.
+
+gnome_extensions:
+  - { uuid: "user-theme@gnome-shell-extensions.gcampax.github.com", id: 19 }
+  - { uuid: "dash-to-dock@micxgx.gmail.com", id: 307 }
+  - { uuid: "blur-my-shell@aunetx", id: 3193 }
+  - { uuid: "just-perfection-desktop@just-perfection", id: 3843 }
+  - { uuid: "caffeine@patapon.info", id: 517 }
+  - { uuid: "clipboard-indicator@tudmotu.com", id: 779 }
+  - { uuid: "Vitals@CoreCoding.com", id: 1460 }
+  - { uuid: "space-bar@luchrioh", id: 5090 }
+  - { uuid: "appindicatorsupport@rgcjonas.gmail.com", id: 615 }
+
+# gsettings — each entry: schema, key, value
+# Use dconf paths for community.general.dconf module
+gnome_dconf_settings:
+  # Appearance
+  - { key: "/org/gnome/desktop/interface/color-scheme", value: "'prefer-dark'" }
+  - { key: "/org/gnome/desktop/interface/gtk-theme", value: "'Dracula'" }
+  - { key: "/org/gnome/desktop/interface/icon-theme", value: "'Papirus-Dark'" }
+  - { key: "/org/gnome/desktop/interface/cursor-theme", value: "'Bibata-Modern-Classic'" }
+  - { key: "/org/gnome/desktop/interface/cursor-size", value: "24" }
+  - { key: "/org/gnome/desktop/interface/enable-animations", value: "true" }
+  - { key: "/org/gnome/desktop/interface/enable-hot-corners", value: "false" }
+  - { key: "/org/gnome/desktop/interface/clock-show-weekday", value: "true" }
+  - { key: "/org/gnome/desktop/interface/clock-format", value: "'24h'" }
+  - { key: "/org/gnome/desktop/interface/show-battery-percentage", value: "true" }
+
+  # Accent color (GNOME 47+)
+  - { key: "/org/gnome/desktop/interface/accent-color", value: "'purple'", min_gnome: 47 }
+
+  # Fonts
+  - { key: "/org/gnome/desktop/interface/font-name", value: "'Inter 11'" }
+  - { key: "/org/gnome/desktop/interface/document-font-name", value: "'Inter 11'" }
+  - { key: "/org/gnome/desktop/interface/monospace-font-name", value: "'JetBrainsMono Nerd Font 12'" }
+  - { key: "/org/gnome/desktop/wm/preferences/titlebar-font", value: "'Inter Bold 11'" }
+  - { key: "/org/gnome/desktop/interface/font-antialiasing", value: "'rgba'" }
+  - { key: "/org/gnome/desktop/interface/font-hinting", value: "'slight'" }
+  - { key: "/org/gnome/desktop/interface/text-scaling-factor", value: "1.0" }
+
+  # Window management
+  - { key: "/org/gnome/desktop/wm/preferences/button-layout", value: "'appmenu:minimize,maximize,close'" }
+  - { key: "/org/gnome/desktop/wm/preferences/focus-mode", value: "'click'" }
+  - { key: "/org/gnome/desktop/wm/preferences/action-double-click-titlebar", value: "'toggle-maximize'" }
+  - { key: "/org/gnome/desktop/wm/preferences/action-middle-click-titlebar", value: "'minimize'" }
+  - { key: "/org/gnome/mutter/center-new-windows", value: "true" }
+  - { key: "/org/gnome/mutter/edge-tiling", value: "true" }
+  - { key: "/org/gnome/mutter/dynamic-workspaces", value: "true" }
+
+  # Dash to Dock
+  - { key: "/org/gnome/shell/extensions/dash-to-dock/dock-position", value: "'BOTTOM'" }
+  - { key: "/org/gnome/shell/extensions/dash-to-dock/extend-height", value: "false" }
+  - { key: "/org/gnome/shell/extensions/dash-to-dock/dock-fixed", value: "false" }
+  - { key: "/org/gnome/shell/extensions/dash-to-dock/autohide", value: "true" }
+  - { key: "/org/gnome/shell/extensions/dash-to-dock/intellihide", value: "true" }
+  - { key: "/org/gnome/shell/extensions/dash-to-dock/autohide-in-fullscreen", value: "true" }
+  - { key: "/org/gnome/shell/extensions/dash-to-dock/transparency-mode", value: "'FIXED'" }
+  - { key: "/org/gnome/shell/extensions/dash-to-dock/background-opacity", value: "0.80000000000000004" }
+  - { key: "/org/gnome/shell/extensions/dash-to-dock/show-trash", value: "true" }
+  - { key: "/org/gnome/shell/extensions/dash-to-dock/show-mounts", value: "true" }
+  - { key: "/org/gnome/shell/extensions/dash-to-dock/dash-max-icon-size", value: "44" }
+  - { key: "/org/gnome/shell/extensions/dash-to-dock/click-action", value: "'minimize-or-previews'" }
+  - { key: "/org/gnome/shell/extensions/dash-to-dock/scroll-action", value: "'cycle-windows'" }
+
+  # Blur my Shell
+  - { key: "/org/gnome/shell/extensions/blur-my-shell/panel/blur", value: "true" }
+  - { key: "/org/gnome/shell/extensions/blur-my-shell/panel/sigma", value: "30" }
+  - { key: "/org/gnome/shell/extensions/blur-my-shell/panel/brightness", value: "0.59999999999999998" }
+  - { key: "/org/gnome/shell/extensions/blur-my-shell/overview/blur", value: "true" }
+  - { key: "/org/gnome/shell/extensions/blur-my-shell/dash-to-dock/blur", value: "true" }
+  - { key: "/org/gnome/shell/extensions/blur-my-shell/dash-to-dock/sigma", value: "30" }
+
+  # Just Perfection
+  - { key: "/org/gnome/shell/extensions/just-perfection/animation", value: "3" }
+  - { key: "/org/gnome/shell/extensions/just-perfection/activities-button", value: "false" }
+  - { key: "/org/gnome/shell/extensions/just-perfection/panel-button-padding-size", value: "4" }
+  - { key: "/org/gnome/shell/extensions/just-perfection/window-demands-attention-focus", value: "true" }
+
+  # Nautilus
+  - { key: "/org/gnome/nautilus/preferences/default-folder-viewer", value: "'list-view'" }
+  - { key: "/org/gtk/settings/file-chooser/sort-directories-first", value: "true" }
+  - { key: "/org/gnome/nautilus/list-view/default-zoom-level", value: "'small'" }
+  - { key: "/org/gnome/nautilus/list-view/use-tree-view", value: "true" }
+  - { key: "/org/gnome/nautilus/preferences/recursive-search", value: "'local-only'" }
+
+  # Input — Touchpad
+  - { key: "/org/gnome/desktop/peripherals/touchpad/tap-to-click", value: "true" }
+  - { key: "/org/gnome/desktop/peripherals/touchpad/two-finger-scrolling-enabled", value: "true" }
+  - { key: "/org/gnome/desktop/peripherals/touchpad/natural-scroll", value: "true" }
+  - { key: "/org/gnome/desktop/peripherals/touchpad/disable-while-typing", value: "true" }
+  - { key: "/org/gnome/desktop/peripherals/touchpad/speed", value: "0.20000000000000001" }
+
+  # Input — Mouse
+  - { key: "/org/gnome/desktop/peripherals/mouse/accel-profile", value: "'flat'" }
+  - { key: "/org/gnome/desktop/peripherals/mouse/speed", value: "0.0" }
+
+  # Input — Keyboard
+  - { key: "/org/gnome/desktop/peripherals/keyboard/delay", value: "uint32 250" }
+  - { key: "/org/gnome/desktop/peripherals/keyboard/repeat-interval", value: "uint32 30" }
+
+  # Power
+  - { key: "/org/gnome/desktop/session/idle-delay", value: "uint32 300" }
+  - { key: "/org/gnome/settings-daemon/plugins/power/sleep-inactive-ac-type", value: "'nothing'" }
+  - { key: "/org/gnome/settings-daemon/plugins/power/sleep-inactive-battery-timeout", value: "900" }
+  - { key: "/org/gnome/settings-daemon/plugins/power/sleep-inactive-battery-type", value: "'suspend'" }
+
+  # Night Light
+  - { key: "/org/gnome/settings-daemon/plugins/color/night-light-enabled", value: "true" }
+  - { key: "/org/gnome/settings-daemon/plugins/color/night-light-schedule-automatic", value: "true" }
+  - { key: "/org/gnome/settings-daemon/plugins/color/night-light-temperature", value: "uint32 4000" }
+
+  # Privacy
+  - { key: "/org/gnome/desktop/privacy/remember-recent-files", value: "true" }
+  - { key: "/org/gnome/desktop/privacy/recent-files-max-age", value: "30" }
+  - { key: "/org/gnome/desktop/privacy/remove-old-temp-files", value: "true" }
+  - { key: "/org/gnome/desktop/privacy/remove-old-trash-files", value: "true" }
+  - { key: "/org/gnome/desktop/privacy/old-files-age", value: "uint32 30" }
+  - { key: "/org/gnome/desktop/privacy/send-software-usage-stats", value: "false" }
+  - { key: "/org/gnome/desktop/privacy/report-technical-problems", value: "false" }
+
+  # Calendar
+  - { key: "/org/gnome/desktop/calendar/show-weekdate", value: "true" }
+
+  # Screen lock
+  - { key: "/org/gnome/desktop/screensaver/lock-enabled", value: "true" }
+  - { key: "/org/gnome/desktop/screensaver/lock-delay", value: "uint32 30" }
+
+# Workspace keybindings — dconf format
+gnome_keybindings:
+  - { key: "/org/gnome/desktop/wm/keybindings/switch-to-workspace-1", value: "['<Super>1']" }
+  - { key: "/org/gnome/desktop/wm/keybindings/switch-to-workspace-2", value: "['<Super>2']" }
+  - { key: "/org/gnome/desktop/wm/keybindings/switch-to-workspace-3", value: "['<Super>3']" }
+  - { key: "/org/gnome/desktop/wm/keybindings/switch-to-workspace-4", value: "['<Super>4']" }
+  - { key: "/org/gnome/desktop/wm/keybindings/move-to-workspace-1", value: "['<Super><Shift>1']" }
+  - { key: "/org/gnome/desktop/wm/keybindings/move-to-workspace-2", value: "['<Super><Shift>2']" }
+  - { key: "/org/gnome/desktop/wm/keybindings/move-to-workspace-3", value: "['<Super><Shift>3']" }
+  - { key: "/org/gnome/desktop/wm/keybindings/move-to-workspace-4", value: "['<Super><Shift>4']" }
+  - { key: "/org/gnome/desktop/wm/keybindings/show-desktop", value: "['<Super>d']" }
+  - { key: "/org/gnome/shell/keybindings/toggle-overview", value: "['<Super>s']" }

@@ -1,0 +1,88 @@
+---
+# Role: gnome — Extensions, gsettings, and keybindings.
+
+# ── Ensure dbus-run-session is available ───────────────────────────────────
+- name: Ensure dbus is installed
+  ansible.builtin.package:
+    name: dbus
+    state: present
+
+# ── Install GNOME extensions ───────────────────────────────────────────────
+- name: Install GNOME extensions
+  ansible.builtin.include_tasks: extension.yml
+  loop: "{{ gnome_extensions }}"
+  loop_control:
+    loop_var: _ext
+    label: "{{ _ext.uuid }}"
+
+# ── Enable extensions ──────────────────────────────────────────────────────
+- name: Build extension UUID list
+  ansible.builtin.set_fact:
+    _ext_uuids: "{{ gnome_extensions | map(attribute='uuid') | list }}"
+
+- name: Build gsettings enabled-extensions string
+  ansible.builtin.set_fact:
+    _gnome_shell_enabled_extensions: >-
+      {{ "[]" if (_ext_uuids | length == 0) else ("['" ~ (_ext_uuids | join("','")) ~ "']") }}
+
+- name: Enable all extensions
+  ansible.builtin.shell: |
+    # Strip spaces and @as type annotation for comparison
+    current=$(dbus-run-session gsettings get org.gnome.shell enabled-extensions 2>/dev/null \
+      | tr -d ' ' | sed 's/@as//')
+    wanted="{{ _gnome_shell_enabled_extensions | replace(' ', '') }}"
+    if [ "$current" != "$wanted" ]; then
+      dbus-run-session gsettings set org.gnome.shell enabled-extensions \
+        "{{ _gnome_shell_enabled_extensions }}"
+      echo changed
+    fi
+  become_user: "{{ target_user }}"
+  environment:
+    HOME: "{{ target_home }}"
+  register: _ext_enable_out
+  changed_when: "'changed' in _ext_enable_out.stdout"
+  failed_when: false
+  args:
+    executable: /bin/bash
+
+# ── Apply dconf/gsettings ──────────────────────────────────────────────────
+- name: Apply GNOME settings
+  ansible.builtin.shell: |
+    current=$(dbus-run-session dconf read '{{ item.key }}' 2>/dev/null)
+    if [ "$current" != "{{ item.value }}" ]; then
+      dbus-run-session dconf write '{{ item.key }}' "{{ item.value }}"
+      echo changed
+    fi
+  become_user: "{{ target_user }}"
+  environment:
+    HOME: "{{ target_home }}"
+  loop: "{{ gnome_dconf_settings | rejectattr('min_gnome', 'defined') | list +
+            (gnome_dconf_settings | selectattr('min_gnome', 'defined')
+             | selectattr('min_gnome', 'le', gnome_shell_major | int) | list) }}"
+  loop_control:
+    label: "{{ item.key }}"
+  register: _dconf_out
+  changed_when: "'changed' in _dconf_out.stdout"
+  failed_when: false
+  args:
+    executable: /bin/bash
+
+# ── Apply keybindings ──────────────────────────────────────────────────────
+- name: Apply GNOME keybindings
+  ansible.builtin.shell: |
+    current=$(dbus-run-session dconf read '{{ item.key }}' 2>/dev/null)
+    if [ "$current" != "{{ item.value }}" ]; then
+      dbus-run-session dconf write '{{ item.key }}' "{{ item.value }}"
+      echo changed
+    fi
+  become_user: "{{ target_user }}"
+  environment:
+    HOME: "{{ target_home }}"
+  loop: "{{ gnome_keybindings }}"
+  loop_control:
+    label: "{{ item.key }}"
+  register: _keybind_out
+  changed_when: "'changed' in _keybind_out.stdout"
+  failed_when: false
+  args:
+    executable: /bin/bash

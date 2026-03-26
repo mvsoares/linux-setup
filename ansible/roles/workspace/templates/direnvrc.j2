@@ -1,0 +1,17 @@
+# Auto-detect and use Python venv
+layout_python() {
+    local python=${1:-python3}
+    if [[ ! -d .venv ]]; then
+        $python -m venv .venv
+    fi
+    source .venv/bin/activate
+}
+
+# Auto-detect and use Node version from .nvmrc
+use_nvm() {
+    local NVM_DIR="$HOME/.nvm"
+    if [[ -f .nvmrc ]] && [[ -s "$NVM_DIR/nvm.sh" ]]; then
+        source "$NVM_DIR/nvm.sh"
+        nvm use
+    fi
+}

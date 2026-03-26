@@ -1,0 +1,44 @@
+---
+# Sub-task: Download and install a single Nerd Font.
+# Called with loop_var: _nf_name
+# Uses a marker file (.{{ _nf_name }}.installed) to track installation
+# since Nerd Fonts renames many fonts (e.g. CascadiaCode → CaskaydiaCove).
+
+- name: "NerdFont {{ _nf_name }} — check if installed"
+  ansible.builtin.stat:
+    path: "{{ font_dir }}/mono/.{{ _nf_name }}.installed"
+  register: _nf_marker
+
+- name: "NerdFont {{ _nf_name }} — download and install"
+  when: not _nf_marker.stat.exists
+  block:
+    - name: "NerdFont {{ _nf_name }} — download zip"
+      ansible.builtin.get_url:
+        url: "https://github.com/ryanoasis/nerd-fonts/releases/download/{{ _nerd_font_ver }}/{{ _nf_name }}.zip"
+        dest: "/tmp/nf-{{ _nf_name }}.zip"
+        headers:
+          User-Agent: "{{ curl_ua }}"
+        mode: "0644"
+      register: _nf_dl
+      failed_when: false
+
+    - name: "NerdFont {{ _nf_name }} — extract"
+      ansible.builtin.unarchive:
+        src: "/tmp/nf-{{ _nf_name }}.zip"
+        dest: "{{ font_dir }}/mono"
+        remote_src: yes
+      when: _nf_dl is success
+      notify: Run fc-cache
+      failed_when: false
+
+    - name: "NerdFont {{ _nf_name }} — create marker file"
+      ansible.builtin.file:
+        path: "{{ font_dir }}/mono/.{{ _nf_name }}.installed"
+        state: touch
+        mode: "0644"
+      when: _nf_dl is success
+
+    - name: "NerdFont {{ _nf_name }} — cleanup zip"
+      ansible.builtin.file:
+        path: "/tmp/nf-{{ _nf_name }}.zip"
+        state: absent

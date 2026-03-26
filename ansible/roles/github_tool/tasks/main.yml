@@ -1,0 +1,144 @@
+---
+# Reusable role: github_tool — Install a single tool from GitHub releases.
+#
+# Required vars (passed via include_role + vars):
+#   repo:         GitHub owner/repo (e.g. "dandavison/delta")
+#   tool_name:    Human-readable name (avoids collision with reserved 'name' var)
+#   binary:       Binary name to check in $PATH
+#   type:         "tar", "deb", "rpm", or "pkg" (auto deb/rpm)
+#
+# Optional vars:
+#   pattern_tar:  Filename pattern for tar/zip assets
+#   pattern_deb:  Filename pattern for .deb assets
+#   pattern_rpm:  Filename pattern for .rpm assets
+#   archive_format: "zip" if the tar asset is actually a zip (default: tar)
+
+- name: "{{ tool_name }} — check if installed"
+  ansible.builtin.command: "which {{ binary }}"
+  register: _gt_check
+  changed_when: false
+  failed_when: false
+
+- name: "{{ tool_name }} — install from GitHub"
+  when: _gt_check.rc != 0
+  block:
+    - name: "{{ tool_name }} — get latest release"
+      ansible.builtin.uri:
+        url: "https://api.github.com/repos/{{ repo }}/releases/latest"
+        headers: "{{ _github_headers | combine({'User-Agent': curl_ua}) }}"
+        return_content: yes
+      register: _gt_release
+      failed_when: false
+
+    - name: "{{ tool_name }} — set release facts"
+      ansible.builtin.set_fact:
+        _gt_assets: "{{ (_gt_release.json | default({})).assets | default([]) }}"
+        _gt_effective_type: >-
+          {{ (type == 'pkg') | ternary(
+               (ansible_os_family == 'Debian') | ternary('deb', 'rpm'),
+               type) }}
+
+    # ── DEB install ──────────────────────────────────────────────────────────
+    - name: "{{ tool_name }} — find .deb asset URL"
+      ansible.builtin.set_fact:
+        _gt_url: "{{ (_gt_assets | selectattr('browser_download_url', 'search', pattern_deb) | map(attribute='browser_download_url') | first) | default('') }}"
+      when: _gt_effective_type == 'deb'
+
+    - name: "{{ tool_name }} — download and install .deb"
+      when:
+        - _gt_effective_type == 'deb'
+        - _gt_url | default('') | length > 0
+      block:
+        - name: "{{ tool_name }} — download .deb"
+          ansible.builtin.get_url:
+            url: "{{ _gt_url }}"
+            dest: "/tmp/{{ tool_name }}.deb"
+            headers:
+              User-Agent: "{{ curl_ua }}"
+            mode: "0644"
+
+        - name: "{{ tool_name }} — install .deb"
+          ansible.builtin.apt:
+            deb: "/tmp/{{ tool_name }}.deb"
+            state: present
+
+        - name: "{{ tool_name }} — cleanup .deb"
+          ansible.builtin.file:
+            path: "/tmp/{{ tool_name }}.deb"
+            state: absent
+
+    # ── RPM install ──────────────────────────────────────────────────────────
+    - name: "{{ tool_name }} — find .rpm asset URL"
+      ansible.builtin.set_fact:
+        _gt_url: "{{ (_gt_assets | selectattr('browser_download_url', 'search', pattern_rpm) | map(attribute='browser_download_url') | first) | default('') }}"
+      when: _gt_effective_type == 'rpm'
+
+    - name: "{{ tool_name }} — install .rpm"
+      ansible.builtin.dnf:
+        name: "{{ _gt_url }}"
+        state: present
+        disable_gpg_check: yes
+      when:
+        - _gt_effective_type == 'rpm'
+        - _gt_url | default('') | length > 0
+
+    # ── TAR/ZIP install ──────────────────────────────────────────────────────
+    - name: "{{ tool_name }} — find tar/zip asset URL"
+      ansible.builtin.set_fact:
+        _gt_url: "{{ (_gt_assets | selectattr('browser_download_url', 'search', pattern_tar) | map(attribute='browser_download_url') | first) | default('') }}"
+      when: _gt_effective_type == 'tar'
+
+    - name: "{{ tool_name }} — download and extract tar/zip"
+      when:
+        - _gt_effective_type == 'tar'
+        - _gt_url | default('') | length > 0
+      block:
+        - name: "{{ tool_name }} — create temp dir"
+          ansible.builtin.tempfile:
+            state: directory
+          register: _gt_tmpdir
+
+        - name: "{{ tool_name }} — download archive"
+          ansible.builtin.get_url:
+            url: "{{ _gt_url }}"
+            dest: "{{ _gt_tmpdir.path }}/{{ tool_name }}.{{ (archive_format | default('tar')) == 'zip' | ternary('zip', 'tar.gz') }}"
+            headers:
+              User-Agent: "{{ curl_ua }}"
+            mode: "0644"
+
+        - name: "{{ tool_name }} — extract archive"
+          ansible.builtin.unarchive:
+            src: "{{ _gt_tmpdir.path }}/{{ tool_name }}.{{ (archive_format | default('tar')) == 'zip' | ternary('zip', 'tar.gz') }}"
+            dest: "{{ _gt_tmpdir.path }}"
+            remote_src: yes
+
+        - name: "{{ tool_name }} — find binary in extracted files"
+          ansible.builtin.find:
+            paths: "{{ _gt_tmpdir.path }}"
+            patterns: "{{ binary }}"
+            recurse: yes
+            file_type: file
+          register: _gt_found
+
+        - name: "{{ tool_name }} — install binary to /usr/local/bin"
+          ansible.builtin.copy:
+            src: "{{ _gt_found.files[0].path }}"
+            dest: "/usr/local/bin/{{ binary }}"
+            mode: "0755"
+            remote_src: yes
+          when: _gt_found.files | length > 0
+
+        - name: "{{ tool_name }} — cleanup temp"
+          ansible.builtin.file:
+            path: "{{ _gt_tmpdir.path }}"
+            state: absent
+
+  vars:
+    _github_headers: >-
+      {{
+        {'Accept': 'application/vnd.github+json'} |
+        combine(
+          (github_token is defined and github_token | length > 0) |
+          ternary({'Authorization': 'Bearer ' + (github_token | default(''))}, {})
+        )
+      }}

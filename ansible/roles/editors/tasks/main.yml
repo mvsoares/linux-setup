@@ -1,0 +1,231 @@
+---
+# Role: editors — VSCodium, Neovim, WezTerm, AI CLIs.
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# VSCodium
+# ═══════════════════════════════════════════════════════════════════════════════
+- name: Add VSCodium repo (Debian)
+  when: ansible_os_family == 'Debian'
+  block:
+    - name: Download VSCodium GPG key
+      ansible.builtin.get_url:
+        url: "{{ vscodium_repo.debian.key_url }}"
+        dest: /tmp/vscodium-pub.gpg
+        mode: "0644"
+
+    - name: Dearmor VSCodium GPG key
+      ansible.builtin.shell: >
+        gpg --batch --yes --dearmor -o /usr/share/keyrings/vscodium-archive-keyring.gpg
+        /tmp/vscodium-pub.gpg
+      args:
+        creates: /usr/share/keyrings/vscodium-archive-keyring.gpg
+
+    - name: Add VSCodium apt repo
+      ansible.builtin.apt_repository:
+        repo: "deb [signed-by=/usr/share/keyrings/vscodium-archive-keyring.gpg] {{ vscodium_repo.debian.url }} {{ vscodium_repo.debian.repo }}"
+        filename: vscodium
+        state: present
+
+    - name: Install VSCodium (Debian)
+      ansible.builtin.apt:
+        name: codium
+        state: present
+        update_cache: yes
+        cache_valid_time: 3600
+
+- name: Add VSCodium repo (Fedora)
+  when: ansible_os_family == 'RedHat'
+  block:
+    - name: Import VSCodium GPG key (Fedora)
+      ansible.builtin.rpm_key:
+        key: "{{ vscodium_repo.redhat.key_url }}"
+        state: present
+
+    - name: Add VSCodium yum repo
+      ansible.builtin.yum_repository:
+        name: vscodium
+        description: VSCodium
+        baseurl: "{{ vscodium_repo.redhat.baseurl }}"
+        gpgcheck: yes
+        gpgkey: "{{ vscodium_repo.redhat.key_url }}"
+
+    - name: Install VSCodium (Fedora)
+      ansible.builtin.dnf:
+        name: codium
+        state: present
+
+# ── VSCodium extensions ────────────────────────────────────────────────────
+- name: Install VSCodium extensions
+  ansible.builtin.shell: "codium --install-extension {{ item }} --force 2>/dev/null || true"
+  become_user: "{{ target_user }}"
+  environment:
+    HOME: "{{ target_home }}"
+  loop: "{{ vscodium_extensions }}"
+  changed_when: false
+  failed_when: false
+
+# ── Migrate VSCode settings to VSCodium ────────────────────────────────────
+- name: Check for VSCode settings to migrate
+  ansible.builtin.stat:
+    path: "{{ target_home }}/.config/Code/User/settings.json"
+  register: _vscode_settings
+
+- name: Migrate VSCode settings to VSCodium
+  ansible.builtin.copy:
+    src: "{{ target_home }}/.config/Code/User/settings.json"
+    dest: "{{ target_home }}/.config/VSCodium/User/settings.json"
+    remote_src: yes
+    owner: "{{ target_user }}"
+    group: "{{ target_user }}"
+    force: no
+  when: _vscode_settings.stat.exists
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Neovim
+# ═══════════════════════════════════════════════════════════════════════════════
+- name: Install Neovim from GitHub
+  ansible.builtin.include_role:
+    name: github_tool
+  vars:
+    repo: "{{ neovim_repo }}"
+    tool_name: "neovim"
+    binary: "nvim"
+    type: "tar"
+    pattern_tar: "nvim-linux-x86_64.tar.gz"
+
+- name: Create Neovim symlink
+  ansible.builtin.file:
+    src: /usr/local/bin/nvim
+    dest: /usr/local/bin/vim
+    state: link
+    force: no
+  failed_when: false
+
+# ── kickstart.nvim config ──────────────────────────────────────────────────
+- name: Check if kickstart.nvim exists
+  ansible.builtin.stat:
+    path: "{{ target_home }}/.config/nvim/init.lua"
+  register: _nvim_cfg
+
+- name: Install kickstart.nvim
+  ansible.builtin.git:
+    repo: "{{ kickstart_nvim_repo }}"
+    dest: "{{ target_home }}/.config/nvim"
+    depth: 1
+  become_user: "{{ target_user }}"
+  when: not _nvim_cfg.stat.exists
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# WezTerm
+# ═══════════════════════════════════════════════════════════════════════════════
+- name: Check if WezTerm is installed
+  ansible.builtin.command: which wezterm
+  register: _wezterm_check
+  changed_when: false
+  failed_when: false
+
+- name: Install WezTerm (Fedora — COPR)
+  when:
+    - ansible_os_family == 'RedHat'
+    - _wezterm_check.rc != 0
+  block:
+    - name: Enable WezTerm COPR
+      ansible.builtin.command: "dnf copr enable -y {{ wezterm.copr_repo }}"
+      failed_when: false
+    - name: Install WezTerm (Fedora)
+      ansible.builtin.dnf:
+        name: wezterm
+        state: present
+
+- name: Install WezTerm (Debian — apt)
+  when:
+    - ansible_os_family == 'Debian'
+    - _wezterm_check.rc != 0
+  block:
+    - name: Add WezTerm apt repo
+      ansible.builtin.apt_repository:
+        repo: "deb {{ wezterm.apt_repo_url }} * *"
+        filename: wezterm
+        state: present
+      failed_when: false
+
+    - name: Install WezTerm (Debian)
+      ansible.builtin.apt:
+        name: wezterm
+        state: present
+        update_cache: yes
+        cache_valid_time: 3600
+      failed_when: false
+
+    - name: Install WezTerm via Flatpak (fallback)
+      community.general.flatpak:
+        name: "{{ wezterm.flatpak_id }}"
+        state: present
+      when: _wezterm_check.rc != 0
+      failed_when: false
+
+# ── WezTerm config ─────────────────────────────────────────────────────────
+# Deploy to both the standard XDG path and the Flatpak sandbox path.
+# Flatpak WezTerm overrides XDG_CONFIG_HOME to ~/.var/app/.../config inside
+# its container, so it ignores ~/.config/wezterm unless we also write there.
+- name: Create WezTerm config directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ target_user }}"
+    group: "{{ target_user }}"
+    mode: "0755"
+  loop:
+    - "{{ target_home }}/.config/wezterm"
+    - "{{ target_home }}/.var/app/org.wezfurlong.wezterm/config/wezterm"
+
+- name: Deploy WezTerm config (XDG standard path)
+  ansible.builtin.template:
+    src: wezterm.lua.j2
+    dest: "{{ target_home }}/.config/wezterm/wezterm.lua"
+    owner: "{{ target_user }}"
+    group: "{{ target_user }}"
+    mode: "0644"
+
+- name: Deploy WezTerm config (Flatpak sandbox path)
+  ansible.builtin.template:
+    src: wezterm.lua.j2
+    dest: "{{ target_home }}/.var/app/org.wezfurlong.wezterm/config/wezterm/wezterm.lua"
+    owner: "{{ target_user }}"
+    group: "{{ target_user }}"
+    mode: "0644"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# AI Code Assistant CLIs
+# ═══════════════════════════════════════════════════════════════════════════════
+- name: Check if npm is available
+  ansible.builtin.command: which npm
+  register: _npm_check
+  changed_when: false
+  failed_when: false
+
+- name: Install AI CLI tools via npm
+  ansible.builtin.shell: |
+    export NVM_DIR="{{ target_home }}/.nvm"
+    source "$NVM_DIR/nvm.sh" 2>/dev/null || true
+    npm install -g {{ item }} 2>/dev/null || true
+  become_user: "{{ target_user }}"
+  environment:
+    HOME: "{{ target_home }}"
+  args:
+    executable: /bin/bash
+  loop: "{{ ai_cli_tools }}"
+  failed_when: false
+
+# ── Cursor CLI ─────────────────────────────────────────────────────────────
+- name: Check if Cursor is installed
+  ansible.builtin.command: which cursor
+  register: _cursor_check
+  changed_when: false
+  failed_when: false
+
+- name: Install Cursor CLI
+  ansible.builtin.shell: "curl -fsSL {{ cursor_install_url }} | sh"
+  when: _cursor_check.rc != 0
+  failed_when: false
+  changed_when: false

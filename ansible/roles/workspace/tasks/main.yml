@@ -1,0 +1,156 @@
+---
+# Role: workspace — Git config, tmux, direnv, editorconfig, SSH.
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Git Config
+# ═══════════════════════════════════════════════════════════════════════════════
+- name: Set git credential helper (Fedora)
+  community.general.git_config:
+    name: credential.helper
+    value: /usr/libexec/git-core/git-credential-libsecret
+    scope: global
+  become_user: "{{ target_user }}"
+  when: ansible_os_family == 'RedHat'
+  failed_when: false
+
+- name: Set git credential helper (Debian)
+  community.general.git_config:
+    name: credential.helper
+    value: /usr/share/doc/git/contrib/credential/libsecret/git-credential-libsecret
+    scope: global
+  become_user: "{{ target_user }}"
+  when: ansible_os_family == 'Debian'
+  failed_when: false
+
+- name: Apply git config settings
+  community.general.git_config:
+    name: "{{ item.key }}"
+    value: "{{ item.value }}"
+    scope: global
+  become_user: "{{ target_user }}"
+  loop:
+    - { key: "init.defaultBranch", value: "main" }
+    - { key: "core.autocrlf", value: "input" }
+    - { key: "core.pager", value: "delta" }
+    - { key: "interactive.diffFilter", value: "delta --color-only" }
+    - { key: "delta.navigate", value: "true" }
+    - { key: "delta.side-by-side", value: "true" }
+    - { key: "delta.line-numbers", value: "true" }
+    - { key: "delta.syntax-theme", value: "Dracula" }
+    - { key: "merge.conflictstyle", value: "zdiff3" }
+    - { key: "diff.algorithm", value: "histogram" }
+    - { key: "diff.colorMoved", value: "default" }
+    - { key: "rerere.enabled", value: "true" }
+    - { key: "fetch.prune", value: "true" }
+    - { key: "push.autoSetupRemote", value: "true" }
+    - { key: "pull.rebase", value: "true" }
+    - { key: "rebase.autoStash", value: "true" }
+    - { key: "branch.sort", value: "-committerdate" }
+    - { key: "tag.sort", value: "-version:refname" }
+    - { key: "column.ui", value: "auto" }
+  loop_control:
+    label: "{{ item.key }}"
+
+# ── Global .gitignore ──────────────────────────────────────────────────────
+- name: Deploy global .gitignore
+  ansible.builtin.template:
+    src: gitignore_global.j2
+    dest: "{{ target_home }}/.gitignore_global"
+    owner: "{{ target_user }}"
+    group: "{{ target_user }}"
+    mode: "0644"
+    force: no
+
+- name: Set global gitignore in git config
+  community.general.git_config:
+    name: core.excludesFile
+    value: "{{ target_home }}/.gitignore_global"
+    scope: global
+  become_user: "{{ target_user }}"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Tmux
+# ═══════════════════════════════════════════════════════════════════════════════
+- name: Deploy tmux config
+  ansible.builtin.template:
+    src: tmux.conf.j2
+    dest: "{{ target_home }}/.tmux.conf"
+    owner: "{{ target_user }}"
+    group: "{{ target_user }}"
+    mode: "0644"
+    force: no
+
+- name: Install TPM (tmux plugin manager)
+  ansible.builtin.git:
+    repo: https://github.com/tmux-plugins/tpm.git
+    dest: "{{ target_home }}/.tmux/plugins/tpm"
+    depth: 1
+  become_user: "{{ target_user }}"
+  failed_when: false
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Direnv
+# ═══════════════════════════════════════════════════════════════════════════════
+- name: Ensure direnv is installed
+  ansible.builtin.package:
+    name: direnv
+    state: present
+
+- name: Create direnv config directory
+  ansible.builtin.file:
+    path: "{{ target_home }}/.config/direnv"
+    state: directory
+    owner: "{{ target_user }}"
+    group: "{{ target_user }}"
+    mode: "0755"
+
+- name: Deploy direnvrc
+  ansible.builtin.template:
+    src: direnvrc.j2
+    dest: "{{ target_home }}/.config/direnv/direnvrc"
+    owner: "{{ target_user }}"
+    group: "{{ target_user }}"
+    mode: "0644"
+    force: no
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# EditorConfig
+# ═══════════════════════════════════════════════════════════════════════════════
+- name: Deploy global .editorconfig
+  ansible.builtin.template:
+    src: editorconfig.j2
+    dest: "{{ target_home }}/.editorconfig"
+    owner: "{{ target_user }}"
+    group: "{{ target_user }}"
+    mode: "0644"
+    force: no
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# SSH
+# ═══════════════════════════════════════════════════════════════════════════════
+- name: Create .ssh directory
+  ansible.builtin.file:
+    path: "{{ target_home }}/.ssh"
+    state: directory
+    owner: "{{ target_user }}"
+    group: "{{ target_user }}"
+    mode: "0700"
+
+- name: Deploy SSH config
+  ansible.builtin.template:
+    src: ssh_config.j2
+    dest: "{{ target_home }}/.ssh/config"
+    owner: "{{ target_user }}"
+    group: "{{ target_user }}"
+    mode: "0600"
+    force: no
+
+- name: Check for SSH key
+  ansible.builtin.stat:
+    path: "{{ target_home }}/.ssh/id_ed25519"
+  register: _ssh_key
+
+- name: Advise SSH key generation
+  ansible.builtin.debug:
+    msg: "No SSH key found. Generate one with: ssh-keygen -t ed25519 -C 'your-email@example.com'"
+  when: not _ssh_key.stat.exists

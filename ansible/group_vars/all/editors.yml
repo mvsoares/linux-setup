@@ -1,0 +1,58 @@
+---
+# Editor configuration — VSCodium, Neovim, WezTerm, AI CLIs.
+
+# VSCodium repos
+vscodium_repo:
+  debian:
+    url: "https://download.vscodium.com/debs"
+    key_url: "https://gitlab.com/paulcarroty/vscodium-deb-rpm-repo/raw/master/pub.gpg"
+    repo: "vscodium main"
+  redhat:
+    baseurl: "https://download.vscodium.com/rpms/"
+    key_url: "https://gitlab.com/paulcarroty/vscodium-deb-rpm-repo/raw/master/pub.gpg"
+
+# VSCodium extensions
+vscodium_extensions:
+  - bradlc.vscode-tailwindcss
+  - catppuccin.catppuccin-vsc
+  - christian-kohler.path-intellisense
+  - dbaeumer.vscode-eslint
+  - dracula-theme.theme-dracula
+  - dsznajder.es7-react-js-snippets
+  - eamodio.gitlens
+  - esbenp.prettier-vscode
+  - formulahendry.auto-rename-tag
+  - golang.go
+  - gruntfuggly.todo-tree
+  - humao.rest-client
+  - mhutchie.git-graph
+  - pkief.material-icon-theme
+  - rangav.vscode-thunder-client
+  - redhat.vscode-yaml
+  - streetsidesoftware.code-spell-checker
+  - usernamehw.errorlens
+  - vscodevim.vim
+  - wayou.vscode-todo-highlight
+  - rust-lang.rust-analyzer
+  - tamasfe.even-better-toml
+
+# Neovim
+neovim_repo: "neovim/neovim"
+kickstart_nvim_repo: "https://github.com/nvim-lua/kickstart.nvim.git"
+
+# WezTerm
+wezterm:
+  copr_repo: "wezfurlong/wezterm-nightly"
+  apt_repo_url: "https://apt.fury.io/wez"
+  flatpak_id: "org.wezfurlong.wezterm"
+  font: "JetBrainsMono Nerd Font"
+  color_scheme: "Monokai Remastered"
+
+# AI code assistant CLIs (installed via npm)
+ai_cli_tools:
+  - "@google/gemini-cli"
+  - "@anthropic-ai/claude-code"
+  - "@openai/codex"
+
+# Cursor CLI
+cursor_install_url: "https://cursor.com/install"

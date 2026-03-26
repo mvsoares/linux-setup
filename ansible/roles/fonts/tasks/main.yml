@@ -1,0 +1,75 @@
+---
+# Role: fonts — Nerd Fonts, Google Fonts, package fonts, fc-cache.
+
+# ── Font directories ────────────────────────────────────────────────────────
+- name: Create font directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - "{{ font_dir }}/mono"
+    - "{{ font_dir }}/general"
+
+# ── Package manager fonts ───────────────────────────────────────────────────
+- name: Install package fonts (Debian)
+  ansible.builtin.apt:
+    name: "{{ package_fonts.debian }}"
+    state: present
+  when: ansible_os_family == 'Debian'
+
+- name: Install package fonts (Fedora)
+  ansible.builtin.dnf:
+    name: "{{ package_fonts.redhat }}"
+    state: present
+  when: ansible_os_family == 'RedHat'
+
+# ── GitHub API headers ─────────────────────────────────────────────────────
+- name: Set GitHub API headers
+  ansible.builtin.set_fact:
+    _github_headers: >-
+      {{
+        {'Accept': 'application/vnd.github+json'} |
+        combine(
+          (github_token is defined and github_token | length > 0) |
+          ternary({'Authorization': 'Bearer ' + (github_token | default(''))}, {})
+        )
+      }}
+
+# ── Nerd Fonts from GitHub ─────────────────────────────────────────────────
+- name: Determine Nerd Font version
+  when: not (use_pinned_versions | default(false) | bool)
+  block:
+    - name: Get latest Nerd Font release tag
+      ansible.builtin.uri:
+        url: https://api.github.com/repos/ryanoasis/nerd-fonts/releases/latest
+        headers: "{{ _github_headers }}"
+        return_content: yes
+      register: _nf_release
+      failed_when: false
+
+    - name: Set Nerd Font version from API
+      ansible.builtin.set_fact:
+        _nerd_font_ver: "{{ (_nf_release.json | default({})).tag_name | default(pinned_versions.nerd_font) }}"
+
+- name: Use pinned Nerd Font version
+  ansible.builtin.set_fact:
+    _nerd_font_ver: "{{ pinned_versions.nerd_font }}"
+  when: use_pinned_versions | default(false) | bool
+
+- name: Download and install Nerd Fonts
+  ansible.builtin.include_tasks: nerd_font.yml
+  loop: "{{ nerd_fonts }}"
+  loop_control:
+    loop_var: _nf_name
+    label: "{{ _nf_name }}"
+
+# ── Google Fonts ────────────────────────────────────────────────────────────
+- name: Download Google Fonts
+  ansible.builtin.include_tasks: google_font.yml
+  loop: "{{ google_fonts }}"
+  loop_control:
+    loop_var: _gf_name
+    label: "{{ _gf_name }}"
+
+# fc-cache is triggered via handler (Run fc-cache) only when fonts are installed.

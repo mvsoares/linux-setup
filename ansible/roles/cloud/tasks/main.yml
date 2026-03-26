@@ -1,0 +1,266 @@
+---
+# Role: cloud — AWS, GCP, Azure CLIs + Kubernetes tools.
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# AWS CLI v2
+# ═══════════════════════════════════════════════════════════════════════════════
+- name: Check if AWS CLI is installed
+  ansible.builtin.command: which aws
+  register: _aws_check
+  changed_when: false
+  failed_when: false
+
+- name: Install AWS CLI v2
+  when: _aws_check.rc != 0
+  block:
+    - name: Download AWS CLI installer
+      ansible.builtin.get_url:
+        url: https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip
+        dest: /tmp/awscliv2.zip
+        mode: "0644"
+
+    - name: Extract AWS CLI
+      ansible.builtin.unarchive:
+        src: /tmp/awscliv2.zip
+        dest: /tmp
+        remote_src: yes
+
+    - name: Run AWS CLI installer
+      ansible.builtin.command: /tmp/aws/install
+      args:
+        creates: /usr/local/bin/aws
+
+    - name: Cleanup AWS installer
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/awscliv2.zip
+        - /tmp/aws
+
+- name: Install AWS bash completion
+  ansible.builtin.copy:
+    dest: /etc/bash_completion.d/aws
+    content: "complete -C '/usr/local/bin/aws_completer' aws\n"
+    mode: "0644"
+
+# ── eksctl ─────────────────────────────────────────────────────────────────
+- name: Install eksctl from GitHub
+  ansible.builtin.include_role:
+    name: github_tool
+  vars:
+    repo: "eksctl-io/eksctl"
+    tool_name: "eksctl"
+    binary: "eksctl"
+    type: "tar"
+    pattern_tar: "Linux_amd64.tar.gz"
+
+# ── AWS Session Manager plugin ─────────────────────────────────────────────
+- name: Check if session-manager-plugin is installed
+  ansible.builtin.command: which session-manager-plugin
+  register: _ssm_check
+  changed_when: false
+  failed_when: false
+
+- name: Install Session Manager plugin (Debian)
+  when:
+    - ansible_os_family == 'Debian'
+    - _ssm_check.rc != 0
+  block:
+    - name: Download Session Manager .deb
+      ansible.builtin.get_url:
+        url: "{{ aws_session_manager.deb_url }}"
+        dest: /tmp/session-manager-plugin.deb
+        mode: "0644"
+    - name: Install Session Manager .deb
+      ansible.builtin.apt:
+        deb: /tmp/session-manager-plugin.deb
+    - name: Cleanup Session Manager .deb
+      ansible.builtin.file:
+        path: /tmp/session-manager-plugin.deb
+        state: absent
+
+- name: Install Session Manager plugin (Fedora)
+  when:
+    - ansible_os_family == 'RedHat'
+    - _ssm_check.rc != 0
+  ansible.builtin.dnf:
+    name: "{{ aws_session_manager.rpm_url }}"
+    state: present
+    disable_gpg_check: yes
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Google Cloud SDK
+# ═══════════════════════════════════════════════════════════════════════════════
+- name: Add Google Cloud SDK repo (Debian)
+  when: ansible_os_family == 'Debian'
+  block:
+    - name: Add GCloud GPG key
+      ansible.builtin.shell: >
+        curl -fsSL {{ gcloud_repo.debian.key_url }}
+        | gpg --batch --yes --dearmor -o /usr/share/keyrings/cloud.google.gpg
+      args:
+        creates: /usr/share/keyrings/cloud.google.gpg
+
+    - name: Add GCloud apt repo
+      ansible.builtin.apt_repository:
+        repo: "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] {{ gcloud_repo.debian.url }} {{ gcloud_repo.debian.repo }}"
+        filename: google-cloud-sdk
+        state: present
+
+    - name: Install GCloud packages (Debian)
+      ansible.builtin.apt:
+        name: "{{ gcloud_repo.debian.packages }}"
+        state: present
+        update_cache: yes
+        cache_valid_time: 3600
+
+- name: Add Google Cloud SDK repo (Fedora)
+  when: ansible_os_family == 'RedHat'
+  block:
+    - name: Add GCloud yum repo
+      ansible.builtin.yum_repository:
+        name: google-cloud-sdk
+        description: Google Cloud SDK
+        baseurl: "{{ gcloud_repo.redhat.baseurl }}"
+        gpgcheck: yes
+        gpgkey: "{{ gcloud_repo.redhat.key_url }}"
+        repo_gpgcheck: no
+
+    - name: Install GCloud packages (Fedora)
+      ansible.builtin.dnf:
+        name: "{{ gcloud_repo.redhat.packages }}"
+        state: present
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Azure CLI
+# ═══════════════════════════════════════════════════════════════════════════════
+- name: Add Azure CLI repo (Debian)
+  when: ansible_os_family == 'Debian'
+  block:
+    - name: Add Azure GPG key
+      ansible.builtin.shell: >
+        curl -fsSL {{ azure_repo.debian.key_url }}
+        | gpg --batch --yes --dearmor -o /etc/apt/keyrings/azure-cli.gpg
+      args:
+        creates: /etc/apt/keyrings/azure-cli.gpg
+
+    - name: Add Azure apt repo
+      ansible.builtin.apt_repository:
+        repo: "deb [arch={{ ansible_architecture | regex_replace('x86_64', 'amd64') }} signed-by=/etc/apt/keyrings/azure-cli.gpg] {{ azure_repo.debian.url }} {{ azure_apt_suite }} main"
+        filename: azure-cli
+        state: present
+
+    - name: Install Azure CLI (Debian)
+      ansible.builtin.apt:
+        name: azure-cli
+        state: present
+        update_cache: yes
+        cache_valid_time: 3600
+
+- name: Add Azure CLI repo (Fedora)
+  when: ansible_os_family == 'RedHat'
+  block:
+    - name: Import Microsoft GPG key for Azure
+      ansible.builtin.rpm_key:
+        key: "{{ azure_repo.redhat.key_url }}"
+        state: present
+
+    - name: Add Azure yum repo
+      ansible.builtin.yum_repository:
+        name: azure-cli
+        description: Azure CLI
+        baseurl: "{{ azure_repo.redhat.baseurl }}"
+        gpgcheck: yes
+        gpgkey: "{{ azure_repo.redhat.key_url }}"
+
+    - name: Install Azure CLI (Fedora)
+      ansible.builtin.dnf:
+        name: azure-cli
+        state: present
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Kubernetes Tools
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# ── kubectl ────────────────────────────────────────────────────────────────
+- name: Check if kubectl is installed
+  ansible.builtin.command: which kubectl
+  register: _kubectl_check
+  changed_when: false
+  failed_when: false
+
+- name: Install kubectl
+  when: _kubectl_check.rc != 0
+  block:
+    - name: Get latest kubectl version
+      ansible.builtin.uri:
+        url: "{{ kubectl_stable_url }}"
+        return_content: yes
+      register: _kubectl_ver_resp
+      failed_when: false
+      when: not (use_pinned_versions | default(false) | bool)
+
+    - name: Set kubectl version
+      ansible.builtin.set_fact:
+        _kubectl_ver: "{{ (use_pinned_versions | default(false) | bool) | ternary(pinned_versions.kubectl, _kubectl_ver_resp.content | default(pinned_versions.kubectl) | trim) }}"
+
+    - name: Download kubectl
+      ansible.builtin.get_url:
+        url: "{{ kubectl_install_url }}/{{ _kubectl_ver }}/bin/linux/amd64/kubectl"
+        dest: /usr/local/bin/kubectl
+        mode: "0755"
+
+# ── Helm ───────────────────────────────────────────────────────────────────
+- name: Check if helm is installed
+  ansible.builtin.command: which helm
+  register: _helm_check
+  changed_when: false
+  failed_when: false
+
+- name: Install Helm
+  ansible.builtin.shell: curl -fsSL {{ helm_install_script }} | bash
+  when: _helm_check.rc != 0
+
+# ── kubectx + kubens ───────────────────────────────────────────────────────
+- name: Install kubectx from GitHub
+  ansible.builtin.include_role:
+    name: github_tool
+  vars:
+    repo: "{{ kubectx_repo }}"
+    tool_name: "kubectx"
+    binary: "kubectx"
+    type: "tar"
+    pattern_tar: "kubectx_.*linux_x86_64\\.tar\\.gz"
+
+- name: Install kubens from GitHub
+  ansible.builtin.include_role:
+    name: github_tool
+  vars:
+    repo: "{{ kubectx_repo }}"
+    tool_name: "kubens"
+    binary: "kubens"
+    type: "tar"
+    pattern_tar: "kubens_.*linux_x86_64\\.tar\\.gz"
+
+# ── Kustomize ──────────────────────────────────────────────────────────────
+- name: Check if kustomize is installed
+  ansible.builtin.command: which kustomize
+  register: _kustomize_check
+  changed_when: false
+  failed_when: false
+
+- name: Install kustomize
+  ansible.builtin.shell: >
+    curl -fsSL {{ kustomize_install_script }} | bash &&
+    mv kustomize /usr/local/bin/
+  args:
+    chdir: /tmp
+  when: _kustomize_check.rc != 0
+
+# ── Cloud aliases profile ──────────────────────────────────────────────────
+- name: Deploy cloud aliases profile
+  ansible.builtin.template:
+    src: 97-cloud-aliases.sh.j2
+    dest: "/etc/profile.d/{{ cloud_aliases_profile }}"
+    mode: "0755"

@@ -1,0 +1,108 @@
+---
+# Role: shell — Starship prompt, synth-shell, global profile, bashrc.
+
+# ── Starship prompt ─────────────────────────────────────────────────────────
+- name: Check if Starship is installed
+  ansible.builtin.command: which starship
+  register: _starship_check
+  changed_when: false
+  failed_when: false
+
+- name: Install Starship prompt
+  ansible.builtin.shell: curl -fsSL https://starship.rs/install.sh | sh -s -- --yes
+  when: _starship_check.rc != 0
+
+# ── Global shell profile ───────────────────────────────────────────────────
+- name: Deploy global shell profile
+  ansible.builtin.template:
+    src: 99-workstation.sh.j2
+    dest: /etc/profile.d/99-workstation.sh
+    mode: "0755"
+
+# ── Starship config (user context) ─────────────────────────────────────────
+- name: Create user .config directory
+  ansible.builtin.file:
+    path: "{{ target_home }}/.config"
+    state: directory
+    owner: "{{ target_user }}"
+    group: "{{ target_user }}"
+    mode: "0755"
+
+- name: Deploy Starship config
+  ansible.builtin.template:
+    src: starship.toml.j2
+    dest: "{{ target_home }}/.config/starship.toml"
+    owner: "{{ target_user }}"
+    group: "{{ target_user }}"
+    mode: "0644"
+    force: no
+
+# ── synth-shell ─────────────────────────────────────────────────────────────
+- name: Check if synth-shell is installed
+  ansible.builtin.stat:
+    path: "{{ target_home }}/.config/synth-shell/synth-shell-prompt.sh"
+  register: _synth_check
+
+- name: Install synth-shell
+  when: not _synth_check.stat.exists
+  block:
+    - name: Clone synth-shell
+      ansible.builtin.git:
+        repo: https://github.com/andresgongora/synth-shell.git
+        dest: /tmp/synth-shell-install
+        depth: 1
+        recursive: yes
+        force: yes
+
+    - name: Run synth-shell installer
+      ansible.builtin.shell: printf 'iunyyyy' | bash /tmp/synth-shell-install/setup.sh
+      become_user: "{{ target_user }}"
+      environment:
+        HOME: "{{ target_home }}"
+
+    - name: Patch synth-shell kube segment
+      ansible.builtin.replace:
+        path: "{{ target_home }}/.config/synth-shell/synth-shell-prompt.sh"
+        regexp: 'echo -n "\$\(kubectl config view.*yq.*head -n 1\)"'
+        replace: 'echo -n "$(kubectl config current-context 2>/dev/null)"'
+      failed_when: false
+
+    - name: Apply synth-shell theme
+      ansible.builtin.shell: |
+        THEME_N={{ synth_shell_theme | default(2) }}
+        CFG="{{ target_home }}/.config/synth-shell/synth-shell-prompt.config"
+        if [[ -f "$CFG" ]]; then
+          sed -i "s/^font_color_user=.*/font_color_user=White/" "$CFG"
+          sed -i "s/^background_user=.*/background_user=${THEME_N}/" "$CFG"
+        fi
+      become_user: "{{ target_user }}"
+      environment:
+        HOME: "{{ target_home }}"
+      failed_when: false
+
+    - name: Cleanup synth-shell installer
+      ansible.builtin.file:
+        path: /tmp/synth-shell-install
+        state: absent
+
+# ── Bashrc tune-ups ─────────────────────────────────────────────────────────
+- name: Tune bashrc HISTSIZE
+  ansible.builtin.lineinfile:
+    path: "{{ target_home }}/.bashrc"
+    regexp: '^HISTSIZE=1000$'
+    line: 'HISTSIZE=50000'
+  failed_when: false
+
+- name: Tune bashrc HISTFILESIZE
+  ansible.builtin.lineinfile:
+    path: "{{ target_home }}/.bashrc"
+    regexp: '^HISTFILESIZE=2000$'
+    line: 'HISTFILESIZE=100000'
+  failed_when: false
+
+- name: Enable globstar in bashrc
+  ansible.builtin.lineinfile:
+    path: "{{ target_home }}/.bashrc"
+    regexp: '^#shopt -s globstar$'
+    line: 'shopt -s globstar'
+  failed_when: false

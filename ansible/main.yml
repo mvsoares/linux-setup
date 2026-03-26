@@ -1,12 +1,77 @@
 ---
 - name: Workstation Full Setup
-  hosts: localhost
-  connection: local
+  hosts: workstations
   become: yes
 
-  vars_files:
-    - group_vars/all.yml
+  vars:
+    target_user: "{{ ansible_env.SUDO_USER | default(ansible_user_id) }}"
+    target_home: "/home/{{ target_user }}"
+    curl_ua: "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+
+  pre_tasks:
+    - name: Get target UID
+      ansible.builtin.command: id -u {{ target_user }}
+      register: _target_uid
+      changed_when: false
+      tags: always
+
+    - name: Set target UID fact
+      ansible.builtin.set_fact:
+        target_uid: "{{ _target_uid.stdout }}"
+      tags: always
+
+    - name: Warn if GITHUB_TOKEN not set
+      ansible.builtin.debug:
+        msg: >
+          GITHUB_TOKEN not set — GitHub API limited to 60 req/hr.
+          Pass -e github_token=ghp_xxx for higher limits.
+      when: github_token is not defined
+      tags: always
+
+    - name: Detect GNOME Shell version
+      ansible.builtin.shell: gnome-shell --version 2>/dev/null | awk '{print $3}'
+      register: _gnome_ver
+      changed_when: false
+      failed_when: false
+      tags: always
+
+    - name: Set GNOME Shell facts
+      ansible.builtin.set_fact:
+        gnome_shell_version: "{{ _gnome_ver.stdout | default('0') }}"
+        gnome_shell_major: "{{ (_gnome_ver.stdout | default('0')).split('.')[0] | int }}"
+      tags: always
 
   roles:
-    - role: system_core
-      tags: ['core', 'repos']
+    - { role: repos,      tags: ['repos', 'step01'] }
+    - { role: nvidia,     tags: ['nvidia', 'step01'] }
+    - { role: packages,   tags: ['packages', 'step02'] }
+    - { role: cli_tools,  tags: ['cli_tools', 'step02'] }
+    - { role: shell,      tags: ['shell', 'step03'] }
+    - { role: fonts,      tags: ['fonts', 'step04'] }
+    - { role: gnome,      tags: ['gnome', 'step05'] }
+    - { role: cloud,      tags: ['cloud', 'step06'] }
+    - { role: languages,  tags: ['languages', 'step07'] }
+    - { role: editors,    tags: ['editors', 'step08'] }
+    - { role: workspace,  tags: ['workspace', 'step09'] }
+    - { role: tweaks,     tags: ['tweaks', 'step10'] }
+    - { role: themes,     tags: ['themes', 'optional'], when: install_themes | default(false) | bool }
+
+  post_tasks:
+    - name: Final package upgrade
+      ansible.builtin.package:
+        upgrade: yes
+      tags: ['upgrade', 'step10']
+
+    - name: Autoremove unused packages (Debian)
+      ansible.builtin.apt:
+        autoremove: yes
+      when: ansible_os_family == 'Debian'
+      tags: ['upgrade', 'step10']
+
+    - name: Display completion message
+      ansible.builtin.debug:
+        msg: |
+          === WORKSTATION SETUP COMPLETE ===
+          Reboot recommended to apply all changes.
+          Re-run a role: ansible-playbook main.yml --tags <role>
+      tags: always

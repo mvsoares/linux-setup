@@ -1,0 +1,47 @@
+---
+# Cloud CLI tools and Kubernetes configuration.
+
+# AWS
+aws_session_manager:
+  deb_url: "https://s3.amazonaws.com/session-manager-downloads/plugin/latest/ubuntu_64bit/session-manager-plugin.deb"
+  rpm_url: "https://s3.amazonaws.com/session-manager-downloads/plugin/latest/64bit/session-manager-plugin.rpm"
+
+# Google Cloud SDK repos
+gcloud_repo:
+  debian:
+    url: "https://packages.cloud.google.com/apt"
+    repo: "cloud-sdk main"
+    key_url: "https://packages.cloud.google.com/apt/doc/apt-key.gpg"
+    packages: [google-cloud-cli, google-cloud-cli-gke-gcloud-auth-plugin]
+  redhat:
+    baseurl: "https://packages.cloud.google.com/yum/repos/cloud-sdk-el9-x86_64"
+    key_url: "https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg"
+    packages: [google-cloud-cli, google-cloud-cli-gke-gcloud-auth-plugin]
+
+# Azure CLI repos
+# azure_apt_suite: Microsoft only publishes packages for specific Ubuntu LTS releases.
+# Map forward-looking distros to the latest supported suite (noble = 24.04).
+azure_apt_suite: >-
+  {{ ansible_distribution_release
+     if ansible_distribution_release in ['focal', 'jammy', 'noble']
+     else 'noble' }}
+
+azure_repo:
+  debian:
+    url: "https://packages.microsoft.com/repos/azure-cli/"
+    key_url: "https://packages.microsoft.com/keys/microsoft.asc"
+  redhat:
+    baseurl: "https://packages.microsoft.com/yumrepos/azure-cli"
+    key_url: "https://packages.microsoft.com/keys/microsoft.asc"
+
+# Kubernetes tools
+kubectl_install_url: "https://dl.k8s.io/release"
+kubectl_stable_url: "https://dl.k8s.io/release/stable.txt"
+helm_install_script: "https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3"
+kustomize_install_script: "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh"
+
+# kubectx/kubens from GitHub
+kubectx_repo: "ahmetb/kubectx"
+
+# Cloud aliases profile script name
+cloud_aliases_profile: "97-cloud-aliases.sh"

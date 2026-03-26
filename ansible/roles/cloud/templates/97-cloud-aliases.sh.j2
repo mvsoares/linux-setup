@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+# Cloud & Kubernetes aliases — managed by Ansible.
+[[ $- != *i* ]] && return
+
+# ── AWS ──────────────────────────────────────────────────────────────────────
+if command -v aws &>/dev/null; then
+    alias awswho='aws sts get-caller-identity'
+    alias awsregion='aws configure get region'
+    alias awsprofiles='aws configure list-profiles'
+    awsp() {
+        local profile
+        profile=$(aws configure list-profiles | fzf --prompt="AWS Profile > " 2>/dev/null) || return
+        export AWS_PROFILE="$profile"
+        echo "AWS_PROFILE=$profile"
+    }
+fi
+
+# ── GCP ──────────────────────────────────────────────────────────────────────
+if command -v gcloud &>/dev/null; then
+    alias gcpwho='gcloud auth list'
+    alias gcpproject='gcloud config get-value project'
+    gcpp() {
+        local project
+        project=$(gcloud projects list --format="value(projectId)" | fzf --prompt="GCP Project > " 2>/dev/null) || return
+        gcloud config set project "$project"
+        echo "Project: $project"
+    }
+fi
+
+# ── Azure ────────────────────────────────────────────────────────────────────
+if command -v az &>/dev/null; then
+    alias azwho='az account show'
+    alias azaccounts='az account list --output table'
+    azp() {
+        local sub
+        sub=$(az account list --query "[].{name:name, id:id}" -o tsv | fzf --prompt="Azure Sub > " | awk '{print $NF}' 2>/dev/null) || return
+        az account set --subscription "$sub"
+        echo "Subscription: $sub"
+    }
+fi
+
+# ── Kubernetes ───────────────────────────────────────────────────────────────
+if command -v kubectl &>/dev/null; then
+    alias k='kubectl'
+    alias kx='kubectx'
+    alias kn='kubens'
+    alias kgp='kubectl get pods'
+    alias kgs='kubectl get svc'
+    alias kga='kubectl get all'
+    alias kdp='kubectl describe pod'
+    alias klo='kubectl logs -f'
+    alias kex='kubectl exec -it'
+    source <(kubectl completion bash) 2>/dev/null
+    complete -o default -F __start_kubectl k 2>/dev/null
+fi

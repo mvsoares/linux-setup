@@ -1,0 +1,63 @@
+---
+# System packages organized by category with distro-specific variants.
+# common: installed on both Ubuntu and Fedora
+# debian/redhat: distro-specific package names
+
+system_packages:
+  essentials:
+    common: [git, git-lfs, curl, wget, jq, unzip, xclip, xdotool, bc]
+    debian: [build-essential, cmake, ninja-build, pkg-config, gnupg2, ca-certificates,
+             software-properties-common, apt-transport-https, git-extras, aria2,
+             p7zip-full, unrar-free, dconf-editor, preload]
+    redhat: ["@development-tools", cmake, ninja-build, pkgconf-pkg-config,
+             gnupg2, ca-certificates, aria2, p7zip, p7zip-plugins, dconf-editor]
+
+  monitors:
+    common: [btop, htop, iotop, iftop, ncdu]
+    debian: [nvtop, nethogs, lm-sensors, fancontrol, smartmontools, inxi,
+             sysstat, upower, powertop]
+    redhat: [nvtop, nethogs, lm_sensors, smartmontools, inxi, sysstat,
+             upower, powertop, fastfetch]
+
+  developer:
+    common: [gh, python3, jq, direnv, mkcert, pipx]
+    debian: [python3-pip, python3-venv, python3-dev, nodejs, code,
+             podman, podman-compose, buildah, skopeo, yq, redis-tools]
+    redhat: [python3-pip, python3-devel, nodejs,
+             podman, podman-compose, buildah, skopeo, yq]
+
+  network:
+    common: [nmap, rsync, tree, ranger, fzf, ripgrep, tmux, mosh, strace, tcpdump]
+    debian: [netcat-openbsd, dnsutils, fd-find, bat,
+             whois, rclone, mc, eza, screen, ssh-askpass, chafa, remmina]
+    redhat: [nmap-ncat, bind-utils, fd-find, bat,
+             whois, rclone, mc, eza, screen, openssh-askpass, chafa, remmina]
+
+  browsers:
+    common: []
+    debian: [google-chrome-stable, google-chrome-beta]
+    redhat: [google-chrome-stable]
+
+  multimedia:
+    common: [ffmpeg, mpv, celluloid, colord, yt-dlp]
+    debian: [vlc, gstreamer1.0-plugins-base, gstreamer1.0-plugins-good,
+             gstreamer1.0-plugins-bad, gstreamer1.0-plugins-ugly,
+             gstreamer1.0-libav, gstreamer1.0-vaapi, libavcodec-extra]
+    redhat: [vlc, gstreamer1-plugins-base, gstreamer1-plugins-good,
+             gstreamer1-plugins-bad-free, gstreamer1-plugins-ugly-free,
+             gstreamer1-plugin-libav, gstreamer1-vaapi]
+
+  extras:
+    common: []
+    debian: [gparted, stacer, libsecret-1-0, libsecret-1-dev]
+    redhat: [gparted, libsecret, libsecret-devel]
+
+# Snap packages (Ubuntu only). VS Code is installed via apt (repos role + code above);
+# onefetch is not in Ubuntu main/universe — snap remains the default here.
+snap_packages:
+  - { name: onefetch, classic: false }
+
+# Fedora alternatives to snap
+fedora_extras:
+  - code
+  - onefetch

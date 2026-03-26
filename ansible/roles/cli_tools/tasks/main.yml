@@ -1,0 +1,66 @@
+---
+# Role: cli_tools — Install CLI tools from GitHub releases + extras.
+
+# ── GitHub release tools (loop through github_tools.yml data) ──────────────
+- name: Install GitHub release tools
+  ansible.builtin.include_role:
+    name: github_tool
+  vars:
+    repo: "{{ item.repo }}"
+    tool_name: "{{ item.name }}"
+    binary: "{{ item.binary }}"
+    type: "{{ item.type }}"
+    pattern_tar: "{{ item.pattern_tar | default('') }}"
+    pattern_deb: "{{ item.pattern_deb | default('') }}"
+    pattern_rpm: "{{ item.pattern_rpm | default('') }}"
+    archive_format: "{{ item.archive_format | default('tar') }}"
+  loop: "{{ github_tools }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+# ── Zoxide ─────────────────────────────────────────────────────────────────
+- name: Check if zoxide is installed
+  ansible.builtin.stat:
+    path: /usr/local/bin/zoxide
+  register: _zoxide_check
+
+- name: Install zoxide
+  ansible.builtin.shell: >
+    curl -fsSL https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh
+    | sh -s -- --bin-dir /usr/local/bin
+  when: not _zoxide_check.stat.exists
+
+# ── pre-commit ─────────────────────────────────────────────────────────────
+- name: Check if pre-commit is installed
+  ansible.builtin.command: which pre-commit
+  register: _precommit_check
+  changed_when: false
+  failed_when: false
+
+- name: Install pre-commit via pipx
+  community.general.pipx:
+    name: pre-commit
+    state: present
+  become_user: "{{ target_user }}"
+  when: _precommit_check.rc != 0
+  failed_when: false
+
+# ── fd symlink (Ubuntu names it fdfind) ────────────────────────────────────
+- name: Create fd symlink from fdfind (Debian)
+  ansible.builtin.file:
+    src: /usr/bin/fdfind
+    dest: /usr/local/bin/fd
+    state: link
+  when:
+    - ansible_os_family == 'Debian'
+  failed_when: false
+
+# ── bat symlink (Ubuntu names it batcat) ───────────────────────────────────
+- name: Create bat symlink from batcat (Debian)
+  ansible.builtin.file:
+    src: /usr/bin/batcat
+    dest: /usr/local/bin/bat
+    state: link
+  when:
+    - ansible_os_family == 'Debian'
+  failed_when: false

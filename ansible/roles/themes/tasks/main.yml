@@ -1,0 +1,84 @@
+---
+# Role: themes — Optional GTK themes, icon packs, and cursors.
+# Only runs when: install_themes | default(false) | bool
+
+# ── Dracula GTK Theme ──────────────────────────────────────────────────────
+- name: Check if Dracula theme is installed
+  ansible.builtin.stat:
+    path: /usr/share/themes/Dracula
+  register: _dracula_check
+
+- name: Install Dracula GTK theme
+  when: not _dracula_check.stat.exists
+  block:
+    - name: Download Dracula theme
+      ansible.builtin.get_url:
+        url: https://github.com/dracula/gtk/archive/master.zip
+        dest: /tmp/dracula-gtk.zip
+        mode: "0644"
+
+    - name: Extract Dracula theme
+      ansible.builtin.unarchive:
+        src: /tmp/dracula-gtk.zip
+        dest: /tmp
+        remote_src: yes
+
+    - name: Install Dracula theme
+      ansible.builtin.command: mv /tmp/gtk-master /usr/share/themes/Dracula
+      args:
+        creates: /usr/share/themes/Dracula
+
+    - name: Cleanup Dracula download
+      ansible.builtin.file:
+        path: /tmp/dracula-gtk.zip
+        state: absent
+
+# ── Papirus Icon Theme ─────────────────────────────────────────────────────
+- name: Install Papirus icon theme (Debian)
+  ansible.builtin.apt:
+    name: papirus-icon-theme
+    state: present
+  when: ansible_os_family == 'Debian'
+
+- name: Install Papirus icon theme (Fedora)
+  ansible.builtin.dnf:
+    name: papirus-icon-theme
+    state: present
+  when: ansible_os_family == 'RedHat'
+
+# ── Bibata Cursor Theme ───────────────────────────────────────────────────
+- name: Check if Bibata cursor is installed
+  ansible.builtin.stat:
+    path: /usr/share/icons/Bibata-Modern-Classic
+  register: _bibata_check
+
+- name: Install Bibata cursor theme
+  when: not _bibata_check.stat.exists
+  block:
+    - name: Get latest Bibata release
+      ansible.builtin.uri:
+        url: https://api.github.com/repos/ful1e5/Bibata_Cursor/releases/latest
+        return_content: yes
+      register: _bibata_release
+      failed_when: false
+
+    - name: Download Bibata cursor
+      ansible.builtin.get_url:
+        url: "{{ (_bibata_release.json | default({})).assets | default([]) | selectattr('name', 'search', 'Bibata-Modern-Classic.tar.xz') | map(attribute='browser_download_url') | first | default('') }}"
+        dest: /tmp/bibata-cursor.tar.xz
+        mode: "0644"
+      when: _bibata_release is not failed
+      register: _bibata_dl
+      failed_when: false
+
+    - name: Extract Bibata cursor
+      ansible.builtin.unarchive:
+        src: /tmp/bibata-cursor.tar.xz
+        dest: /usr/share/icons/
+        remote_src: yes
+      when: _bibata_dl is not failed and _bibata_dl is not skipped
+
+    - name: Cleanup Bibata download
+      ansible.builtin.file:
+        path: /tmp/bibata-cursor.tar.xz
+        state: absent

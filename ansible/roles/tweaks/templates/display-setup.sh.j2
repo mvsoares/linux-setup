@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+# display-setup — Gamma, brightness adjustment, and display info.
+# Managed by Ansible — do not edit manually.
+set -euo pipefail
+
+usage() {
+    echo "Usage: display-setup [gamma N.N] [brightness N.N] [info]"
+    echo "  gamma 1.0      Set gamma correction (default 1.0)"
+    echo "  brightness 0.8  Set brightness (0.0–1.0)"
+    echo "  info            Show connected displays"
+    exit 1
+}
+
+[[ $# -eq 0 ]] && usage
+
+case "${1:-}" in
+    gamma)
+        val="${2:-1.0}"
+        if [[ "$XDG_SESSION_TYPE" == "wayland" ]]; then
+            echo "Gamma adjustment on Wayland requires compositor support"
+        else
+            for output in $(xrandr --query | grep ' connected' | cut -d' ' -f1); do
+                xrandr --output "$output" --gamma "${val}:${val}:${val}"
+                echo "Set gamma ${val} on $output"
+            done
+        fi
+        ;;
+    brightness)
+        val="${2:-1.0}"
+        if [[ "$XDG_SESSION_TYPE" == "wayland" ]]; then
+            gdbus call --session \
+                --dest org.gnome.SettingsDaemon.Power \
+                --object-path /org/gnome/SettingsDaemon/Power \
+                --method org.freedesktop.DBus.Properties.Set \
+                org.gnome.SettingsDaemon.Power.Screen Brightness \
+                "<int32 $(echo "$val * 100" | bc | cut -d. -f1)>" 2>/dev/null \
+                && echo "Brightness set to ${val}" \
+                || echo "Could not set brightness via D-Bus"
+        else
+            for output in $(xrandr --query | grep ' connected' | cut -d' ' -f1); do
+                xrandr --output "$output" --brightness "$val"
+                echo "Set brightness ${val} on $output"
+            done
+        fi
+        ;;
+    info)
+        echo "=== Display Info ==="
+        echo "Session: ${XDG_SESSION_TYPE:-unknown}"
+        if [[ "$XDG_SESSION_TYPE" == "wayland" ]]; then
+            gnome-randr show-current 2>/dev/null || echo "(gnome-randr not available)"
+        else
+            xrandr --query 2>/dev/null | grep -E ' connected|current'
+        fi
+        echo ""
+        if command -v nvidia-smi &>/dev/null; then
+            echo "=== GPU ==="
+            nvidia-smi --query-gpu=name,driver_version,memory.total --format=csv,noheader
+        fi
+        ;;
+    *) usage ;;
+esac

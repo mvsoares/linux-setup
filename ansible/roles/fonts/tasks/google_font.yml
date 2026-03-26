@@ -1,0 +1,46 @@
+---
+# Sub-task: Download and install a single Google Font via the manifest API.
+# Called with loop_var: _gf_name
+
+- name: "GoogleFont {{ _gf_name }} — check if installed"
+  ansible.builtin.find:
+    paths: "{{ font_dir }}/general"
+    patterns: "*{{ _gf_name | replace(' ', '') }}*"
+    file_type: file
+  register: _gf_found
+
+- name: "GoogleFont {{ _gf_name }} — install"
+  when: _gf_found.files | length == 0
+  block:
+    - name: "GoogleFont {{ _gf_name }} — get manifest"
+      ansible.builtin.uri:
+        url: "https://fonts.google.com/download/list?family={{ _gf_name | urlencode }}"
+        return_content: yes
+      register: _gf_manifest_raw
+      failed_when: false
+
+    - name: "GoogleFont {{ _gf_name }} — parse manifest"
+      ansible.builtin.set_fact:
+        _gf_manifest: "{{ _gf_manifest_raw.content | regex_replace('^.+?\n', '') | from_json }}"
+      when: _gf_manifest_raw.content is defined
+
+    - name: "GoogleFont {{ _gf_name }} — create directory"
+      ansible.builtin.file:
+        path: "{{ font_dir }}/general/{{ _gf_name }}"
+        state: directory
+        mode: '0755'
+      when: _gf_manifest is defined
+
+    - name: "GoogleFont {{ _gf_name }} — download font files"
+      ansible.builtin.get_url:
+        url: "{{ item.url }}"
+        dest: "{{ font_dir }}/general/{{ _gf_name }}/{{ item.filename | basename }}"
+        mode: '0644'
+      loop: "{{ (_gf_manifest.manifest.fileRefs | default([])) }}"
+      when:
+        - _gf_manifest is defined
+        - item.filename is match('.*\.(ttf|otf)$')
+      loop_control:
+        label: "{{ item.filename }}"
+      notify: Run fc-cache
+      failed_when: false

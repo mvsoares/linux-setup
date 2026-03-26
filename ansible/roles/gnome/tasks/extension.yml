@@ -1,0 +1,69 @@
+---
+# Sub-task: Install a single GNOME Shell extension.
+# Called with loop_var: _ext (dict with uuid and id)
+
+- name: "GnomeExt {{ _ext.uuid }} — check if installed"
+  ansible.builtin.stat:
+    path: "/home/{{ target_user }}/.local/share/gnome-shell/extensions/{{ _ext.uuid }}"
+  register: _ext_check
+
+- name: "GnomeExt {{ _ext.uuid }} — install"
+  when: not _ext_check.stat.exists
+  block:
+    - name: "GnomeExt {{ _ext.uuid }} — query extensions API"
+      ansible.builtin.uri:
+        url: "https://extensions.gnome.org/extension-info/?pk={{ _ext.id }}&shell_version={{ item }}"
+        headers:
+          User-Agent: "{{ curl_ua }}"
+        return_content: yes
+      register: _ext_info
+      failed_when: false
+      loop:
+        - "{{ gnome_shell_version }}"
+        - "{{ gnome_shell_major }}.0"
+        - ""
+      when: _ext_info.json is not defined or _ext_info.json.download_url is not defined
+
+    - name: "GnomeExt {{ _ext.uuid }} — set download URL"
+      ansible.builtin.set_fact:
+        # Use the first successful result from the loop
+        _ext_dl_url: "https://extensions.gnome.org{{ (item.json | default({})).download_url | default('') }}"
+      loop: "{{ _ext_info.results }}"
+      when:
+        - item is not failed
+        - (item.json | default({})).download_url is defined
+        - _ext_dl_url is not defined
+
+    - name: "GnomeExt {{ _ext.uuid }} — download"
+      ansible.builtin.get_url:
+        url: "{{ _ext_dl_url }}"
+        dest: "/tmp/gnome-ext-{{ _ext.id }}.zip"
+        headers:
+          User-Agent: "{{ curl_ua }}"
+        mode: "0644"
+      when: _ext_dl_url is defined and _ext_dl_url | length > 30
+      register: _ext_download
+      failed_when: false
+
+    - name: "GnomeExt {{ _ext.uuid }} — create extension dir"
+      ansible.builtin.file:
+        path: "{{ target_home }}/.local/share/gnome-shell/extensions/{{ _ext.uuid }}"
+        state: directory
+        owner: "{{ target_user }}"
+        group: "{{ target_user }}"
+        mode: "0755"
+      when: _ext_download is success
+
+    - name: "GnomeExt {{ _ext.uuid }} — extract"
+      ansible.builtin.unarchive:
+        src: "/tmp/gnome-ext-{{ _ext.id }}.zip"
+        dest: "{{ target_home }}/.local/share/gnome-shell/extensions/{{ _ext.uuid }}"
+        remote_src: yes
+        owner: "{{ target_user }}"
+        group: "{{ target_user }}"
+      when: _ext_download is success
+
+    - name: "GnomeExt {{ _ext.uuid }} — cleanup"
+      ansible.builtin.file:
+        path: "/tmp/gnome-ext-{{ _ext.id }}.zip"
+        state: absent

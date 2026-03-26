@@ -1,0 +1,82 @@
+---
+# GitHub release tools — fed to the github_tool role via include_role loop.
+# type: tar (extract + install binary), deb (dpkg -i), rpm (dnf install), pkg (auto deb/rpm)
+
+github_tools:
+  - repo: "dandavison/delta"
+    name: "git-delta"
+    binary: "delta"
+    type: "pkg"
+    pattern_deb: "amd64.deb"
+    pattern_rpm: "x86_64.rpm"
+
+  - repo: "jesseduffield/lazygit"
+    name: "lazygit"
+    binary: "lazygit"
+    type: "tar"
+    pattern_tar: "Linux_x86_64.tar.gz"
+
+  - repo: "jesseduffield/lazydocker"
+    name: "lazydocker"
+    binary: "lazydocker"
+    type: "tar"
+    pattern_tar: "Linux_x86_64.tar.gz"
+
+  - repo: "bootandy/dust"
+    name: "dust"
+    binary: "dust"
+    type: "tar"
+    pattern_tar: "x86_64-unknown-linux-musl.tar.gz"
+
+  - repo: "dalance/procs"
+    name: "procs"
+    binary: "procs"
+    type: "tar"
+    pattern_tar: "x86_64-linux.zip"
+    archive_format: "zip"
+
+  - repo: "muesli/duf"
+    name: "duf"
+    binary: "duf"
+    type: "pkg"
+    pattern_deb: "amd64.deb"
+    pattern_rpm: "x86_64.rpm"
+
+  - repo: "charmbracelet/glow"
+    name: "glow"
+    binary: "glow"
+    type: "pkg"
+    pattern_deb: "amd64.deb"
+    pattern_rpm: "x86_64.rpm"
+
+  - repo: "ClementTsang/bottom"
+    name: "bottom"
+    binary: "btm"
+    type: "pkg"
+    pattern_deb: "amd64.deb"
+    pattern_rpm: "x86_64.rpm"
+
+  - repo: "casey/just"
+    name: "just"
+    binary: "just"
+    type: "tar"
+    pattern_tar: "x86_64-unknown-linux-musl.tar.gz"
+
+  - repo: "sharkdp/hyperfine"
+    name: "hyperfine"
+    binary: "hyperfine"
+    type: "pkg"
+    pattern_deb: "amd64.deb"
+    pattern_rpm: "x86_64.rpm"
+
+  - repo: "derailed/k9s"
+    name: "k9s"
+    binary: "k9s"
+    type: "tar"
+    pattern_tar: "Linux_amd64.tar.gz"
+
+  - repo: "stern/stern"
+    name: "stern"
+    binary: "stern"
+    type: "tar"
+    pattern_tar: "linux_amd64.tar.gz"

@@ -1,0 +1,4 @@
+---
+- name: Run fc-cache
+  ansible.builtin.command: fc-cache -f
+  listen: Run fc-cache

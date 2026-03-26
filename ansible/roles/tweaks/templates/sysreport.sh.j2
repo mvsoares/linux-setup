@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+# sysreport — Quick system info summary.
+# Managed by Ansible — do not edit manually.
+set -euo pipefail
+
+echo "=== System Report ==="
+echo "OS:       $(lsb_release -ds 2>/dev/null || cat /etc/os-release | grep PRETTY_NAME | cut -d= -f2 | tr -d '\"')"
+echo "Kernel:   $(uname -r)"
+echo "Shell:    ${SHELL} ($(${SHELL} --version 2>/dev/null | head -1))"
+echo "Uptime:   $(uptime -p)"
+echo ""
+
+echo "=== Hardware ==="
+echo "CPU:      $(lscpu | grep 'Model name' | sed 's/Model name:\s*//')"
+echo "Memory:   $(free -h | awk '/^Mem:/ {print $2 " total, " $3 " used, " $7 " available"}')"
+echo "Swap:     $(free -h | awk '/^Swap:/ {print $2 " total, " $3 " used"}')"
+echo "Disk:     $(df -h / | awk 'NR==2 {print $2 " total, " $3 " used (" $5 ")"}')"
+if command -v nvidia-smi &>/dev/null; then
+    echo "GPU:      $(nvidia-smi --query-gpu=name,driver_version --format=csv,noheader 2>/dev/null || echo 'N/A')"
+fi
+echo ""
+
+echo "=== Dev Tools ==="
+for cmd in git node python3 go rustc java mvn kubectl helm docker podman; do
+    if command -v "$cmd" &>/dev/null; then
+        ver=$("$cmd" --version 2>/dev/null | head -1 || echo "installed")
+        printf "  %-12s %s\n" "$cmd" "$ver"
+    fi
+done
+echo ""
+
+echo "=== Modern CLI ==="
+for cmd in bat eza fd fzf ripgrep delta lazygit btm dust procs duf zoxide starship; do
+    actual="$cmd"
+    [[ "$cmd" == "ripgrep" ]] && actual="rg"
+    if command -v "$actual" &>/dev/null; then
+        printf "  %-12s installed\n" "$cmd"
+    fi
+done
