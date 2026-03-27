@@ -8,26 +8,22 @@ if command -v codium &>/dev/null; then
     skip "VSCodium"
 else
     if is_fedora; then
-        info "Adding VSCodium repo..."
-        rpm --import https://gitlab.com/paulcarroty/vscodium-deb-rpm-repo/-/raw/master/pub.gpg >> "$LOG_FILE" 2>&1 || warn "VSCodium key failed"
-        cat > /etc/yum.repos.d/vscodium.repo << 'VSCODIUM'
-[gitlab.com_paulcarroty_vscodium_repo]
+        add_dnf_repo "VSCodium" \
+"[gitlab.com_paulcarroty_vscodium_repo]
 name=download.vscodium.com
 baseurl=https://download.vscodium.com/rpms/
 enabled=1
 gpgcheck=1
 repo_gpgcheck=1
 gpgkey=https://gitlab.com/paulcarroty/vscodium-deb-rpm-repo/-/raw/master/pub.gpg
-metadata_expire=1h
-VSCODIUM
+metadata_expire=1h" \
+            "/etc/yum.repos.d/vscodium.repo" "https://gitlab.com/paulcarroty/vscodium-deb-rpm-repo/-/raw/master/pub.gpg"
         dnf_each codium
     else
-        info "Adding VSCodium repo..."
-        curl -fsSL https://gitlab.com/paulcarroty/vscodium-deb-rpm-repo/raw/master/pub.gpg \
-            | gpg --batch --yes --dearmor -o /usr/share/keyrings/vscodium-archive-keyring.gpg >> "$LOG_FILE" 2>&1 || warn "VSCodium key failed"
-        echo "deb [signed-by=/usr/share/keyrings/vscodium-archive-keyring.gpg] \
-https://download.vscodium.com/debs vscodium main" \
-            > /etc/apt/sources.list.d/vscodium.list
+        add_apt_repo "VSCodium" "https://gitlab.com/paulcarroty/vscodium-deb-rpm-repo/raw/master/pub.gpg" \
+            "/usr/share/keyrings/vscodium-archive-keyring.gpg" \
+            "/etc/apt/sources.list.d/vscodium.list" \
+            "deb [signed-by=/usr/share/keyrings/vscodium-archive-keyring.gpg] https://download.vscodium.com/debs vscodium main"
         apt_quiet update
         apt_each codium
     fi
@@ -134,14 +130,15 @@ else
         fi
     else
         # Try apt repo first (native), fall back to Flatpak
-        curl -fsSL https://apt.fury.io/wez/gpg.key \
-            | gpg --batch --yes --dearmor -o /usr/share/keyrings/wezterm-fury.gpg >> "$LOG_FILE" 2>&1 \
-            && chmod 644 /usr/share/keyrings/wezterm-fury.gpg \
-            && echo 'deb [signed-by=/usr/share/keyrings/wezterm-fury.gpg] https://apt.fury.io/wez/ * *' \
-                > /etc/apt/sources.list.d/wezterm.list \
-            && apt-get update -q >> "$LOG_FILE" 2>&1 \
-            && apt-get install -y -qq wezterm >> "$LOG_FILE" 2>&1 \
-            && _wez_installed=true && ok "WezTerm (apt)"
+        if add_apt_repo "WezTerm" "https://apt.fury.io/wez/gpg.key" \
+            "/usr/share/keyrings/wezterm-fury.gpg" \
+            "/etc/apt/sources.list.d/wezterm.list" \
+            "deb [signed-by=/usr/share/keyrings/wezterm-fury.gpg] https://apt.fury.io/wez/ * *"; then
+            apt_quiet update
+            if apt-get install -y -qq wezterm >> "$LOG_FILE" 2>&1; then
+                _wez_installed=true && ok "WezTerm (apt)"
+            fi
+        fi
     fi
 
     if ! $_wez_installed && command -v flatpak &>/dev/null; then

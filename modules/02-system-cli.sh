@@ -173,9 +173,12 @@ if ! command -v procs &>/dev/null; then
         | grep browser_download_url | grep "x86_64-linux.zip" | head -1 | cut -d'"' -f4)
     if [[ -n "$_procs_url" ]]; then
         _procs_tmp=$(mktemp -d)
-        curl -sSfL "$_procs_url" -o "$_procs_tmp/procs.zip" >> "$LOG_FILE" 2>&1
-        unzip -q "$_procs_tmp/procs.zip" -d "$_procs_tmp" >> "$LOG_FILE" 2>&1
-        install "$_procs_tmp/procs" /usr/local/bin/procs && ok "procs installed" || warn "procs install failed"
+        if curl -sSfL "$_procs_url" -o "$_procs_tmp/procs.zip" >> "$LOG_FILE" 2>&1; then
+            unzip -q "$_procs_tmp/procs.zip" -d "$_procs_tmp" >> "$LOG_FILE" 2>&1
+            install "$_procs_tmp/procs" /usr/local/bin/procs && ok "procs installed" || warn "procs install failed"
+        else
+            warn "procs — download failed"
+        fi
         rm -rf "$_procs_tmp"
     else
         warn "procs — could not find release"

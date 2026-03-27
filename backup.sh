@@ -185,7 +185,11 @@ done
 
 # ── 16. Package lists ────────────────────────────────────────────────────────
 info "Saving installed package lists..."
-dpkg --get-selections | grep -v deinstall > "${BACKUP_DIR}/system/dpkg-packages.txt" 2>/dev/null && ok "dpkg package list"
+if command -v dpkg &>/dev/null; then
+    dpkg --get-selections | grep -v deinstall > "${BACKUP_DIR}/system/dpkg-packages.txt" 2>/dev/null && ok "dpkg package list"
+elif command -v rpm &>/dev/null; then
+    rpm -qa --qf "%{NAME}\n" | sort > "${BACKUP_DIR}/system/rpm-packages.txt" 2>/dev/null && ok "rpm package list"
+fi
 snap list 2>/dev/null > "${BACKUP_DIR}/system/snap-packages.txt" && ok "snap package list" || true
 flatpak list 2>/dev/null > "${BACKUP_DIR}/system/flatpak-packages.txt" && ok "flatpak package list" || true
 pip3 list --user 2>/dev/null > "${BACKUP_DIR}/system/pip-packages.txt" && ok "pip package list" || true

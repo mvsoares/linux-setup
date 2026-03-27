@@ -53,16 +53,29 @@ else
     info "Installing WezTerm..."
     _wez_installed=false
 
-    # Try apt repo first (native package)
-    if curl -fsSL https://apt.fury.io/wez/gpg.key \
-            | gpg --batch --yes --dearmor -o /usr/share/keyrings/wezterm-fury.gpg >> "$LOG_FILE" 2>&1 \
-        && chmod 644 /usr/share/keyrings/wezterm-fury.gpg \
-        && echo 'deb [signed-by=/usr/share/keyrings/wezterm-fury.gpg] https://apt.fury.io/wez/ * *' \
-            > /etc/apt/sources.list.d/wezterm.list \
-        && apt-get update -q >> "$LOG_FILE" 2>&1 \
-        && apt-get install -y -qq wezterm >> "$LOG_FILE" 2>&1; then
-        ok "WezTerm installed (apt)"
-        _wez_installed=true
+    # 1. Try Fedora COPR
+    if command -v dnf &>/dev/null && command -v rpm &>/dev/null; then
+        info "Adding WezTerm COPR repository (Fedora)..."
+        if dnf copr enable -y wezfurlong/wezterm-nightly >> "$LOG_FILE" 2>&1 \
+            && dnf install -y wezterm >> "$LOG_FILE" 2>&1; then
+            ok "WezTerm installed (COPR)"
+            _wez_installed=true
+        fi
+    fi
+
+    # 2. Try apt repo (Ubuntu/Debian)
+    if ! $_wez_installed && command -v apt-get &>/dev/null; then
+        info "Adding WezTerm apt repository..."
+        if curl -fsSL https://apt.fury.io/wez/gpg.key | gpg --batch --yes --dearmor -o /usr/share/keyrings/wezterm-fury.gpg >> "$LOG_FILE" 2>&1; then
+            chmod 644 /usr/share/keyrings/wezterm-fury.gpg
+            echo 'deb [signed-by=/usr/share/keyrings/wezterm-fury.gpg] https://apt.fury.io/wez/ * *' > /etc/apt/sources.list.d/wezterm.list
+            if apt-get update -q >> "$LOG_FILE" 2>&1 && apt-get install -y -qq wezterm >> "$LOG_FILE" 2>&1; then
+                ok "WezTerm installed (apt)"
+                _wez_installed=true
+            fi
+        else
+            warn "Failed to download WezTerm GPG key"
+        fi
     fi
 
     # Fallback: Flatpak
