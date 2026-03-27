@@ -58,20 +58,24 @@ else
     rm -rf "$local_tmp"
 fi
 
-# Orchis GTK
-if ls /usr/share/themes/Orchis* &>/dev/null 2>&1; then
-    skip "Orchis GTK theme"
+# Arc GTK Theme
+if dpkg -l arc-theme &>/dev/null 2>&1 || [[ -d /usr/share/themes/Arc ]]; then
+    skip "Arc GTK theme"
 else
-    info "Installing Orchis GTK theme..."
-    local_tmp=$(mktemp -d)
-    if timeout 60 git clone --depth=1 https://github.com/vinceliuice/Orchis-theme.git \
-            "${local_tmp}/orchis" >> "$LOG_FILE" 2>&1; then
-        bash "${local_tmp}/orchis/install.sh" -t purple -c dark >> "$LOG_FILE" 2>&1 \
-            && ok "Orchis GTK theme (purple dark)" || warn "Orchis install had errors"
-    else
-        warn "Orchis clone failed or timed out"
-    fi
-    rm -rf "$local_tmp"
+    info "Installing Arc GTK theme..."
+    apt-get update -q >> "$LOG_FILE" 2>&1
+    apt-get install -y -qq arc-theme >> "$LOG_FILE" 2>&1 \
+        && ok "Arc GTK theme" || warn "Arc GTK install failed"
+fi
+
+# Materia GTK Theme
+if dpkg -l materia-gtk-theme &>/dev/null 2>&1 || [[ -d /usr/share/themes/Materia ]]; then
+    skip "Materia GTK theme"
+else
+    info "Installing Materia GTK theme..."
+    apt-get update -q >> "$LOG_FILE" 2>&1
+    apt-get install -y -qq materia-gtk-theme >> "$LOG_FILE" 2>&1 \
+        && ok "Materia GTK theme" || warn "Materia GTK install failed"
 fi
 
 echo ""

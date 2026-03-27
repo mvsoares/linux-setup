@@ -19,7 +19,7 @@ All notable changes to this project are documented in this file.
 
 #### GTK Themes installer (`scripts/install-themes.sh`)
 - Standalone optional script decoupled from the main install
-- Installs: Dracula GTK, Catppuccin Mocha (mauve), Orchis (purple dark)
+- Installs: Dracula GTK, Catppuccin Mocha (mauve), Arc, Materia
 - Icons: Papirus-Dark, Tela (purple)
 - Cursors: Bibata Modern Classic + Ice
 - nwg-look (GTK theme manager for Wayland/Hyprland)
@@ -53,7 +53,7 @@ All notable changes to this project are documented in this file.
 - Replaced with `grep -oE '[0-9]+\.[0-9.]+-tem' | grep '^21\.'` — extracts the identifier token directly from anywhere in the line
 
 #### GTK themes removed from main install (`modules/04-fonts-themes.sh`)
-- Moved Dracula, Catppuccin, Orchis, Papirus, Tela, Bibata, nwg-look to `scripts/install-themes.sh`
+- Moved Dracula, Catppuccin, Arc, Materia, Papirus, Tela, Bibata, nwg-look to `scripts/install-themes.sh`
 - Eliminates install-time throttling/timeouts on slow connections
 - `init_sub` count corrected (9 → 5 ticks)
 
