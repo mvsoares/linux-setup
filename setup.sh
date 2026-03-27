@@ -191,7 +191,7 @@ printf "${BOLD}${GREEN}║${RESET}  %-64s${BOLD}${GREEN}║${RESET}\n" "✔ Font
 printf "${BOLD}${GREEN}║${RESET}  %-64s${BOLD}${GREEN}║${RESET}\n" "✔ GNOME    : 9 extensions · Dock · Blur · workspaces"
 printf "${BOLD}${GREEN}║${RESET}  %-64s${BOLD}${GREEN}║${RESET}\n" "✔ Cloud    : AWS · GCP · Azure · kubectl · helm · k9s"
 printf "${BOLD}${GREEN}║${RESET}  %-64s${BOLD}${GREEN}║${RESET}\n" "✔ Langs    : nvm · pyenv · rustup · Go · SDKMAN"
-printf "${BOLD}${GREEN}║${RESET}  %-64s${BOLD}${GREEN}║${RESET}\n" "✔ Editors  : Cursor · VSCodium · Neovim · WezTerm"
+printf "${BOLD}${GREEN}║${RESET}  %-64s${BOLD}${GREEN}║${RESET}\n" "✔ Editors  : VSCodium · Neovim · WezTerm"
 printf "${BOLD}${GREEN}║${RESET}  %-64s${BOLD}${GREEN}║${RESET}\n" "✔ Workspace: git-delta · tmux · direnv · editorconfig"
 printf "${BOLD}${GREEN}║${RESET}  %-64s${BOLD}${GREEN}║${RESET}\n" "✔ Kernel   : swappiness=10 · inotify · fstrim · preload"
 [[ $ERRORS -gt 0 ]] && \

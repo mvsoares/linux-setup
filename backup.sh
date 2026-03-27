@@ -81,12 +81,6 @@ backup_file "$HOME/.config/wezterm/wezterm.lua" "wezterm" "wezterm.lua"
 info "Backing up tmux..."
 backup_file "$HOME/.tmux.conf"                 "tmux"   ".tmux.conf"
 
-# ── 7. Cursor IDE ────────────────────────────────────────────────────────────
-info "Backing up Cursor IDE..."
-backup_file "$HOME/.config/Cursor/User/settings.json"     "cursor" "settings.json"
-backup_file "$HOME/.config/Cursor/User/keybindings.json"  "cursor" "keybindings.json"
-backup_dir  "$HOME/.config/Cursor/User/snippets"           "cursor" "snippets"
-
 # ── 8. VSCode ────────────────────────────────────────────────────────────────
 info "Backing up VSCode..."
 backup_file "$HOME/.config/Code/User/settings.json"       "vscode" "settings.json"
@@ -203,7 +197,7 @@ info "Recording tool versions..."
     for cmd in git node npm python3 pip3 go rustc cargo docker kubectl helm \
                aws gcloud az bat eza fd rg fzf zoxide delta lazygit lazydocker \
                dust procs tokei duf glow btm just hyperfine starship nvim tmux \
-               codium code cursor pre-commit pipx k9s stern kubectx helm; do
+               codium code pre-commit pipx k9s stern kubectx helm; do
         ver=$(command -v "$cmd" &>/dev/null && "$cmd" --version 2>/dev/null | head -1 || echo "not installed")
         printf "%-16s %s\n" "$cmd" "$ver"
     done

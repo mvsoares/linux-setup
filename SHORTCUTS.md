@@ -184,7 +184,7 @@ Prefix: **`Ctrl+A`**
 | `Ctrl+Alt+T` | Open terminal |
 | `Alt+Tab` | Switch windows |
 
-### Cursor / VSCode / VSCodium
+### VSCode / VSCodium
 
 | Shortcut | Action |
 |----------|--------|
@@ -243,7 +243,6 @@ Active automatically in `git diff`, `git log -p`, `git show`.
 
 | Agent | Command | Provider |
 |-------|---------|----------|
-| Cursor CLI | `agent` | Anysphere |
 | Claude Code | `claude` | Anthropic |
 | Gemini CLI | `gemini` | Google |
 | Codex CLI | `codex` | OpenAI |

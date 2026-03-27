@@ -215,15 +215,6 @@ fi
 tick "WezTerm + config"
 
 # ── AI Code Assist CLIs ───────────────────────────────────────────────────
-# Cursor CLI Agent (Anysphere)
-if command -v agent &>/dev/null; then
-    skip "Cursor CLI $(agent --version 2>/dev/null | head -1 || true)"
-else
-    info "Installing Cursor CLI Agent..."
-    as_user "curl -fsSL https://cursor.com/install -o /tmp/cursor_install.sh && bash /tmp/cursor_install.sh && rm -f /tmp/cursor_install.sh" >> "$LOG_FILE" 2>&1 \
-        && ok "Cursor CLI Agent installed" || warn "Cursor CLI install failed — run: curl https://cursor.com/install -fsS | bash"
-fi
-tick "Cursor CLI Agent"
 
 # Source nvm so npm is available (installed by module 07 as the real user)
 NVM_DIR="${USER_HOME}/.nvm"

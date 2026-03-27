@@ -3,7 +3,7 @@
 # restore.sh — Restore workstation configuration from backup archive
 # Usage:  bash restore.sh <backup-archive.tar.gz> [--dry-run] [--only section]
 #
-# Sections: shell git starship synth-shell wezterm tmux cursor vscode
+# Sections: shell git starship synth-shell wezterm tmux vscode
 #           vscodium nvim ssh direnv misc gnome system extensions
 # =============================================================================
 set -euo pipefail
@@ -29,8 +29,8 @@ while [[ $# -gt 0 ]]; do
         --help|-h)
             echo "Usage: bash restore.sh <backup.tar.gz> [--dry-run] [--only section]"
             echo ""
-            echo "Sections: shell git starship synth-shell wezterm tmux cursor"
-            echo "          vscode vscodium nvim ssh direnv misc gnome system extensions"
+            echo "Sections: shell git starship synth-shell wezterm tmux vscode"
+            echo "          vscodium nvim ssh direnv misc gnome system extensions"
             echo ""
             echo "Options:"
             echo "  --dry-run     Show what would be restored without changing anything"
@@ -173,14 +173,6 @@ fi
 if should_restore "tmux"; then
     info "Restoring tmux..."
     restore_file "${BACKUP_DIR}/tmux/.tmux.conf" "$HOME/.tmux.conf" ".tmux.conf"
-fi
-
-# ── 7. Cursor IDE ────────────────────────────────────────────────────────────
-if should_restore "cursor"; then
-    info "Restoring Cursor IDE..."
-    restore_file "${BACKUP_DIR}/cursor/settings.json"    "$HOME/.config/Cursor/User/settings.json"    "Cursor settings.json"
-    restore_file "${BACKUP_DIR}/cursor/keybindings.json" "$HOME/.config/Cursor/User/keybindings.json" "Cursor keybindings.json"
-    restore_dir  "${BACKUP_DIR}/cursor/snippets"          "$HOME/.config/Cursor/User/snippets"          "Cursor snippets"
 fi
 
 # ── 8. VSCode ────────────────────────────────────────────────────────────────

@@ -1,11 +1,6 @@
 local wezterm = require 'wezterm'
 local config = wezterm.config_builder()
 
--- GNOME may expose SSH via gcr/keyring sockets under /run/user/UID/gcr/ssh.
--- WezTerm's mux can try to symlink that path before it exists → ERROR mux::ssh_agent.
--- Disabling avoids clobbering SSH_AUTH_SOCK; use your real agent/socket as usual.
-config.mux_enable_ssh_agent = false
-
 -- ─── Font ────────────────────────────────────────────────────────────────────
 config.font = wezterm.font('VictorMono NF', { weight = 'Regular' })
 config.font_size = 12.5
@@ -115,7 +110,8 @@ local function use_webgpu()
   end
   return true
 end
-config.front_end = use_webgpu() and 'WebGpu' or 'OpenGL'
+-- VMs/headless: skip EGL/DRI3 probe (libEGL DRI3 warnings) by using Software
+config.front_end = use_webgpu() and 'WebGpu' or 'Software'
 config.automatically_reload_config = true
 
 -- ─── Cursor ──────────────────────────────────────────────────────────────────

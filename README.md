@@ -27,7 +27,7 @@ The setup is split into **10 ordered modules**, each independently skippable and
 | 5 | **GNOME** | Dash to Dock, Blur my Shell, Just Perfection, Caffeine, Clipboard Indicator, Vitals, Space Bar; dark mode, workspace shortcuts, Nautilus tree view |
 | 6 | **Cloud & K8s** | AWS CLI v2, gcloud, azure-cli, kubectl, helm, k9s, stern, kubectx/kubens, kustomize, eksctl |
 | 7 | **Languages** | nvm + Node LTS, pyenv + Python, rustup, Go, SDKMAN (Java), pipx (black, ruff, mypy, poetry, httpie, tldr) |
-| 8 | **Editors** | Cursor IDE, VSCodium (with ~30 extensions), Neovim + kickstart.nvim, WezTerm (config + process-name tab titles) |
+| 8 | **Editors** | VSCodium (with ~30 extensions), Neovim + kickstart.nvim, WezTerm (config + process-name tab titles) |
 | 9 | **Workspace** | Git (delta, libsecret, rerere, rebase), tmux (Ctrl+A, Dracula status), direnv, editorconfig, SSH defaults |
 | 10 | **Tweaks** | swappiness=10, TCP tuning, inotify limits, fstrim, preload, UFW firewall, journal cleanup, helper scripts |
 
@@ -72,7 +72,7 @@ bash restore.sh backup.tar.gz --dry-run    # preview what would change
 bash restore.sh backup.tar.gz --only tmux  # restore only tmux config
 ```
 
-Available restore sections: `shell`, `git`, `starship`, `synth-shell`, `wezterm`, `tmux`, `cursor`, `vscode`, `vscodium`, `nvim`, `ssh`, `direnv`, `misc`, `gnome`, `system`, `extensions`.
+Available restore sections: `shell`, `git`, `starship`, `synth-shell`, `wezterm`, `tmux`, `vscode`, `vscodium`, `nvim`, `ssh`, `direnv`, `misc`, `gnome`, `system`, `extensions`.
 
 Existing files are saved as `*.pre-restore` before being overwritten.
 

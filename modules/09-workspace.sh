@@ -24,9 +24,7 @@ else
 fi
 
 as_user "git config --global init.defaultBranch main"
-if command -v cursor &>/dev/null; then
-    as_user "git config --global core.editor 'cursor --wait'"
-elif command -v codium &>/dev/null; then
+if command -v codium &>/dev/null; then
     as_user "git config --global core.editor 'codium --wait'"
 elif command -v code &>/dev/null; then
     as_user "git config --global core.editor 'code --wait'"

@@ -57,10 +57,6 @@ All notable changes to this project are documented in this file.
 - Eliminates install-time throttling/timeouts on slow connections
 - `init_sub` count corrected (9 → 5 ticks)
 
-#### WezTerm Cursor IDE section (`modules/08-editors.sh`)
-- Removed Cursor IDE installer (download was always failing; no stable automated install path)
-- Cursor CLI Agent (Anysphere) retained
-
 #### MapleNerdFont removed (`modules/04-fonts-themes.sh`)
 - Font slug does not exist in Nerd Fonts GitHub releases; removed to eliminate repeated 404 warnings
 
@@ -89,7 +85,7 @@ All notable changes to this project are documented in this file.
 - Google Cloud SDK, Azure CLI, Brave browser, Google Chrome (stable + beta)
 - VSCodium with 20+ extensions mirrored from VS Code settings
 - Neovim with kickstart.nvim config
-- AI CLI tools: Claude Code, Gemini CLI, Codex CLI, Cursor CLI Agent
+- AI CLI tools: Claude Code, Gemini CLI, Codex CLI
 - 20+ Nerd Fonts, Google Fonts (Inter, Nunito, Poppins, etc.), APT font packages
 - GNOME extensions: Dash to Dock, Blur my Shell, Just Perfection, Caffeine, Clipboard Indicator, Vitals, Space Bar, User Themes, AppIndicator
 - GNOME settings: Dracula theme, Papirus-Dark icons, Bibata cursor, workspaces, keybindings, night light, privacy
