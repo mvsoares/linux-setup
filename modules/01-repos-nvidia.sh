@@ -23,47 +23,27 @@ if is_fedora; then
     fi
 
     # GitHub CLI (Fedora)
-    if command -v gh &>/dev/null; then
-        tick "GitHub CLI — already present"
-    else
-        info "Adding GitHub CLI repo..."
-        dnf config-manager addrepo --from-repofile=https://cli.github.com/packages/rpm/gh-cli.repo \
-            >> "$LOG_FILE" 2>&1 || warn "GH CLI repo failed"
-        tick "GitHub CLI repo added"
-    fi
+    add_dnf_repo "GitHub CLI" "https://cli.github.com/packages/rpm/gh-cli.repo" "/etc/yum.repos.d/gh-cli.repo"
 
     # VSCode (Fedora)
-    if command -v code &>/dev/null || [[ -f /etc/yum.repos.d/vscode.repo ]]; then
-        tick "VSCode repo — already present"
-    else
-        info "Adding Microsoft VSCode repo..."
-        rpm --import https://packages.microsoft.com/keys/microsoft.asc >> "$LOG_FILE" 2>&1
-        cat > /etc/yum.repos.d/vscode.repo << 'VSCODE'
-[code]
+    add_dnf_repo "VSCode" \
+"[code]
 name=Visual Studio Code
 baseurl=https://packages.microsoft.com/yumrepos/vscode
 enabled=1
 gpgcheck=1
-gpgkey=https://packages.microsoft.com/keys/microsoft.asc
-VSCODE
-        tick "VSCode repo added"
-    fi
+gpgkey=https://packages.microsoft.com/keys/microsoft.asc" \
+        "/etc/yum.repos.d/vscode.repo" "https://packages.microsoft.com/keys/microsoft.asc"
 
     # Google Chrome (Fedora)
-    if command -v google-chrome-stable &>/dev/null || [[ -f /etc/yum.repos.d/google-chrome.repo ]]; then
-        tick "Google Chrome repo — already present"
-    else
-        info "Adding Google Chrome repo..."
-        cat > /etc/yum.repos.d/google-chrome.repo << 'CHROME'
-[google-chrome]
+    add_dnf_repo "Google Chrome" \
+"[google-chrome]
 name=google-chrome
 baseurl=https://dl.google.com/linux/chrome/rpm/stable/x86_64
 enabled=1
 gpgcheck=1
-gpgkey=https://dl.google.com/linux/linux_signing_key.pub
-CHROME
-        tick "Google Chrome repo added"
-    fi
+gpgkey=https://dl.google.com/linux/linux_signing_key.pub" \
+        "/etc/yum.repos.d/google-chrome.repo" "https://dl.google.com/linux/linux_signing_key.pub"
 
     # Flatpak (Fedora has it by default)
     if command -v flatpak &>/dev/null; then
@@ -85,63 +65,28 @@ else
     tick "Core repositories enabled"
 
     # GitHub CLI
-    if command -v gh &>/dev/null \
-            || { [[ -f /etc/apt/sources.list.d/github-cli.list ]] \
-                 && [[ -s /usr/share/keyrings/githubcli-archive-keyring.gpg ]]; }; then
-        tick "GitHub CLI repo — already present"
-    else
-        info "Adding GitHub CLI repo..."
-        curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
-            -o /usr/share/keyrings/githubcli-archive-keyring.gpg >> "$LOG_FILE" 2>&1 || warn "GH CLI key fetch failed"
-        echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] \
-https://cli.github.com/packages stable main" > /etc/apt/sources.list.d/github-cli.list
-        tick "GitHub CLI repo added"
-    fi
+    add_apt_repo "GitHub CLI" "https://cli.github.com/packages/githubcli-archive-keyring.gpg" \
+        "/usr/share/keyrings/githubcli-archive-keyring.gpg" \
+        "/etc/apt/sources.list.d/github-cli.list" \
+        "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main"
 
     # Brave Browser
-    if command -v brave-browser &>/dev/null \
-            || { [[ -f /etc/apt/sources.list.d/brave-browser-release.list ]] \
-                 && [[ -s /usr/share/keyrings/brave-browser-archive-keyring.gpg ]]; }; then
-        tick "Brave Browser repo — already present"
-    else
-        info "Adding Brave Browser repo..."
-        curl -fsSLo /usr/share/keyrings/brave-browser-archive-keyring.gpg \
-            https://brave-browser-apt-release.s3.brave.com/brave-browser-archive-keyring.gpg >> "$LOG_FILE" 2>&1 || warn "Brave key failed"
-        echo "deb [signed-by=/usr/share/keyrings/brave-browser-archive-keyring.gpg] \
-https://brave-browser-apt-release.s3.brave.com/ stable main" \
-            > /etc/apt/sources.list.d/brave-browser-release.list
-        tick "Brave Browser repo added"
-    fi
+    add_apt_repo "Brave Browser" "https://brave-browser-apt-release.s3.brave.com/brave-browser-archive-keyring.gpg" \
+        "/usr/share/keyrings/brave-browser-archive-keyring.gpg" \
+        "/etc/apt/sources.list.d/brave-browser-release.list" \
+        "deb [signed-by=/usr/share/keyrings/brave-browser-archive-keyring.gpg] https://brave-browser-apt-release.s3.brave.com/ stable main"
 
     # VSCode
-    if command -v code &>/dev/null \
-            || { [[ -f /etc/apt/sources.list.d/vscode.list ]] \
-                 && [[ -s /etc/apt/keyrings/microsoft.gpg ]]; }; then
-        tick "VSCode repo — already present"
-    else
-        info "Adding Microsoft VSCode repo..."
-        curl -fsSL https://packages.microsoft.com/keys/microsoft.asc \
-            | gpg --batch --yes --dearmor -o /etc/apt/keyrings/microsoft.gpg >> "$LOG_FILE" 2>&1 || warn "MS key failed"
-        echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/microsoft.gpg] \
-https://packages.microsoft.com/repos/code stable main" \
-            > /etc/apt/sources.list.d/vscode.list
-        tick "VSCode repo added"
-    fi
+    add_apt_repo "VSCode" "https://packages.microsoft.com/keys/microsoft.asc" \
+        "/etc/apt/keyrings/microsoft.gpg" \
+        "/etc/apt/sources.list.d/vscode.list" \
+        "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/microsoft.gpg] https://packages.microsoft.com/repos/code stable main"
 
     # Google Chrome
-    if command -v google-chrome &>/dev/null \
-            || { [[ -f /etc/apt/sources.list.d/google-chrome.list ]] \
-                 && [[ -s /usr/share/keyrings/google-chrome.gpg ]]; }; then
-        tick "Google Chrome repo — already present"
-    else
-        info "Adding Google Chrome repo..."
-        curl -fsSL https://dl.google.com/linux/linux_signing_key.pub \
-            | gpg --batch --yes --dearmor -o /usr/share/keyrings/google-chrome.gpg >> "$LOG_FILE" 2>&1 || warn "Chrome key failed"
-        echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/google-chrome.gpg] \
-https://dl.google.com/linux/chrome/deb/ stable main" \
-            > /etc/apt/sources.list.d/google-chrome.list
-        tick "Google Chrome repo added"
-    fi
+    add_apt_repo "Google Chrome" "https://dl.google.com/linux/linux_signing_key.pub" \
+        "/usr/share/keyrings/google-chrome.gpg" \
+        "/etc/apt/sources.list.d/google-chrome.list" \
+        "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/google-chrome.gpg] https://dl.google.com/linux/chrome/deb/ stable main"
 
     # Flatpak + Flathub
     if command -v flatpak &>/dev/null; then

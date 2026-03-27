@@ -163,6 +163,55 @@ gset() {
         || warn "gsettings failed: ${schema} ${key}"
 }
 
+# ── Repository Helpers ────────────────────────────────────────────────────────
+add_apt_repo() {
+    local name="$1" key_url="$2" key_file="$3" repo_list_file="$4" repo_content="$5"
+    if [[ -f "$repo_list_file" && -s "$key_file" ]]; then
+        tick "${name} repo — already present"
+        return 0
+    fi
+    info "Adding ${name} repo..."
+    if [[ -n "$key_url" && -n "$key_file" ]]; then
+        if [[ "$key_url" == *".asc" || "$key_url" == *".pub" || "$key_url" == *".gpg" ]]; then
+            if ! curl -fsSL "$key_url" | gpg --batch --yes --dearmor -o "$key_file" >> "$LOG_FILE" 2>&1; then
+                warn "${name} key failed"
+                return 1
+            fi
+        else
+            if ! curl -fsSLo "$key_file" "$key_url" >> "$LOG_FILE" 2>&1; then
+                warn "${name} key failed"
+                return 1
+            fi
+        fi
+    fi
+    echo "$repo_content" > "$repo_list_file"
+    tick "${name} repo added"
+}
+
+add_dnf_repo() {
+    local name="$1" repo_url_or_content="$2" repo_file="$3" key_url="$4"
+    if [[ -f "$repo_file" ]]; then
+        tick "${name} repo — already present"
+        return 0
+    fi
+    info "Adding ${name} repo..."
+    if [[ -n "$key_url" ]]; then
+        if ! rpm --import "$key_url" >> "$LOG_FILE" 2>&1; then
+            warn "${name} key failed"
+            return 1
+        fi
+    fi
+    if [[ "$repo_url_or_content" == http* ]]; then
+        if ! dnf config-manager addrepo --from-repofile="$repo_url_or_content" >> "$LOG_FILE" 2>&1; then
+            warn "${name} repo failed"
+            return 1
+        fi
+    else
+        echo "$repo_url_or_content" > "$repo_file"
+    fi
+    tick "${name} repo added"
+}
+
 # ── APT helpers (Debian/Ubuntu) ───────────────────────────────────────────────
 apt_quiet() {
     local rc=0
@@ -187,13 +236,13 @@ snap_install() {
 dnf_quiet() {
     local rc=0
     local attempt
-    for attempt in 1 2 3; do
+    for attempt in {1..5}; do
         wait_for_rpm_lock
         dnf -y -q "$@" >> "$LOG_FILE" 2>&1 && return 0
         rc=$?
         # dnf check-update uses exit 100 when updates exist — not an error
         [[ "$1" == "check-update" && $rc -eq 100 ]] && return 0
-        [[ $attempt -lt 3 ]] && sleep 3
+        [[ $attempt -lt 5 ]] && sleep 5
     done
     [[ $rc -ne 0 ]] && warn "dnf $* → exit ${rc} (see log)"
     return $rc
@@ -202,14 +251,13 @@ dnf_quiet() {
 dnf_each() {
     for pkg in "$@"; do
         local rc=0
-        wait_for_rpm_lock
-        dnf -y -q install "$pkg" >> "$LOG_FILE" 2>&1 || rc=$?
-        # Transient RPM DB lock (PackageKit, etc.) — one retry after short wait
-        if [[ $rc -ne 0 ]]; then
+        local attempt
+        for attempt in {1..5}; do
             wait_for_rpm_lock
-            sleep 3
-            dnf -y -q install "$pkg" >> "$LOG_FILE" 2>&1 && rc=0 || rc=$?
-        fi
+            dnf -y -q install "$pkg" >> "$LOG_FILE" 2>&1 && { rc=0; break; }
+            rc=$?
+            [[ $attempt -lt 5 ]] && sleep 5
+        done
         if [[ $rc -eq 0 ]]; then ok "${pkg}"; else warn "${pkg} — not found / failed (skipped)"; fi
     done
 }
@@ -300,6 +348,12 @@ CURL_UA='Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) 
 
 # Optional: export GITHUB_TOKEN for higher GitHub API rate limits (CI / many VMs).
 
+_gh_api_curl() {
+    local auth_header=()
+    [[ -n "${GITHUB_TOKEN:-}" ]] && auth_header=(-H "Authorization: Bearer ${GITHUB_TOKEN}")
+    curl -sSf -A "$CURL_UA" "${auth_header[@]}" -H 'Accept: application/vnd.github+json' "$@"
+}
+
 # Get latest release tag via redirect header (no API quota used)
 _github_latest_tag() {
     local loc tag
@@ -307,9 +361,7 @@ _github_latest_tag() {
         | grep -i '^location:' | tail -1)
     tag=$(echo "$loc" | sed 's|.*/tag/||; s/\r//; s/[[:space:]]//g')
     if [[ -z "$tag" ]]; then
-        tag=$(curl -sSf -A "$CURL_UA" ${GITHUB_TOKEN:+-H "Authorization: Bearer ${GITHUB_TOKEN}"} \
-            -H 'Accept: application/vnd.github+json' \
-            "https://api.github.com/repos/$1/releases/latest" 2>/dev/null \
+        tag=$(_gh_api_curl "https://api.github.com/repos/$1/releases/latest" 2>/dev/null \
             | grep '"tag_name"' | head -1 | cut -d'"' -f4)
     fi
     echo "$tag"
@@ -333,9 +385,7 @@ _github_asset_url() {
 # Reliable asset URL via GitHub API (uses GITHUB_TOKEN if set)
 _github_api_asset_url() {
     local repo="$1" pattern="$2"
-    curl -sSf -A "$CURL_UA" ${GITHUB_TOKEN:+-H "Authorization: Bearer ${GITHUB_TOKEN}"} \
-        -H 'Accept: application/vnd.github+json' \
-        "https://api.github.com/repos/${repo}/releases/latest" 2>/dev/null \
+    _gh_api_curl "https://api.github.com/repos/${repo}/releases/latest" 2>/dev/null \
         | grep browser_download_url | grep -F "$pattern" | head -1 | cut -d'"' -f4
 }
 
@@ -346,9 +396,7 @@ github_latest_version() {
         echo "${tag#v}"
         return
     fi
-    curl -sSf -A "$CURL_UA" ${GITHUB_TOKEN:+-H "Authorization: Bearer ${GITHUB_TOKEN}"} \
-        -H 'Accept: application/vnd.github+json' \
-        "https://api.github.com/repos/$1/releases/latest" 2>/dev/null \
+    _gh_api_curl "https://api.github.com/repos/$1/releases/latest" 2>/dev/null \
         | grep tag_name | cut -d'"' -f4 | sed 's/^v//'
 }
 
@@ -360,10 +408,13 @@ install_github_deb() {
     [[ -z "$url" ]] && url=$(_github_api_asset_url "$repo" "$pattern")
     if [[ -n "$url" ]]; then
         local tmp=$(mktemp -d)
-        curl -sSfL -A "$CURL_UA" "$url" -o "$tmp/pkg.deb" >> "$LOG_FILE" 2>&1 \
-            && dpkg -i "$tmp/pkg.deb" >> "$LOG_FILE" 2>&1 \
-            && ok "$name installed" \
-            || { apt-get install -f -y >> "$LOG_FILE" 2>&1; warn "$name install had issues"; }
+        if curl -sSfL -A "$CURL_UA" "$url" -o "$tmp/pkg.deb" >> "$LOG_FILE" 2>&1; then
+            dpkg -i "$tmp/pkg.deb" >> "$LOG_FILE" 2>&1 \
+                && ok "$name installed" \
+                || { apt-get install -f -y >> "$LOG_FILE" 2>&1; warn "$name install had issues"; }
+        else
+            warn "$name — download failed"
+        fi
         rm -rf "$tmp"
     else
         warn "$name — could not find release"
@@ -378,10 +429,13 @@ install_github_rpm() {
     [[ -z "$url" ]] && url=$(_github_api_asset_url "$repo" "$pattern")
     if [[ -n "$url" ]]; then
         local tmp=$(mktemp -d)
-        curl -sSfL -A "$CURL_UA" "$url" -o "$tmp/pkg.rpm" >> "$LOG_FILE" 2>&1 \
-            && dnf install -y "$tmp/pkg.rpm" >> "$LOG_FILE" 2>&1 \
-            && ok "$name installed" \
-            || warn "$name install had issues"
+        if curl -sSfL -A "$CURL_UA" "$url" -o "$tmp/pkg.rpm" >> "$LOG_FILE" 2>&1; then
+            dnf install -y "$tmp/pkg.rpm" >> "$LOG_FILE" 2>&1 \
+                && ok "$name installed" \
+                || warn "$name install had issues"
+        else
+            warn "$name — download failed"
+        fi
         rm -rf "$tmp"
     else
         warn "$name — could not find release"
@@ -422,15 +476,21 @@ install_github_tar() {
     if [[ -n "$url" ]]; then
         local tmp=$(mktemp -d)
         # Download to file first — tar can auto-detect compression from file but not from stdin pipe
-        curl -sSfL -A "$CURL_UA" "$url" -o "$tmp/archive" >> "$LOG_FILE" 2>&1
-        tar -xf "$tmp/archive" -C "$tmp" >> "$LOG_FILE" 2>&1
-        local bin_path
-        bin_path=$(find "$tmp" -name "$binary" -type f 2>/dev/null | head -1)
-        if [[ -n "$bin_path" ]]; then
-            install "$bin_path" /usr/local/bin/"$binary"
-            ok "$name installed"
+        if curl -sSfL -A "$CURL_UA" "$url" -o "$tmp/archive" >> "$LOG_FILE" 2>&1; then
+            if tar -xf "$tmp/archive" -C "$tmp" >> "$LOG_FILE" 2>&1; then
+                local bin_path
+                bin_path=$(find "$tmp" -name "$binary" -type f 2>/dev/null | head -1)
+                if [[ -n "$bin_path" ]]; then
+                    install "$bin_path" /usr/local/bin/"$binary"
+                    ok "$name installed"
+                else
+                    warn "$name — binary not found in archive"
+                fi
+            else
+                warn "$name — archive extraction failed"
+            fi
         else
-            warn "$name — binary not found in archive"
+            warn "$name — download failed"
         fi
         rm -rf "$tmp"
     else

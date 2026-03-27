@@ -24,9 +24,9 @@ set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # ── Globals ───────────────────────────────────────────────────────────────────
-export TOTAL_STEPS=10
 export CURRENT_STEP=0
-export LOG_FILE="/tmp/workstation-setup-$(date +%Y%m%d-%H%M%S).log"
+mkdir -p "/var/log/linux-setup" 2>/dev/null || true
+export LOG_FILE="/var/log/linux-setup/setup-$(date +%Y%m%d-%H%M%S).log"
 export STATE_DIR="/var/cache/workstation-setup"
 export ERRORS=0
 
@@ -47,6 +47,8 @@ MODULES=(
     "10-tweaks.sh:System Tweaks · Performance · Cleanup"
 )
 
+export TOTAL_STEPS=${#MODULES[@]}
+
 # ── CLI argument parsing ──────────────────────────────────────────────────────
 ONLY_STEPS=()
 SKIP_STEPS=()
@@ -64,11 +66,13 @@ while [[ $# -gt 0 ]]; do
             fi
             ;;
         --only)
-            IFS=',' read -ra ONLY_STEPS <<< "${2:-}"
+            _only="${2:-}"
+            IFS=',' read -ra ONLY_STEPS <<< "${_only// /}"
             shift
             ;;
         --skip)
-            IFS=',' read -ra SKIP_STEPS <<< "${2:-}"
+            _skip="${2:-}"
+            IFS=',' read -ra SKIP_STEPS <<< "${_skip// /}"
             shift
             ;;
         --list)
@@ -139,7 +143,10 @@ ensure_user_local_bin_path
 # Keep sudo alive
 while true; do sudo -n true; sleep 55; kill -0 "$$" || exit; done 2>/dev/null &
 SUDO_KEEPER_PID=$!
-trap "kill $SUDO_KEEPER_PID 2>/dev/null || true" EXIT
+cleanup() {
+    kill $SUDO_KEEPER_PID 2>/dev/null || true
+}
+trap cleanup EXIT INT TERM
 
 # ── Run modules ──────────────────────────────────────────────────────────────
 for i in "${!MODULES[@]}"; do
