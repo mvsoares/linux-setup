@@ -38,10 +38,10 @@ if command -v nvidia-smi &>/dev/null; then
 fi
 
 # Modern tool overrides (only activate if present)
+command -v wezterm &>/dev/null && alias wezterm='wezterm 2>/dev/null'
 command -v bat &>/dev/null && alias cat='bat --paging=never --style=plain' && alias catp='bat'
 command -v eza &>/dev/null && alias ls='eza --icons' && alias ll='eza -lah --icons --git' && alias lt='eza --tree --icons -L 3'
 command -v fzf &>/dev/null && export FZF_DEFAULT_OPTS='--height=40% --layout=reverse --border --info=inline --color=header:italic:underline,prompt:bold'
-command -v zoxide &>/dev/null && eval "$(zoxide init bash)" && alias cd='z'
 command -v direnv &>/dev/null && eval "$(direnv hook bash)" 2>/dev/null || true
 command -v dust &>/dev/null && alias du='dust'
 command -v procs &>/dev/null && alias pss='procs'
@@ -255,6 +255,13 @@ if [[ -f "$BASHRC" ]]; then
     sed -i 's/^HISTSIZE=1000$/HISTSIZE=50000/' "$BASHRC"
     sed -i 's/^HISTFILESIZE=2000$/HISTFILESIZE=100000/' "$BASHRC"
     sed -i 's/^#shopt -s globstar$/shopt -s globstar/' "$BASHRC"
+    
+    # Ensure zoxide is initialized at the very end of .bashrc
+    if ! grep -q 'zoxide init bash' "$BASHRC"; then
+        echo -e '\n# Initialize zoxide (must be at the end)' >> "$BASHRC"
+        echo 'command -v zoxide &>/dev/null && eval "$(zoxide init bash)" && alias cd='\''z'\''' >> "$BASHRC"
+    fi
+
     ok "Bashrc tuned (backup: ${BACKUP})"
 fi
 tick "Bashrc improvements"
