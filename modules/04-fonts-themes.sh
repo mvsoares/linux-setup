@@ -7,7 +7,7 @@ FONT_DIR="/usr/local/share/fonts/custom"
 mkdir -p "${FONT_DIR}/mono" "${FONT_DIR}/general"
 
 # ── Nerd Font installer ──────────────────────────────────────────────────────
-NERD_FONT_VER=$(curl -sSf "https://api.github.com/repos/ryanoasis/nerd-fonts/releases/latest" 2>/dev/null \
+NERD_FONT_VER=$(_gh_api_curl "https://api.github.com/repos/ryanoasis/nerd-fonts/releases/latest" 2>/dev/null \
     | grep tag_name | cut -d'"' -f4)
 [[ -z "$NERD_FONT_VER" ]] && NERD_FONT_VER="v3.3.0"
 
@@ -75,7 +75,7 @@ install_github_font() {
         return
     fi
     local url
-    url=$(curl -sSf "https://api.github.com/repos/${repo}/releases/latest" 2>/dev/null \
+    url=$(_gh_api_curl "https://api.github.com/repos/${repo}/releases/latest" 2>/dev/null \
         | grep browser_download_url | grep "$pattern" | head -1 | cut -d'"' -f4)
     if [[ -n "$url" ]]; then
         mkdir -p "$dest"

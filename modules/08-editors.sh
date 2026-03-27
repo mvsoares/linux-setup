@@ -88,7 +88,7 @@ if command -v nvim &>/dev/null; then
     skip "Neovim"
 else
     info "Installing Neovim (latest stable)..."
-    NVIM_URL=$(curl -sSf "https://api.github.com/repos/neovim/neovim/releases/latest" 2>/dev/null \
+    NVIM_URL=$(_gh_api_curl "https://api.github.com/repos/neovim/neovim/releases/latest" 2>/dev/null \
         | grep browser_download_url | grep "nvim-linux-$(uname -m).tar.gz" | head -1 | cut -d'"' -f4 || echo "")
     if [[ -n "$NVIM_URL" ]]; then
         local_tmp=$(mktemp -d)
@@ -223,7 +223,7 @@ if command -v agent &>/dev/null; then
     skip "Cursor CLI $(agent --version 2>/dev/null | head -1 || true)"
 else
     info "Installing Cursor CLI Agent..."
-    as_user "curl -fsSL https://cursor.com/install | bash" >> "$LOG_FILE" 2>&1 \
+    as_user "curl -fsSL https://cursor.com/install -o /tmp/cursor_install.sh && bash /tmp/cursor_install.sh && rm -f /tmp/cursor_install.sh" >> "$LOG_FILE" 2>&1 \
         && ok "Cursor CLI Agent installed" || warn "Cursor CLI install failed — run: curl https://cursor.com/install -fsS | bash"
 fi
 tick "Cursor CLI Agent"

@@ -191,7 +191,7 @@ if command -v helm &>/dev/null; then
     skip "helm"
 else
     info "Installing helm..."
-    curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash >> "$LOG_FILE" 2>&1 \
+    curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 -o /tmp/get-helm-3.sh && bash /tmp/get-helm-3.sh >> "$LOG_FILE" 2>&1 && rm -f /tmp/get-helm-3.sh \
         && ok "helm installed" || warn "helm install failed"
 fi
 

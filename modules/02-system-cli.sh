@@ -126,7 +126,7 @@ fi
 
 # zoxide (install as user so it goes to ~/.local/bin)
 if ! command -v zoxide &>/dev/null; then
-    as_user "curl -sSfL https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | sh" \
+    as_user "curl -sSfL https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh -o /tmp/zoxide_install.sh && sh /tmp/zoxide_install.sh && rm -f /tmp/zoxide_install.sh" \
         >> "$LOG_FILE" 2>&1 && ok "zoxide installed" || warn "zoxide install failed"
 else
     skip "zoxide $(zoxide --version 2>/dev/null)"
@@ -169,7 +169,7 @@ if ! command -v procs &>/dev/null; then
     _procs_tag=$(_github_latest_tag "dalance/procs")
     _procs_url=""
     [[ -n "$_procs_tag" ]] && _procs_url=$(_github_asset_url "dalance/procs" "$_procs_tag" "x86_64-linux.zip")
-    [[ -z "$_procs_url" ]] && _procs_url=$(curl -sSf "https://api.github.com/repos/dalance/procs/releases/latest" 2>/dev/null \
+    [[ -z "$_procs_url" ]] && _procs_url=$(_gh_api_curl "https://api.github.com/repos/dalance/procs/releases/latest" 2>/dev/null \
         | grep browser_download_url | grep "x86_64-linux.zip" | head -1 | cut -d'"' -f4)
     if [[ -n "$_procs_url" ]]; then
         _procs_tmp=$(mktemp -d)

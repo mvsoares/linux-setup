@@ -9,10 +9,10 @@ if [[ -d "$NVM_DIR" ]]; then
     skip "nvm"
 else
     info "Installing nvm..."
-    NVM_VER=$(curl -fsSL "https://api.github.com/repos/nvm-sh/nvm/releases/latest" 2>/dev/null \
+    NVM_VER=$(_gh_api_curl "https://api.github.com/repos/nvm-sh/nvm/releases/latest" 2>/dev/null \
         | grep tag_name | cut -d'"' -f4)
     [[ -z "$NVM_VER" ]] && NVM_VER="v0.40.1"
-    as_user "curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/${NVM_VER}/install.sh | bash" \
+    as_user "curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/${NVM_VER}/install.sh -o /tmp/nvm_install.sh && bash /tmp/nvm_install.sh && rm -f /tmp/nvm_install.sh" \
         >> "$LOG_FILE" 2>&1 && ok "nvm ${NVM_VER}" || warn "nvm install failed"
     # Install latest LTS node via nvm
     if [[ -d "$NVM_DIR" ]]; then
@@ -41,7 +41,7 @@ else
     fi
 
     info "Installing pyenv..."
-    as_user "curl -fsSL https://pyenv.run | bash" >> "$LOG_FILE" 2>&1 \
+    as_user "curl -fsSL https://pyenv.run -o /tmp/pyenv_install.sh && bash /tmp/pyenv_install.sh && rm -f /tmp/pyenv_install.sh" >> "$LOG_FILE" 2>&1 \
         && ok "pyenv installed" || warn "pyenv install failed"
 
     # Add to profile if not present
@@ -77,7 +77,7 @@ if [[ -d "${USER_HOME}/.rustup" ]] || as_user "command -v rustup" &>/dev/null; t
     skip "rustup"
 else
     info "Installing Rust via rustup..."
-    as_user "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y" \
+    as_user "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs -o /tmp/rustup_install.sh && sh /tmp/rustup_install.sh -y && rm -f /tmp/rustup_install.sh" \
         >> "$LOG_FILE" 2>&1 && ok "Rust installed via rustup" || warn "Rust install failed"
 fi
 tick "Rust (rustup)"
@@ -114,7 +114,7 @@ if [[ -d "$SDKMAN_DIR" ]]; then
     skip "SDKMAN"
 else
     info "Installing SDKMAN..."
-    as_user "curl -fsSL 'https://get.sdkman.io?rcupdate=false' | bash" \
+    as_user "curl -fsSL 'https://get.sdkman.io?rcupdate=false' -o /tmp/sdkman_install.sh && bash /tmp/sdkman_install.sh && rm -f /tmp/sdkman_install.sh" \
         >> "$LOG_FILE" 2>&1 && ok "SDKMAN installed" || warn "SDKMAN install failed"
 fi
 tick "SDKMAN (Java/Gradle/Maven/Kotlin)"

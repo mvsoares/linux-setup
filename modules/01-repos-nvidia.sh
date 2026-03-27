@@ -104,7 +104,7 @@ else
         tick "NodeSource — already present"
     else
         info "Adding NodeSource LTS repo..."
-        curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - >> "$LOG_FILE" 2>&1 || warn "NodeSource setup had errors"
+        curl -fsSL https://deb.nodesource.com/setup_lts.x -o /tmp/nodesource_setup.sh && bash /tmp/nodesource_setup.sh >> "$LOG_FILE" 2>&1 && rm -f /tmp/nodesource_setup.sh || warn "NodeSource setup had errors"
         tick "NodeSource LTS repo added"
     fi
 

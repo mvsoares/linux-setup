@@ -8,7 +8,7 @@ if command -v starship &>/dev/null; then
     skip "Starship"
 else
     info "Installing Starship prompt..."
-    curl -fsSL https://starship.rs/install.sh | sh -s -- --yes >> "$LOG_FILE" 2>&1 \
+    curl -fsSL https://starship.rs/install.sh -o /tmp/starship_install.sh && sh /tmp/starship_install.sh --yes >> "$LOG_FILE" 2>&1 && rm -f /tmp/starship_install.sh \
         && ok "Starship installed" || warn "Starship install failed"
 fi
 tick "Starship prompt"
