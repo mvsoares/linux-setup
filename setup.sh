@@ -210,7 +210,7 @@ echo ""
 THEMES_SCRIPT="${SCRIPT_DIR}/scripts/install-themes.sh"
 if [[ -f "$THEMES_SCRIPT" ]]; then
     echo -e "${BOLD}${CYAN}┌─ Optional: GTK Themes · Icons · Cursors ───────────────────────┐${RESET}"
-    echo -e "${BOLD}${CYAN}│${RESET}  Dracula · Catppuccin Mocha · Arc · Materia                   ${BOLD}${CYAN}│${RESET}"
+    echo -e "${BOLD}${CYAN}│${RESET}  Dracula · Catppuccin · Arc · Materia · Numix · Greybird        ${BOLD}${CYAN}│${RESET}"
     echo -e "${BOLD}${CYAN}│${RESET}  Papirus · Tela icons   ·   Bibata Modern cursor                ${BOLD}${CYAN}│${RESET}"
     echo -e "${BOLD}${CYAN}│${RESET}  Skipped during main install (slow — optional).                 ${BOLD}${CYAN}│${RESET}"
     echo -e "${BOLD}${CYAN}└────────────────────────────────────────────────────────────────┘${RESET}"

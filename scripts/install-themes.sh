@@ -78,6 +78,36 @@ else
         && ok "Materia GTK theme" || warn "Materia GTK install failed"
 fi
 
+# Numix GTK Theme
+if dpkg -l numix-gtk-theme &>/dev/null 2>&1 || [[ -d /usr/share/themes/Numix ]]; then
+    skip "Numix GTK theme"
+else
+    info "Installing Numix GTK theme..."
+    apt-get update -q >> "$LOG_FILE" 2>&1
+    apt-get install -y -qq numix-gtk-theme >> "$LOG_FILE" 2>&1 \
+        && ok "Numix GTK theme" || warn "Numix GTK install failed"
+fi
+
+# Greybird GTK Theme
+if dpkg -l greybird-gtk-theme &>/dev/null 2>&1 || [[ -d /usr/share/themes/Greybird ]]; then
+    skip "Greybird GTK theme"
+else
+    info "Installing Greybird GTK theme..."
+    apt-get update -q >> "$LOG_FILE" 2>&1
+    apt-get install -y -qq greybird-gtk-theme >> "$LOG_FILE" 2>&1 \
+        && ok "Greybird GTK theme" || warn "Greybird GTK install failed"
+fi
+
+# Yaru GTK Theme (Ubuntu Default, good to have if missing)
+if dpkg -l yaru-theme-gtk &>/dev/null 2>&1 || [[ -d /usr/share/themes/Yaru ]]; then
+    skip "Yaru GTK theme"
+else
+    info "Installing Yaru GTK theme..."
+    apt-get update -q >> "$LOG_FILE" 2>&1
+    apt-get install -y -qq yaru-theme-gtk >> "$LOG_FILE" 2>&1 \
+        && ok "Yaru GTK theme" || warn "Yaru GTK install failed"
+fi
+
 echo ""
 
 # ── Icon themes ───────────────────────────────────────────────────────────────

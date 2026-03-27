@@ -19,7 +19,7 @@ All notable changes to this project are documented in this file.
 
 #### GTK Themes installer (`scripts/install-themes.sh`)
 - Standalone optional script decoupled from the main install
-- Installs: Dracula GTK, Catppuccin Mocha (mauve), Arc, Materia
+- Installs: Dracula GTK, Catppuccin Mocha (mauve), Arc, Materia, Numix, Greybird, Yaru
 - Icons: Papirus-Dark, Tela (purple)
 - Cursors: Bibata Modern Classic + Ice
 - nwg-look (GTK theme manager for Wayland/Hyprland)
