@@ -1,7 +1,7 @@
 # =============================================================================
 # Module 05 — GNOME Extensions & Desktop Configuration
 # =============================================================================
-init_sub 9
+init_sub 10
 
 # ── Dependencies ──────────────────────────────────────────────────────────────
 if is_fedora; then
@@ -89,6 +89,7 @@ except: pass
 # ── Install extensions ────────────────────────────────────────────────────────
 install_extension "User Themes"        "user-theme@gnome-shell-extensions.gcampax.github.com"  19
 install_extension "Dash to Dock"       "dash-to-dock@micxgx.gmail.com"                         307
+install_extension "Dash to Panel"      "dash-to-panel@jderose9.github.com"                      1160
 install_extension "Blur my Shell"      "blur-my-shell@aunetx"                                  3193
 install_extension "Just Perfection"    "just-perfection-desktop@just-perfection"                3843
 install_extension "Caffeine"           "caffeine@patapon.info"                                  517
@@ -112,7 +113,7 @@ else
         install_extension "AppIndicator" "appindicatorsupport@rgcjonas.gmail.com" 615
     fi
 fi
-tick "GNOME Shell extensions (9)"
+tick "GNOME Shell extensions (10)"
 
 # Enable extensions
 if [[ ${#ENABLED_EXTS[@]} -gt 0 ]]; then
@@ -164,6 +165,27 @@ as_user "gsettings set ${DTD} dash-max-icon-size      '44'"          2>/dev/null
 as_user "gsettings set ${DTD} click-action            'minimize-or-previews'" 2>/dev/null || true
 as_user "gsettings set ${DTD} scroll-action           'cycle-windows'" 2>/dev/null || true
 tick "Dash-to-Dock (bottom, auto-hide, 44px)"
+
+# ── Dash-to-Panel ─────────────────────────────────────────────────────────────
+DTP="org.gnome.shell.extensions.dash-to-panel"
+if as_user "gsettings list-keys ${DTP}" &>/dev/null; then
+    as_user "gsettings set ${DTP} panel-positions          '{\"0\":\"BOTTOM\"}'" 2>/dev/null || true
+    as_user "gsettings set ${DTP} panel-sizes              '{\"0\":40}'"         2>/dev/null || true
+    as_user "gsettings set ${DTP} show-appmenu             'false'"              2>/dev/null || true
+    as_user "gsettings set ${DTP} show-activities-button   'false'"              2>/dev/null || true
+    as_user "gsettings set ${DTP} show-window-previews     'true'"               2>/dev/null || true
+    as_user "gsettings set ${DTP} click-effect             'MINIMIZE'"           2>/dev/null || true
+    # Ensure Dash to Panel is enabled even if not freshly installed
+    _cur=$(as_user "gsettings get org.gnome.shell enabled-extensions" 2>/dev/null || echo "[]")
+    if ! echo "$_cur" | grep -q "dash-to-panel"; then
+        as_user "gsettings set org.gnome.shell enabled-extensions \
+            \"$(echo "$_cur" | sed "s/]$/, 'dash-to-panel@jderose9.github.com']/")\"" 2>/dev/null || true
+    fi
+    ok "Dash-to-Panel configured"
+else
+    info "Dash-to-Panel schemas not available yet (apply after GNOME Shell restart)"
+fi
+tick "Dash-to-Panel (bottom, 40px)"
 
 # ── Blur my Shell ─────────────────────────────────────────────────────────────
 BMS="org.gnome.shell.extensions.blur-my-shell"
