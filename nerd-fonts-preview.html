@@ -146,6 +146,134 @@
     #status.ok  { color: var(--green); }
     #status.err { color: var(--red); }
 
+    /* ── Terminal Settings panel ── */
+    .settings-toggle {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--subtext);
+      border-radius: 6px;
+      padding: 5px 12px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      cursor: pointer;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    .settings-toggle:hover { color: var(--text); border-color: var(--accent); }
+    .settings-toggle.open  { color: var(--accent); border-color: var(--accent); }
+
+    .settings-panel {
+      display: none;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      margin-bottom: 1.4rem;
+      overflow: hidden;
+    }
+    .settings-panel.open { display: block; }
+
+    .settings-tabs {
+      display: flex;
+      flex-wrap: wrap;
+      background: var(--surface2);
+      border-bottom: 1px solid var(--border);
+    }
+    .settings-tab {
+      background: none;
+      border: none;
+      border-bottom: 2px solid transparent;
+      color: var(--subtext);
+      font-size: 0.72rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 10px 16px;
+      cursor: pointer;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    .settings-tab:hover  { color: var(--text); }
+    .settings-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+    .settings-content { padding: 1.1rem 1.4rem; }
+
+    .settings-pane { display: none; flex-direction: column; gap: 12px; max-width: 420px; }
+    .settings-pane.active { display: flex; }
+
+    .settings-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      font-size: 0.8rem;
+    }
+    .settings-row label { color: var(--subtext); }
+    .settings-row select,
+    .settings-row input[type="number"],
+    .settings-row input[type="text"] {
+      background: var(--surface2);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 4px 8px;
+      font-size: 0.78rem;
+      width: 150px;
+    }
+    .settings-row input[type="range"] { width: 120px; }
+    .settings-row .val { color: var(--text); font-size: 0.74rem; min-width: 40px; text-align: right; }
+
+    /* Toggle switch */
+    .switch { position: relative; display: inline-block; width: 34px; height: 20px; flex-shrink: 0; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .switch .slider {
+      position: absolute; inset: 0; cursor: pointer;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .switch .slider::before {
+      content: '';
+      position: absolute;
+      height: 14px; width: 14px;
+      left: 2px; top: 2px;
+      background: var(--subtext);
+      border-radius: 50%;
+      transition: transform 0.15s, background 0.15s;
+    }
+    .switch input:checked + .slider { background: rgba(137, 180, 250, 0.25); border-color: var(--accent); }
+    .switch input:checked + .slider::before { transform: translateX(14px); background: var(--accent); }
+
+    .scheme-row { display: flex; gap: 6px; }
+    .scheme-row input { flex: 1; width: auto; }
+    .scheme-row button {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--subtext);
+      border-radius: 6px;
+      padding: 4px 10px;
+      font-size: 0.74rem;
+      cursor: pointer;
+    }
+    .scheme-row button:hover { color: var(--accent); border-color: var(--accent); }
+
+    .scheme-quick { display: flex; flex-wrap: wrap; gap: 6px; }
+    .scheme-chip {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--subtext);
+      border-radius: 999px;
+      padding: 3px 10px;
+      font-size: 0.7rem;
+      cursor: pointer;
+      transition: color 0.15s, border-color 0.15s, background 0.15s;
+    }
+    .scheme-chip:hover   { color: var(--accent); border-color: var(--accent); }
+    .scheme-chip.active  { color: var(--bg); background: var(--accent); border-color: var(--accent); }
+
     /* ── Grid ── */
     .grid {
       display: grid;
@@ -307,7 +435,103 @@
       </div>
     </div>
 
+    <button class="settings-toggle" id="settings-toggle"><span>⚙</span> Terminal Settings</button>
+
     <span id="status">Connect: python3 font-picker.py</span>
+  </div>
+
+  <div class="settings-panel" id="settings-panel">
+    <div class="settings-tabs" id="settings-tabs">
+      <button class="settings-tab active" data-pane="window">Window</button>
+      <button class="settings-tab" data-pane="cursor">Cursor &amp; Bell</button>
+      <button class="settings-tab" data-pane="tabbar">Tab Bar</button>
+      <button class="settings-tab" data-pane="scheme">Color Scheme</button>
+      <button class="settings-tab" data-pane="scrollback">Scrollback &amp; Spacing</button>
+    </div>
+
+    <div class="settings-content">
+      <div class="settings-pane active" data-pane="window">
+        <div class="settings-row">
+          <label for="opacity">Opacity</label>
+          <input type="range" id="opacity" min="0.1" max="1" step="0.05" value="1">
+          <span class="val" id="opacity-val">1.00</span>
+        </div>
+        <div class="settings-row">
+          <label for="padding">Padding (px)</label>
+          <input type="number" id="padding" min="0" max="60" step="1" value="10">
+        </div>
+        <div class="settings-row">
+          <label for="decorations">Decorations</label>
+          <select id="decorations">
+            <option value="TITLE | RESIZE">Title + Resize</option>
+            <option value="RESIZE">Resize only</option>
+            <option value="TITLE">Title only</option>
+            <option value="NONE">Borderless</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="settings-pane" data-pane="cursor">
+        <div class="settings-row">
+          <label for="cursor-style">Style</label>
+          <select id="cursor-style">
+            <option value="SteadyBlock">Steady Block</option>
+            <option value="BlinkingBlock">Blinking Block</option>
+            <option value="SteadyUnderline">Steady Underline</option>
+            <option value="BlinkingUnderline">Blinking Underline</option>
+            <option value="SteadyBar">Steady Bar</option>
+            <option value="BlinkingBar">Blinking Bar</option>
+          </select>
+        </div>
+        <div class="settings-row">
+          <label for="cursor-blink">Blink rate (ms)</label>
+          <input type="number" id="cursor-blink" min="0" max="2000" step="50" value="500">
+        </div>
+        <div class="settings-row">
+          <label for="bell">Audible bell</label>
+          <label class="switch"><input type="checkbox" id="bell"><span class="slider"></span></label>
+        </div>
+      </div>
+
+      <div class="settings-pane" data-pane="tabbar">
+        <div class="settings-row">
+          <label for="hide-tab-bar">Hide if one tab</label>
+          <label class="switch"><input type="checkbox" id="hide-tab-bar" data-key="hide_tab_bar_if_only_one_tab"><span class="slider"></span></label>
+        </div>
+        <div class="settings-row">
+          <label for="fancy-tab-bar">Fancy tab bar</label>
+          <label class="switch"><input type="checkbox" id="fancy-tab-bar" data-key="use_fancy_tab_bar"><span class="slider"></span></label>
+        </div>
+        <div class="settings-row">
+          <label for="tab-bar-bottom">Tab bar at bottom</label>
+          <label class="switch"><input type="checkbox" id="tab-bar-bottom" data-key="tab_bar_at_bottom"><span class="slider"></span></label>
+        </div>
+        <div class="settings-row">
+          <label for="tab-max-width">Tab max width</label>
+          <input type="number" id="tab-max-width" min="4" max="64" step="1" value="16">
+        </div>
+      </div>
+
+      <div class="settings-pane" data-pane="scheme" style="max-width: 640px;">
+        <div class="scheme-row">
+          <input type="text" id="scheme" list="scheme-list" placeholder="Search 1,000+ schemes…">
+          <datalist id="scheme-list"></datalist>
+          <button id="scheme-default">Default</button>
+        </div>
+        <div class="scheme-quick" id="scheme-quick"></div>
+      </div>
+
+      <div class="settings-pane" data-pane="scrollback">
+        <div class="settings-row">
+          <label for="scrollback">Scrollback lines</label>
+          <input type="number" id="scrollback" min="0" max="1000000" step="500" value="3500">
+        </div>
+        <div class="settings-row">
+          <label for="line-height">Line height</label>
+          <input type="number" id="line-height" min="0.5" max="3" step="0.05" value="1.0">
+        </div>
+      </div>
+    </div>
   </div>
 
   <div class="grid" id="grid"></div>
@@ -423,6 +647,104 @@
     document.getElementById('tab-dec').addEventListener('click',    () => stepTab(-1));
     document.getElementById('tab-inc').addEventListener('click',    () => stepTab(+1));
 
+    // ── Terminal Settings panel ──
+    const settingsToggle = document.getElementById('settings-toggle');
+    const settingsPanel  = document.getElementById('settings-panel');
+    settingsToggle.addEventListener('click', () => {
+      settingsPanel.classList.toggle('open');
+      settingsToggle.classList.toggle('open');
+    });
+
+    document.querySelectorAll('.settings-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.settings-tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.settings-pane').forEach(p => p.classList.remove('active'));
+        tab.classList.add('active');
+        document.querySelector(`.settings-pane[data-pane="${tab.dataset.pane}"]`).classList.add('active');
+      });
+    });
+
+    const opacityEl     = document.getElementById('opacity');
+    const opacityValEl  = document.getElementById('opacity-val');
+    const paddingEl     = document.getElementById('padding');
+    const decorationsEl = document.getElementById('decorations');
+    const cursorStyleEl = document.getElementById('cursor-style');
+    const cursorBlinkEl = document.getElementById('cursor-blink');
+    const bellEl        = document.getElementById('bell');
+    const hideTabBarEl  = document.getElementById('hide-tab-bar');
+    const fancyTabBarEl = document.getElementById('fancy-tab-bar');
+    const tabBarBottomEl = document.getElementById('tab-bar-bottom');
+    const tabMaxWidthEl = document.getElementById('tab-max-width');
+    const schemeEl      = document.getElementById('scheme');
+    const schemeListEl  = document.getElementById('scheme-list');
+    const schemeDefaultBtn = document.getElementById('scheme-default');
+    const schemeQuickEl = document.getElementById('scheme-quick');
+    const scrollbackEl  = document.getElementById('scrollback');
+    const lineHeightEl  = document.getElementById('line-height');
+
+    const QUICK_SCHEMES = [
+      'Catppuccin Mocha', 'Catppuccin Macchiato', 'Dracula', 'Nord (Gogh)',
+      'Tokyo Night', 'Tokyo Night Storm', 'Gruvbox Dark (Gogh)',
+      'Solarized Dark - Patched', 'Monokai Remastered', 'Everforest Dark (Gogh)',
+    ];
+
+    function highlightActiveChip(name) {
+      schemeQuickEl.querySelectorAll('.scheme-chip').forEach(c => {
+        c.classList.toggle('active', c.textContent === name);
+      });
+    }
+
+    function buildSchemeChips() {
+      schemeQuickEl.innerHTML = QUICK_SCHEMES.map(s => `<button class="scheme-chip">${s}</button>`).join('');
+      schemeQuickEl.querySelectorAll('.scheme-chip').forEach(chip => {
+        chip.addEventListener('click', () => {
+          schemeEl.value = chip.textContent;
+          highlightActiveChip(chip.textContent);
+          applyAndStatus(`/apply-scheme?name=${encodeURIComponent(chip.textContent)}`);
+        });
+      });
+    }
+    buildSchemeChips();
+
+    async function applyAndStatus(path) {
+      const j = await api(path);
+      if (j?.ok) setStatus('✔ ' + j.msg, 'ok');
+      else if (j) setStatus(j.msg, 'err');
+    }
+
+    opacityEl.addEventListener('input', () => { opacityValEl.textContent = parseFloat(opacityEl.value).toFixed(2); });
+    opacityEl.addEventListener('change', () => applyAndStatus(`/apply-opacity?value=${opacityEl.value}`));
+    paddingEl.addEventListener('change', () => applyAndStatus(`/apply-padding?value=${paddingEl.value}`));
+    decorationsEl.addEventListener('change', () => applyAndStatus(`/apply-decorations?value=${encodeURIComponent(decorationsEl.value)}`));
+    cursorStyleEl.addEventListener('change', () => applyAndStatus(`/apply-cursor-style?value=${encodeURIComponent(cursorStyleEl.value)}`));
+    cursorBlinkEl.addEventListener('change', () => applyAndStatus(`/apply-cursor-blink?value=${cursorBlinkEl.value}`));
+    bellEl.addEventListener('change', () => applyAndStatus(`/apply-bell?enabled=${bellEl.checked ? 1 : 0}`));
+    tabMaxWidthEl.addEventListener('change', () => applyAndStatus(`/apply-tab-max-width?value=${tabMaxWidthEl.value}`));
+    scrollbackEl.addEventListener('change', () => applyAndStatus(`/apply-scrollback?value=${scrollbackEl.value}`));
+    lineHeightEl.addEventListener('change', () => applyAndStatus(`/apply-line-height?value=${lineHeightEl.value}`));
+
+    [hideTabBarEl, fancyTabBarEl, tabBarBottomEl].forEach(el => {
+      el.addEventListener('change', () => applyAndStatus(`/apply-tab-toggle?key=${el.dataset.key}&value=${el.checked ? 1 : 0}`));
+    });
+
+    schemeEl.addEventListener('change', () => {
+      if (schemeEl.value) {
+        highlightActiveChip(schemeEl.value);
+        applyAndStatus(`/apply-scheme?name=${encodeURIComponent(schemeEl.value)}`);
+      }
+    });
+    schemeDefaultBtn.addEventListener('click', () => {
+      schemeEl.value = '';
+      highlightActiveChip('');
+      applyAndStatus('/apply-scheme?name=');
+    });
+
+    async function loadSchemes() {
+      const schemes = await api('/schemes');
+      if (!schemes) return;
+      schemeListEl.innerHTML = schemes.map(s => `<option value="${s}"></option>`).join('');
+    }
+
     // Build cards from font list
     const cardMap = {};
     function buildGrid(fonts) {
@@ -481,6 +803,22 @@
       if (j.tabSize) tabSizeEl.value    = j.tabSize;
       if (j.weight)    editorWeightEl.value = j.weight;
       if (j.tabWeight) tabWeightEl.value    = j.tabWeight;
+
+      if (j.opacity != null) { opacityEl.value = j.opacity; opacityValEl.textContent = parseFloat(j.opacity).toFixed(2); }
+      if (j.padding !== '')  paddingEl.value = j.padding;
+      if (j.decorations)     decorationsEl.value = j.decorations;
+      if (j.cursorStyle)     cursorStyleEl.value = j.cursorStyle;
+      if (j.cursorBlink != null) cursorBlinkEl.value = j.cursorBlink;
+      bellEl.checked = j.bell === 'SystemBeep';
+      hideTabBarEl.checked   = !!j.hideTabBarIfOnlyOneTab;
+      fancyTabBarEl.checked  = !!j.useFancyTabBar;
+      tabBarBottomEl.checked = !!j.tabBarAtBottom;
+      if (j.tabMaxWidth != null) tabMaxWidthEl.value = j.tabMaxWidth;
+      if (j.scrollback != null)  scrollbackEl.value  = j.scrollback;
+      if (j.lineHeight != null)  lineHeightEl.value  = j.lineHeight;
+      schemeEl.value = j.colorScheme || '';
+      highlightActiveChip(j.colorScheme || '');
+
       statusEl.textContent = 'Ready';
     }
 
@@ -491,6 +829,7 @@
       if (!fonts) return;
       buildGrid(fonts);
       setStatus(`${fonts.length} font${fonts.length !== 1 ? 's' : ''} found`, 'ok');
+      loadSchemes();
       await loadCurrent();
     }
 

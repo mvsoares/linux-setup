@@ -9,6 +9,7 @@ import json
 import re
 import socketserver
 import subprocess
+import tempfile
 import urllib.parse
 from pathlib import Path
 
@@ -130,6 +131,127 @@ def read_cfg():
 def write_cfg(src):
     WEZTERM_CFG.write_text(src)
 
+
+def _get_scalar(src, key):
+    """Read a one-line `config.key = value` assignment (commented or not).
+
+    Returns (raw_value_str, is_commented) or (None, None) if the key isn't present.
+    """
+    m = re.search(r"^[ \t]*(--\s*)?config\.%s\s*=\s*(.+?)[ \t]*$" % re.escape(key), src, re.MULTILINE)
+    if not m:
+        return None, None
+    return m.group(2), bool(m.group(1))
+
+def _scalar_or_default(src, key, default, cast=str):
+    raw, commented = _get_scalar(src, key)
+    if raw is None or commented:
+        return default
+    try:
+        if cast is bool:
+            return raw.strip() == "true"
+        if cast is float:
+            return float(raw.strip().strip("'\""))
+        if cast is int:
+            return int(float(raw.strip().strip("'\"")))
+        return raw.strip().strip("'\"")
+    except Exception:
+        return default
+
+def _set_scalar(src, key, value_literal):
+    """Set (or insert) a one-line `config.key = value` assignment, uncommenting if needed."""
+    pattern = re.compile(r"^([ \t]*)(?:--\s*)?config\.%s\s*=\s*.+?[ \t]*$" % re.escape(key), re.MULTILINE)
+    def repl(m):
+        return f"{m.group(1)}config.{key} = {value_literal}"
+    new_src, n = pattern.subn(repl, src, count=1)
+    if n == 0:
+        new_src = src.replace(
+            "local config = wezterm.config_builder()",
+            f"local config = wezterm.config_builder()\nconfig.{key} = {value_literal}",
+            1,
+        )
+    return new_src
+
+def _apply_and_save(key, value_literal, label):
+    write_cfg(_set_scalar(read_cfg(), key, value_literal))
+    return label
+
+def _get_padding(src):
+    m = re.search(r"config\.window_padding\s*=\s*\{([^}]*)\}", src)
+    if not m:
+        return ""
+    nums = re.findall(r"[\d.]+", m.group(1))
+    return nums[0] if nums else ""
+
+def apply_padding(value):
+    src = read_cfg()
+    n = int(float(value))
+    padding_literal = f"{{ left = {n}, right = {n}, top = {n}, bottom = {n} }}"
+    pattern = re.compile(r"^([ \t]*)(?:--\s*)?config\.window_padding\s*=\s*\{[^}]*\}", re.MULTILINE)
+    def repl(m):
+        return f"{m.group(1)}config.window_padding = {padding_literal}"
+    new_src, count = pattern.subn(repl, src, count=1)
+    if count == 0:
+        new_src = src.replace(
+            "local config = wezterm.config_builder()",
+            f"local config = wezterm.config_builder()\nconfig.window_padding = {padding_literal}",
+            1,
+        )
+    write_cfg(new_src)
+    return f"Padding → {n}px"
+
+def apply_color_scheme(name):
+    src = read_cfg()
+    if not name or name == "Default":
+        pattern = re.compile(r"^([ \t]*)(--\s*)?(config\.color_scheme\s*=\s*.+?)[ \t]*$", re.MULTILINE)
+        def repl(m):
+            return f"{m.group(1)}-- {m.group(3)}"
+        new_src, n = pattern.subn(repl, src, count=1)
+        write_cfg(new_src if n else src)
+        return "Color scheme → Default"
+    write_cfg(_set_scalar(src, "color_scheme", f"'{name}'"))
+    return f"Color scheme → {name}"
+
+
+_SCHEME_CACHE = None
+_SCHEME_LUA_TEMPLATE = """
+local wezterm = require 'wezterm'
+local config = wezterm.config_builder()
+local names = {}
+for name, _ in pairs(wezterm.color.get_builtin_schemes()) do
+  table.insert(names, name)
+end
+table.sort(names)
+local f = io.open('__JSON_PATH__', 'w')
+f:write(wezterm.json_encode(names))
+f:close()
+return config
+"""
+
+def get_color_schemes():
+    """List WezTerm's built-in color scheme names (cached — the wezterm subprocess call takes ~5s)."""
+    global _SCHEME_CACHE
+    if _SCHEME_CACHE is not None:
+        return _SCHEME_CACHE
+    schemes = []
+    try:
+        with tempfile.TemporaryDirectory() as d:
+            lua_path = Path(d) / "dump_schemes.lua"
+            json_path = Path(d) / "schemes.json"
+            lua_path.write_text(_SCHEME_LUA_TEMPLATE.replace("__JSON_PATH__", json_path.as_posix()))
+            subprocess.run(
+                ["wezterm", "--config-file", str(lua_path), "ls-fonts", "--list-system"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                timeout=15,
+                check=True,
+            )
+            schemes = json.loads(json_path.read_text())
+    except Exception:
+        schemes = []
+    _SCHEME_CACHE = schemes
+    return schemes
+
+
 def apply_font(family, weight="Regular"):
     src = read_cfg()
     weight_str = f", {{ weight = '{weight}' }}" if weight else ""
@@ -176,6 +298,45 @@ def apply_tab_size(size):
     write_cfg(src)
     return f"Tab size → {size}"
 
+def apply_opacity(value):
+    v = float(value)
+    return _apply_and_save("window_background_opacity", v, f"Opacity → {v}")
+
+def apply_decorations(value):
+    return _apply_and_save("window_decorations", f"'{value}'", f"Decorations → {value}")
+
+def apply_cursor_style(value):
+    return _apply_and_save("default_cursor_style", f"'{value}'", f"Cursor style → {value}")
+
+def apply_cursor_blink(value):
+    v = int(float(value))
+    return _apply_and_save("cursor_blink_rate", v, f"Cursor blink → {v}ms")
+
+def apply_bell(enabled):
+    on = enabled in ("1", "true", "True")
+    return _apply_and_save("audible_bell", "'SystemBeep'" if on else "'Disabled'",
+                            f"Bell → {'Enabled' if on else 'Disabled'}")
+
+_TAB_TOGGLE_KEYS = {"hide_tab_bar_if_only_one_tab", "use_fancy_tab_bar", "tab_bar_at_bottom"}
+
+def apply_tab_toggle(key, value):
+    if key not in _TAB_TOGGLE_KEYS:
+        raise ValueError(f"Unknown tab toggle: {key}")
+    on = value in ("1", "true", "True")
+    return _apply_and_save(key, "true" if on else "false", f"{key} → {on}")
+
+def apply_tab_max_width(value):
+    v = int(float(value))
+    return _apply_and_save("tab_max_width", v, f"Tab max width → {v}")
+
+def apply_scrollback(value):
+    v = int(float(value))
+    return _apply_and_save("scrollback_lines", v, f"Scrollback → {v} lines")
+
+def apply_line_height(value):
+    v = float(value)
+    return _apply_and_save("line_height", v, f"Line height → {v}")
+
 def get_current():
     src = read_cfg()
     font = tab_font = ""
@@ -200,14 +361,44 @@ def get_current():
         m = re.search(r"font_size\s*=\s*([\d.]+)", block)
         if m: tab_size = m.group(1)
 
-    return {"font": font, "size": size, "weight": weight, "tabFont": tab_font, "tabSize": tab_size, "tabWeight": tab_weight}
+    scheme_raw, scheme_commented = _get_scalar(src, "color_scheme")
+    color_scheme = "" if (scheme_raw is None or scheme_commented) else scheme_raw.strip().strip("'\"")
+
+    return {
+        "font": font, "size": size, "weight": weight,
+        "tabFont": tab_font, "tabSize": tab_size, "tabWeight": tab_weight,
+        "opacity":     _scalar_or_default(src, "window_background_opacity", 1.0, float),
+        "decorations": _scalar_or_default(src, "window_decorations", "TITLE | RESIZE", str),
+        "padding":     _get_padding(src),
+        "cursorStyle": _scalar_or_default(src, "default_cursor_style", "SteadyBlock", str),
+        "cursorBlink": _scalar_or_default(src, "cursor_blink_rate", 500, int),
+        "bell":        _scalar_or_default(src, "audible_bell", "SystemBeep", str),
+        "hideTabBarIfOnlyOneTab": _scalar_or_default(src, "hide_tab_bar_if_only_one_tab", False, bool),
+        "useFancyTabBar":         _scalar_or_default(src, "use_fancy_tab_bar", True, bool),
+        "tabBarAtBottom":         _scalar_or_default(src, "tab_bar_at_bottom", False, bool),
+        "tabMaxWidth": _scalar_or_default(src, "tab_max_width", 16, int),
+        "scrollback":  _scalar_or_default(src, "scrollback_lines", 3500, int),
+        "lineHeight":  _scalar_or_default(src, "line_height", 1.0, float),
+        "colorScheme": color_scheme,
+    }
 
 
 DISPATCH = {
-    "/apply":          lambda p: apply_font(p.get("font", [""])[0], p.get("weight", ["Regular"])[0]),
-    "/apply-tab":      lambda p: apply_tab_font(p.get("font", [""])[0], p.get("weight", ["Regular"])[0]),
-    "/apply-size":     lambda p: apply_size(p.get("size", ["14"])[0]),
-    "/apply-tab-size": lambda p: apply_tab_size(p.get("size", ["12.5"])[0]),
+    "/apply":              lambda p: apply_font(p.get("font", [""])[0], p.get("weight", ["Regular"])[0]),
+    "/apply-tab":          lambda p: apply_tab_font(p.get("font", [""])[0], p.get("weight", ["Regular"])[0]),
+    "/apply-size":         lambda p: apply_size(p.get("size", ["14"])[0]),
+    "/apply-tab-size":     lambda p: apply_tab_size(p.get("size", ["12.5"])[0]),
+    "/apply-opacity":      lambda p: apply_opacity(p.get("value", ["1"])[0]),
+    "/apply-decorations":  lambda p: apply_decorations(p.get("value", ["TITLE | RESIZE"])[0]),
+    "/apply-padding":      lambda p: apply_padding(p.get("value", ["10"])[0]),
+    "/apply-cursor-style": lambda p: apply_cursor_style(p.get("value", ["SteadyBlock"])[0]),
+    "/apply-cursor-blink": lambda p: apply_cursor_blink(p.get("value", ["500"])[0]),
+    "/apply-bell":         lambda p: apply_bell(p.get("enabled", ["1"])[0]),
+    "/apply-tab-toggle":   lambda p: apply_tab_toggle(p.get("key", [""])[0], p.get("value", ["0"])[0]),
+    "/apply-tab-max-width":lambda p: apply_tab_max_width(p.get("value", ["16"])[0]),
+    "/apply-scrollback":   lambda p: apply_scrollback(p.get("value", ["3500"])[0]),
+    "/apply-line-height":  lambda p: apply_line_height(p.get("value", ["1.0"])[0]),
+    "/apply-scheme":       lambda p: apply_color_scheme(p.get("name", [""])[0]),
 }
 
 
@@ -234,6 +425,9 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
         elif parsed.path == "/fonts":
             self._json(json.dumps(get_installed_fonts()).encode())
+
+        elif parsed.path == "/schemes":
+            self._json(json.dumps(get_color_schemes()).encode())
 
         elif parsed.path == "/current":
             self._json(json.dumps(get_current()).encode())
