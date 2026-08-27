@@ -90,28 +90,9 @@ end)
 -- ─── Scrollback & Performance ────────────────────────────────────────────────
 config.scrollback_lines = 10000
 config.animation_fps = 60
--- Prefer WebGPU when a *real* GPU is available. In VMs, vulkaninfo may list
--- lavapipe/llvmpipe but EGL/Mesa can still hit ZINK "failed to choose pdev"
--- and spam libEGL warnings — OpenGL is more reliable there.
-local function use_webgpu()
-  local f = io.popen('vulkaninfo --summary 2>/dev/null')
-  if not f then
-    return false
-  end
-  local out = f:read('*a') or ''
-  f:close()
-  if out:find('deviceName') == nil then
-    return false
-  end
-  -- Skip software-only stacks (VM / no GPU passthrough)
-  local lower = out:lower()
-  if lower:find('llvmpipe') or lower:find('lavapipe') or lower:find('swiftshader') then
-    return false
-  end
-  return true
-end
--- VMs/headless: skip EGL/DRI3 probe (libEGL DRI3 warnings) by using Software
-config.front_end = use_webgpu() and 'WebGpu' or 'Software'
+-- Prefer WebGPU when a *real* GPU is available, but allow forcing Software / X11
+config.enable_wayland = false
+config.front_end = 'Software'
 config.automatically_reload_config = true
 
 -- ─── Cursor ──────────────────────────────────────────────────────────────────

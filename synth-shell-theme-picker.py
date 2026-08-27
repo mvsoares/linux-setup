@@ -338,7 +338,7 @@ def main():
                 apply_theme(selected)
                 print(f"  Applied:  {CONFIG_PATH}")
                 print()
-                print(f"  {BOLD}Open a new terminal tab to see the change.{RESET}")
+                print(f"  {BOLD}Theme applied successfully!{RESET}")
                 print()
                 return
             else:
