@@ -95,7 +95,13 @@ synth_shell_apply_prompt_theme() {
         return 1
     }
     mkdir -p "${USER_HOME}/.config/synth-shell"
-    cp "$src" "$dest"
+
+    local py_picker="${_synth_themes_dir}/../../synth-shell-theme-picker.py"
+    if [[ -f "$py_picker" ]] && command -v python3 &>/dev/null; then
+        sudo -u "${REAL_USER}" HOME="${USER_HOME}" python3 "$py_picker" --apply "$theme_n" >/dev/null 2>&1 || cp "$src" "$dest"
+    else
+        cp "$src" "$dest"
+    fi
     chown "${REAL_USER}:${REAL_USER}" "$dest"
     ok "synth-shell prompt colors → theme ${theme_n} ($(synth_shell_theme_title "$src"))"
 }

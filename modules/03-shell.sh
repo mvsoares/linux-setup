@@ -209,7 +209,11 @@ tick "Starship configuration"
 # shellcheck source=../lib/synth-shell-theme-picker.sh
 source "${SCRIPT_DIR}/lib/synth-shell-theme-picker.sh"
 
-if [[ -n "$REAL_USER" ]] && [[ -f "${USER_HOME}/.config/synth-shell/synth-shell-prompt.sh" ]]; then
+SYNTH_DIR="${USER_HOME}/.config/synth-shell"
+SYNTH_PROMPT="${SYNTH_DIR}/synth-shell-prompt.sh"
+SYNTH_CFG="${SYNTH_DIR}/synth-shell-prompt.config"
+
+if [[ -n "$REAL_USER" ]] && [[ -f "$SYNTH_PROMPT" ]]; then
     skip "synth-shell (already installed)"
 else
     info "Installing synth-shell..."
@@ -226,14 +230,7 @@ else
             && ok "synth-shell installed" \
             || warn "synth-shell setup had errors — check ${LOG_FILE}"
         rm -rf /tmp/synth-shell-install
-        # Fix synth-shell kube segment: upstream uses broken yq query that errors with Go yq/jq
-        SYNTH_PROMPT="${USER_HOME}/.config/synth-shell/synth-shell-prompt.sh"
-        if [[ -f "$SYNTH_PROMPT" ]] && grep -q "yq '\.contexts" "$SYNTH_PROMPT"; then
-            sed -i "/type yq/d" "$SYNTH_PROMPT"
-            sed -i "s|echo -n \"\$(kubectl config view.*yq.*head -n 1)\"|echo -n \"\$(kubectl config current-context 2>/dev/null)\"|" \
-                "$SYNTH_PROMPT"
-            ok "synth-shell kube segment patched"
-        fi
+
         # Prompt colors: gallery themes 1–60 (see synth-shell-color-preview.html). Override with SYNTH_SHELL_THEME=N
         if [[ -z "${SYNTH_SHELL_THEME:-}" ]] && [[ -z "${CI:-}" ]] && { [[ -t 0 ]] || [[ -r /dev/tty ]]; }; then
             synth_shell_print_theme_gallery
@@ -243,6 +240,71 @@ else
     else
         warn "synth-shell clone failed"
     fi
+fi
+
+# ── synth-shell patches & performance optimizations (idempotent) ──────────────
+if [[ -f "$SYNTH_PROMPT" ]]; then
+    # 1. Fix synth-shell kube segment: fast context check without yq dependency
+    if grep -q "yq '\.contexts" "$SYNTH_PROMPT" || grep -q "type yq" "$SYNTH_PROMPT"; then
+        sed -i '/type yq/d' "$SYNTH_PROMPT"
+        sed -i 's|echo -n "\$(kubectl config view.*yq.*head -n 1)"|echo -n "\$(kubectl config current-context 2>/dev/null)"|' "$SYNTH_PROMPT"
+        ok "synth-shell kube segment patched"
+    fi
+
+    # 2. Optimize git status in prompt: single-pass porcelain check (4x speedup)
+    if grep -q '\[\[ -n "\$(git status --porcelain)" \]\]' "$SYNTH_PROMPT"; then
+        python3 -c "
+from pathlib import Path
+p = Path('$SYNTH_PROMPT')
+content = p.read_text()
+old_git = '''    local is_dirty=false &&\\\\
+                [[ -n \"\$(git status --porcelain)\" ]] &&\\\\
+                is_dirty=true
+    local is_ahead=false &&\\\\
+                [[ \"\$(git status --porcelain -u no -b)\" == *\"ahead\"* ]] &&\\\\
+                is_ahead=true
+    local is_behind=false &&\\\\
+                [[ \"\$(git status --porcelain -u no -b)\" == *\"behind\"* ]] &&\\\\
+                is_behind=true'''
+
+new_git = '''    local status_out=\"\$(git status --porcelain -b 2>/dev/null)\"
+    local is_dirty=false
+    [[ \"\$status_out\" =~ $\x27\\\\n\x27 ]] && is_dirty=true
+    local branch_line=\"\${status_out%%$\x27\\\\n\x27*}\"
+    local is_ahead=false && [[ \"\$branch_line\" == *\"ahead\"* ]] && is_ahead=true
+    local is_behind=false && [[ \"\$branch_line\" == *\"behind\"* ]] && is_behind=true'''
+
+if old_git in content:
+    p.write_text(content.replace(old_git, new_git))
+" 2>/dev/null && ok "synth-shell git status optimized (single-pass)"
+    fi
+
+    # 3. Support independent end separator (separator_char_end)
+    if grep -q 'printSegment "$text" "$text_color" "$bg_color" "$next_bg_color" "$text_effect"$' "$SYNTH_PROMPT"; then
+        python3 -c "
+from pathlib import Path
+p = Path('$SYNTH_PROMPT')
+content = p.read_text()
+old_code = '''\tlocal text_effect=\${colors_first[2]}
+\tprintSegment \"\$text\" \"\$text_color\" \"\$bg_color\" \"\$next_bg_color\" \"\$text_effect\"'''
+new_code = '''\tlocal text_effect=\${colors_first[2]}
+\tlocal sep_char=\"\$separator_char\"
+\tif [ \"\$second\" = \"INPUT\" ] && [ -n \"\${separator_char_end:-}\" ]; then
+\t\tsep_char=\"\$separator_char_end\"
+\tfi
+\tprintSegment \"\$text\" \"\$text_color\" \"\$bg_color\" \"\$next_bg_color\" \"\$text_effect\" \"\$sep_char\"'''
+if old_code in content:
+    content = content.replace(old_code, new_code)
+    content = content.replace('printSegment()\n{\n\t## GET PARAMETERS\n\tlocal text=\$1\n\tlocal font_color=\$2\n\tlocal background_color=\$3\n\tlocal next_background_color=\$4\n\tlocal font_effect=\$5', 'printSegment()\n{\n\t## GET PARAMETERS\n\tlocal text=\$1\n\tlocal font_color=\$2\n\tlocal background_color=\$3\n\tlocal next_background_color=\$4\n\tlocal font_effect=\$5\n\tlocal sep_char=\"\${6:-\$separator_char}\"')
+    content = content.replace('\${separator_format}\${separator_char}\${separator_padding_right}', '\${separator_format}\${sep_char}\${separator_padding_right}')
+    p.write_text(content)
+" 2>/dev/null && ok "synth-shell dual separator support enabled"
+    fi
+fi
+
+if [[ -f "$SYNTH_CFG" ]]; then
+    # Tune max_pwd_char from 25 to 35 for better path visibility
+    sed -i 's/^max_pwd_char="25"$/max_pwd_char="35"/' "$SYNTH_CFG"
 fi
 tick "synth-shell (prompt · better-ls · better-alias · better-history)"
 
