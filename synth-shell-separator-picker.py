@@ -12,6 +12,7 @@ from pathlib import Path
 
 THEMES_DIR = Path(__file__).parent / "lib" / "synth-shell-themes"
 CONFIG_PATH = Path.home() / ".config" / "synth-shell" / "synth-shell-prompt.config"
+PROMPT_SCRIPT_PATH = Path.home() / ".config" / "synth-shell" / "synth-shell-prompt.sh"
 BACKUP_DIR = Path.home() / ".config" / "synth-shell" / "backups"
 
 RESET = "\033[0m"
@@ -367,12 +368,65 @@ def backup_config() -> Path | None:
     return dest
 
 
+def ensure_dual_separator_support() -> bool:
+    """Ensure synth-shell-prompt.sh supports separator_char_end for custom last character."""
+    if not PROMPT_SCRIPT_PATH.exists():
+        return False
+    content = PROMPT_SCRIPT_PATH.read_text()
+    if 'local sep_char="${6:-$separator_char}"' in content and 'separator_char_end' in content:
+        return True
+
+    modified = False
+
+    # 1. Update printSegment to accept 6th arg ($sep_char)
+    old_print_segment = (
+        'printSegment()\n{\n\t## GET PARAMETERS\n\tlocal text=$1\n\tlocal font_color=$2\n'
+        '\tlocal background_color=$3\n\tlocal next_background_color=$4 # needed for the separator, it participates in this and the next text segment\n'
+        '\tlocal font_effect=$5'
+    )
+    new_print_segment = (
+        'printSegment()\n{\n\t## GET PARAMETERS\n\tlocal text=$1\n\tlocal font_color=$2\n'
+        '\tlocal background_color=$3\n\tlocal next_background_color=$4 # needed for the separator, it participates in this and the next text segment\n'
+        '\tlocal font_effect=$5\n\tlocal sep_char="${6:-$separator_char}"'
+    )
+    if old_print_segment in content:
+        content = content.replace(old_print_segment, new_print_segment)
+        content = content.replace(
+            '${separator_format}${separator_char}${separator_padding_right}',
+            '${separator_format}${sep_char}${separator_padding_right}',
+        )
+        modified = True
+
+    # 2. Update combine_elements to pass $separator_char_end when second == "INPUT"
+    old_combine = (
+        '\tlocal text_effect=${colors_first[2]}\n'
+        '\tprintSegment "$text" "$text_color" "$bg_color" "$next_bg_color" "$text_effect"\n}'
+    )
+    new_combine = (
+        '\tlocal text_effect=${colors_first[2]}\n'
+        '\tlocal sep_char="$separator_char"\n'
+        '\tif [ "$second" = "INPUT" ] && [ -n "${separator_char_end:-}" ]; then\n'
+        '\t\tsep_char="$separator_char_end"\n'
+        '\tfi\n'
+        '\tprintSegment "$text" "$text_color" "$bg_color" "$next_bg_color" "$text_effect" "$sep_char"\n}'
+    )
+    if old_combine in content:
+        content = content.replace(old_combine, new_combine)
+        modified = True
+
+    if modified:
+        PROMPT_SCRIPT_PATH.write_text(content)
+        return True
+    return False
+
+
 def apply_separators(
     internal: tuple[str, str] | None = None,
     end: tuple[str, str] | None = None,
     label: str = "",
 ) -> None:
     """Write internal and/or end separator to CONFIG_PATH safely."""
+    ensure_dual_separator_support()
     if not CONFIG_PATH.exists():
         print(f"  Error: {CONFIG_PATH} not found.")
         return
