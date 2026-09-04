@@ -169,8 +169,9 @@ tick "Dash-to-Dock (bottom, auto-hide, 44px)"
 # ── Dash-to-Panel ─────────────────────────────────────────────────────────────
 DTP="org.gnome.shell.extensions.dash-to-panel"
 if as_user "gsettings list-keys ${DTP}" &>/dev/null; then
-    as_user "gsettings set ${DTP} panel-positions          '{\"0\":\"BOTTOM\"}'" 2>/dev/null || true
-    as_user "gsettings set ${DTP} panel-sizes              '{\"0\":40}'"         2>/dev/null || true
+    as_user "gsettings set ${DTP} multi-monitors           'true'"               2>/dev/null || true
+    as_user "gsettings set ${DTP} panel-positions          '{\"0\":\"BOTTOM\",\"1\":\"BOTTOM\"}'" 2>/dev/null || true
+    as_user "gsettings set ${DTP} panel-sizes              '{\"0\":40,\"1\":40}'"         2>/dev/null || true
     as_user "gsettings set ${DTP} show-appmenu             'false'"              2>/dev/null || true
     as_user "gsettings set ${DTP} show-activities-button   'false'"              2>/dev/null || true
     as_user "gsettings set ${DTP} show-window-previews     'true'"               2>/dev/null || true
@@ -185,7 +186,7 @@ if as_user "gsettings list-keys ${DTP}" &>/dev/null; then
 else
     info "Dash-to-Panel schemas not available yet (apply after GNOME Shell restart)"
 fi
-tick "Dash-to-Panel (bottom, 40px)"
+tick "Dash-to-Panel (bottom, 40px, both monitors)"
 
 # ── Blur my Shell ─────────────────────────────────────────────────────────────
 BMS="org.gnome.shell.extensions.blur-my-shell"

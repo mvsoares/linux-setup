@@ -123,6 +123,22 @@ wait_for_rpm_lock() {
     done
 }
 
+# GNOME Shell extensions ship their gsettings schema inside their own
+# extension directory, not compiled into /usr/share/glib-2.0/schemas. Plain
+# `gsettings` calls can't see those schemas unless GSETTINGS_SCHEMA_DIR points
+# at them (glib treats it as additive to the standard search path).
+ext_schema_dirs() {
+    local dirs=() d
+    for base in "${USER_HOME}/.local/share/gnome-shell/extensions" "/usr/share/gnome-shell/extensions"; do
+        [[ -d "$base" ]] || continue
+        for d in "$base"/*/schemas; do
+            [[ -d "$d" ]] && dirs+=("$d")
+        done
+    done
+    local IFS=:
+    echo "${dirs[*]}"
+}
+
 as_user() {
     local cmd="$*"
     local bus_addr=""
@@ -138,18 +154,21 @@ as_user() {
     fi
     # Prepend ~/.local/bin so pipx/rustup installs work in same run as setup (non-login shell)
     local _path="${USER_HOME}/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+    local _schema_dir; _schema_dir="$(ext_schema_dirs)"
     if [[ -n "$bus_addr" ]]; then
         sudo -u "$REAL_USER" \
             DBUS_SESSION_BUS_ADDRESS="$bus_addr" \
             XDG_RUNTIME_DIR="/run/user/${USER_ID}" \
             HOME="$USER_HOME" \
             PATH="$_path" \
+            GSETTINGS_SCHEMA_DIR="$_schema_dir" \
             bash -c "$cmd" 2>> "$LOG_FILE"
     else
         sudo -u "$REAL_USER" \
             XDG_RUNTIME_DIR="/run/user/${USER_ID}" \
             HOME="$USER_HOME" \
             PATH="$_path" \
+            GSETTINGS_SCHEMA_DIR="$_schema_dir" \
             bash -c "$cmd" 2>> "$LOG_FILE"
     fi
 }
