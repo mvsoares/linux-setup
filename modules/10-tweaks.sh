@@ -1,7 +1,7 @@
 # =============================================================================
 # Module 10 — System Tweaks · Performance Tuning · Cleanup
 # =============================================================================
-init_sub 6
+init_sub 10
 
 # ── Kernel parameters ────────────────────────────────────────────────────────
 info "Applying kernel parameters..."
@@ -32,6 +32,73 @@ tick "Kernel parameters (swappiness=10, inotify, network)"
 systemctl enable preload     >> "$LOG_FILE" 2>&1 && ok "preload enabled"     || true
 systemctl enable fstrim.timer >> "$LOG_FILE" 2>&1 && ok "fstrim.timer enabled" || true
 tick "Services: preload + fstrim"
+
+# ── Boot speed: Disable slow & unnecessary services ──────────────────────────
+info "Optimizing boot services..."
+systemctl disable --now apport.service apport-autoreport.service >> "$LOG_FILE" 2>&1 || true
+if [[ -f /etc/default/apport ]]; then
+    sed -i 's/enabled=1/enabled=0/' /etc/default/apport 2>/dev/null || true
+fi
+systemctl disable NetworkManager-wait-online.service >> "$LOG_FILE" 2>&1 || true
+tick "Boot optimization (disabled apport & NM-wait-online)"
+
+# ── Storage & Memory: noatime + ZRAM ──────────────────────────────────────────
+info "Optimizing filesystem mount options (noatime)..."
+if grep -q " / ext4 " /etc/fstab && ! grep -q " / ext4 [^ ]*noatime" /etc/fstab; then
+    cp /etc/fstab "/etc/fstab.bak.$(date +%Y%m%d%H%M%S)" 2>/dev/null || true
+    sed -i 's|\(/ ext4 *defaults\)|\1,noatime|' /etc/fstab 2>/dev/null || true
+    mount -o remount,noatime / >> "$LOG_FILE" 2>&1 || true
+    systemctl daemon-reload >> "$LOG_FILE" 2>&1 || true
+    ok "Added noatime to / in /etc/fstab"
+fi
+
+info "Configuring ZRAM compressed swap..."
+if is_fedora; then
+    dnf_each zram-generator
+else
+    apt_each zram-tools
+    if [[ -f /etc/default/zramswap ]]; then
+        sed -i 's/^#*ALGO=.*/ALGO=zstd/' /etc/default/zramswap
+        sed -i 's/^#*PERCENT=.*/PERCENT=50/' /etc/default/zramswap
+        sed -i 's/^#*PRIORITY=.*/PRIORITY=100/' /etc/default/zramswap
+        systemctl restart zramswap.service >> "$LOG_FILE" 2>&1 || true
+    fi
+fi
+tick "Storage & RAM: noatime + zram (zstd, prio 100)"
+
+# ── Battery Health: ASUS charge threshold (80%) ──────────────────────────────
+if [[ -f /sys/class/power_supply/BAT0/charge_control_end_threshold ]]; then
+    info "Configuring ASUS battery charge threshold (80%)..."
+    echo 80 > /sys/class/power_supply/BAT0/charge_control_end_threshold 2>/dev/null || true
+    cat > /etc/systemd/system/battery-charge-threshold.service << 'BAT_EOF'
+[Unit]
+Description=Set ASUS battery charge threshold to 80%
+After=multi-user.target suspend.target hibernate.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/sh -c 'if [ -f /sys/class/power_supply/BAT0/charge_control_end_threshold ]; then echo 80 > /sys/class/power_supply/BAT0/charge_control_end_threshold; fi'
+
+[Install]
+WantedBy=multi-user.target suspend.target hibernate.target
+BAT_EOF
+    cat > /etc/udev/rules.d/99-battery-charge-threshold.rules << 'UDEV_EOF'
+SUBSYSTEM=="power_supply", KERNEL=="BAT0", ATTR{charge_control_end_threshold}="80"
+UDEV_EOF
+    systemctl daemon-reload >> "$LOG_FILE" 2>&1 || true
+    systemctl enable --now battery-charge-threshold.service >> "$LOG_FILE" 2>&1 || true
+    ok "ASUS battery threshold set to 80%"
+    tick "Battery protection (80% charge threshold)"
+fi
+
+# ── Network: Wi-Fi power saving disable (low latency) ────────────────────────
+if [[ -f /etc/NetworkManager/conf.d/default-wifi-powersave-on.conf ]]; then
+    sed -i 's/wifi.powersave = 3/wifi.powersave = 2/' /etc/NetworkManager/conf.d/default-wifi-powersave-on.conf 2>/dev/null || true
+    systemctl reload NetworkManager >> "$LOG_FILE" 2>&1 || true
+    ok "Wi-Fi powersave disabled (wifi.powersave = 2)"
+    tick "Wi-Fi power saving disabled for lower latency"
+fi
 
 # ── Hardware sensors ─────────────────────────────────────────────────────────
 sensors-detect --auto >> "$LOG_FILE" 2>&1 || true
@@ -156,6 +223,8 @@ if is_fedora; then
 else
     apt_quiet autoremove
     apt_quiet autoclean
+    apt_quiet clean
+    snap set system refresh.retain=2 >> "$LOG_FILE" 2>&1 || true
     # Remove orphan snaps
     snap list --all 2>/dev/null | awk '/disabled/{print $1, $3}' | while read snapname revision; do
         snap remove "$snapname" --revision="$revision" >> "$LOG_FILE" 2>&1 || true

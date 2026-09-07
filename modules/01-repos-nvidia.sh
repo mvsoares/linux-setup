@@ -25,15 +25,6 @@ if is_fedora; then
     # GitHub CLI (Fedora)
     add_dnf_repo "GitHub CLI" "https://cli.github.com/packages/rpm/gh-cli.repo" "/etc/yum.repos.d/gh-cli.repo"
 
-    # VSCode (Fedora)
-    add_dnf_repo "VSCode" \
-"[code]
-name=Visual Studio Code
-baseurl=https://packages.microsoft.com/yumrepos/vscode
-enabled=1
-gpgcheck=1
-gpgkey=https://packages.microsoft.com/keys/microsoft.asc" \
-        "/etc/yum.repos.d/vscode.repo" "https://packages.microsoft.com/keys/microsoft.asc"
 
     # Google Chrome (Fedora)
     add_dnf_repo "Google Chrome" \
@@ -74,13 +65,8 @@ else
     add_apt_repo "Brave Browser" "https://brave-browser-apt-release.s3.brave.com/brave-browser-archive-keyring.gpg" \
         "/usr/share/keyrings/brave-browser-archive-keyring.gpg" \
         "/etc/apt/sources.list.d/brave-browser-release.list" \
-        "deb [signed-by=/usr/share/keyrings/brave-browser-archive-keyring.gpg] https://brave-browser-apt-release.s3.brave.com/ stable main"
+        "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/brave-browser-archive-keyring.gpg] https://brave-browser-apt-release.s3.brave.com/ stable main"
 
-    # VSCode
-    add_apt_repo "VSCode" "https://packages.microsoft.com/keys/microsoft.asc" \
-        "/etc/apt/keyrings/microsoft.gpg" \
-        "/etc/apt/sources.list.d/vscode.list" \
-        "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/microsoft.gpg] https://packages.microsoft.com/repos/code stable main"
 
     # Google Chrome
     add_apt_repo "Google Chrome" "https://dl.google.com/linux/linux_signing_key.pub" \

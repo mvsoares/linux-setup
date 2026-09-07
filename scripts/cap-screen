@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# 1. Determine Pictures directory
+PICTURES_DIR="$(xdg-user-dir PICTURES 2>/dev/null || echo "$HOME/Pictures")"
+mkdir -p "$PICTURES_DIR"
+
+# 2. Compute next sequential number (XXX: 001, 002, ...)
+max_seq=0
+shopt -s nullglob
+for f in "$PICTURES_DIR"/cap-*.png; do
+    bn="$(basename "$f")"
+    if [[ "$bn" =~ ^cap-([0-9]+)- ]]; then
+        num=$((10#${BASH_REMATCH[1]}))
+        (( num > max_seq )) && max_seq=$num
+    fi
+done
+next_seq=$((max_seq + 1))
+seq_str=$(printf "%03d" "$next_seq")
+
+# 3. Format Date & Time: DD-MM-YYYY HH:MM
+# Note: Linux filesystem does not allow '/' in filenames as it is the path separator.
+date_str=$(date +"%d-%m-%Y %H:%M")
+target_file="${PICTURES_DIR}/cap-${seq_str}-${date_str}.png"
+
+# 4. Trigger area capture
+flameshot gui -c -p "$target_file"
+
+# 5. If user completed the capture, ensure clipboard and notify
+if [[ -f "$target_file" ]]; then
+    if command -v wl-copy &>/dev/null && [[ "${XDG_SESSION_TYPE:-}" == "wayland" || -n "${WAYLAND_DISPLAY:-}" ]]; then
+        wl-copy -t image/png < "$target_file" 2>/dev/null || true
+    elif command -v xclip &>/dev/null; then
+        xclip -selection clipboard -target image/png -i "$target_file" 2>/dev/null || true
+    fi
+
+    if command -v notify-send &>/dev/null; then
+        notify-send -i "$target_file" "Captura de Tela Salva" "Salvo em: Pictures/$(basename "$target_file")\nCopiado para a área de transferência" 2>/dev/null || true
+    fi
+fi

@@ -88,7 +88,6 @@ except: pass
 
 # ── Install extensions ────────────────────────────────────────────────────────
 install_extension "User Themes"        "user-theme@gnome-shell-extensions.gcampax.github.com"  19
-install_extension "Dash to Dock"       "dash-to-dock@micxgx.gmail.com"                         307
 install_extension "Dash to Panel"      "dash-to-panel@jderose9.github.com"                      1160
 install_extension "Blur my Shell"      "blur-my-shell@aunetx"                                  3193
 install_extension "Just Perfection"    "just-perfection-desktop@just-perfection"                3843
@@ -148,23 +147,6 @@ gset org.gnome.desktop.interface font-antialiasing    "'rgba'"
 gset org.gnome.desktop.interface font-hinting         "'slight'"
 gset org.gnome.desktop.interface text-scaling-factor  "1.0"
 tick "Fonts: Inter 11 / JetBrainsMono 12 / rgba"
-
-# ── Dash-to-Dock ─────────────────────────────────────────────────────────────
-DTD="org.gnome.shell.extensions.dash-to-dock"
-as_user "gsettings set ${DTD} dock-position           'BOTTOM'"     2>/dev/null || true
-as_user "gsettings set ${DTD} extend-height           'false'"       2>/dev/null || true
-as_user "gsettings set ${DTD} dock-fixed              'false'"       2>/dev/null || true
-as_user "gsettings set ${DTD} autohide                'true'"        2>/dev/null || true
-as_user "gsettings set ${DTD} intellihide             'true'"        2>/dev/null || true
-as_user "gsettings set ${DTD} autohide-in-fullscreen  'true'"        2>/dev/null || true
-as_user "gsettings set ${DTD} transparency-mode       'FIXED'"       2>/dev/null || true
-as_user "gsettings set ${DTD} background-opacity      '0.8'"         2>/dev/null || true
-as_user "gsettings set ${DTD} show-trash              'true'"        2>/dev/null || true
-as_user "gsettings set ${DTD} show-mounts             'true'"        2>/dev/null || true
-as_user "gsettings set ${DTD} dash-max-icon-size      '44'"          2>/dev/null || true
-as_user "gsettings set ${DTD} click-action            'minimize-or-previews'" 2>/dev/null || true
-as_user "gsettings set ${DTD} scroll-action           'cycle-windows'" 2>/dev/null || true
-tick "Dash-to-Dock (bottom, auto-hide, 44px)"
 
 # ── Dash-to-Panel ─────────────────────────────────────────────────────────────
 DTP="org.gnome.shell.extensions.dash-to-panel"
@@ -235,6 +217,82 @@ gset org.gnome.desktop.wm.keybindings move-to-workspace-3   "['<Super><Shift>3']
 gset org.gnome.desktop.wm.keybindings move-to-workspace-4   "['<Super><Shift>4']"
 gset org.gnome.desktop.wm.keybindings show-desktop          "['<Super>d']"
 gset org.gnome.shell.keybindings toggle-overview            "['<Super>s']"
+
+# Helper script: cap-screen
+if [[ -f "${SCRIPT_DIR}/scripts/cap-screen" ]]; then
+    cp "${SCRIPT_DIR}/scripts/cap-screen" /usr/local/bin/cap-screen
+    chmod +x /usr/local/bin/cap-screen
+    ok "cap-screen installed to /usr/local/bin/cap-screen"
+fi
+
+# Area screenshot to clipboard (Cmd+Shift+S / Super+Shift+S)
+# App shortcuts:
+#   Cmd/Super + t -> WezTerm
+#   Cmd/Super + b -> Chrome
+#   Cmd/Super + e -> File Explorer (Nemo)
+#   Cmd/Super + g -> Gedit
+#   Cmd/Super + Shift + s -> Area Screenshot to Clipboard
+#   Cmd/Super + Shift + f -> Capture Region to File & Clipboard (cap-screen)
+
+# Cinnamon custom keybindings
+gset org.cinnamon.desktop.keybindings looking-glass-keybinding "@as []"
+gset org.cinnamon.desktop.keybindings.media-keys screensaver "['<Super>l', '<Control><Alt>l', 'XF86ScreenSaver']"
+gset org.cinnamon.desktop.keybindings.media-keys home "['XF86Explorer']"
+gset org.cinnamon.desktop.keybindings.media-keys area-screenshot-clip "['<Control><Shift>Print']"
+gset org.cinnamon.desktop.keybindings custom-list "['custom0', 'custom1', 'custom2', 'custom3', 'custom4', 'custom5']"
+
+gset org.cinnamon.desktop.keybindings.custom-keybinding:/org/cinnamon/desktop/keybindings/custom-keybindings/custom0/ name "'WezTerm'"
+gset org.cinnamon.desktop.keybindings.custom-keybinding:/org/cinnamon/desktop/keybindings/custom-keybindings/custom0/ command "'wezterm'"
+gset org.cinnamon.desktop.keybindings.custom-keybinding:/org/cinnamon/desktop/keybindings/custom-keybindings/custom0/ binding "['<Super>t']"
+
+gset org.cinnamon.desktop.keybindings.custom-keybinding:/org/cinnamon/desktop/keybindings/custom-keybindings/custom1/ name "'Google Chrome'"
+gset org.cinnamon.desktop.keybindings.custom-keybinding:/org/cinnamon/desktop/keybindings/custom-keybindings/custom1/ command "'google-chrome --ozone-platform=x11'"
+gset org.cinnamon.desktop.keybindings.custom-keybinding:/org/cinnamon/desktop/keybindings/custom-keybindings/custom1/ binding "['<Super>b']"
+
+gset org.cinnamon.desktop.keybindings.custom-keybinding:/org/cinnamon/desktop/keybindings/custom-keybindings/custom2/ name "'File Explorer'"
+gset org.cinnamon.desktop.keybindings.custom-keybinding:/org/cinnamon/desktop/keybindings/custom-keybindings/custom2/ command "'nemo'"
+gset org.cinnamon.desktop.keybindings.custom-keybinding:/org/cinnamon/desktop/keybindings/custom-keybindings/custom2/ binding "['<Super>e']"
+
+gset org.cinnamon.desktop.keybindings.custom-keybinding:/org/cinnamon/desktop/keybindings/custom-keybindings/custom3/ name "'Gedit'"
+gset org.cinnamon.desktop.keybindings.custom-keybinding:/org/cinnamon/desktop/keybindings/custom-keybindings/custom3/ command "'gedit'"
+gset org.cinnamon.desktop.keybindings.custom-keybinding:/org/cinnamon/desktop/keybindings/custom-keybindings/custom3/ binding "['<Super>g']"
+
+gset org.cinnamon.desktop.keybindings.custom-keybinding:/org/cinnamon/desktop/keybindings/custom-keybindings/custom4/ name "'Area Screenshot to Clipboard'"
+gset org.cinnamon.desktop.keybindings.custom-keybinding:/org/cinnamon/desktop/keybindings/custom-keybindings/custom4/ command "'gnome-screenshot -a -c'"
+gset org.cinnamon.desktop.keybindings.custom-keybinding:/org/cinnamon/desktop/keybindings/custom-keybindings/custom4/ binding "['<Super><Shift>s', '<Shift><Super>s', '<Super><Shift>S', '<Shift><Super>S']"
+
+gset org.cinnamon.desktop.keybindings.custom-keybinding:/org/cinnamon/desktop/keybindings/custom-keybindings/custom5/ name "'Capture Region to File and Clipboard'"
+gset org.cinnamon.desktop.keybindings.custom-keybinding:/org/cinnamon/desktop/keybindings/custom-keybindings/custom5/ command "'/usr/local/bin/cap-screen'"
+gset org.cinnamon.desktop.keybindings.custom-keybinding:/org/cinnamon/desktop/keybindings/custom-keybindings/custom5/ binding "['<Super><Shift>f', '<Shift><Super>f', '<Super><Shift>F', '<Shift><Super>F']"
+
+# GNOME custom keybindings
+gset org.gnome.settings-daemon.plugins.media-keys screensaver "@as []"
+gset org.gnome.shell.keybindings show-screenshot-ui "['<Super><Shift>s', 'Print']"
+gset org.gnome.settings-daemon.plugins.media-keys custom-keybindings "['/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom0/', '/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom1/', '/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom2/', '/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom3/', '/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom4/', '/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom5/']"
+gset org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom0/ name "'WezTerm'"
+gset org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom0/ command "'wezterm'"
+gset org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom0/ binding "'<Super>t'"
+
+gset org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom1/ name "'Google Chrome'"
+gset org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom1/ command "'google-chrome --ozone-platform=x11'"
+gset org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom1/ binding "'<Super>b'"
+
+gset org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom2/ name "'File Explorer'"
+gset org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom2/ command "'nemo'"
+gset org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom2/ binding "'<Super>e'"
+
+gset org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom3/ name "'Gedit'"
+gset org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom3/ command "'gedit'"
+gset org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom3/ binding "'<Super>g'"
+
+gset org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom4/ name "'Capture Region to File and Clipboard'"
+gset org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom4/ command "'/usr/local/bin/cap-screen'"
+gset org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom4/ binding "'<Super><Shift>f'"
+
+gset org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom5/ name "'Lock Screen'"
+gset org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom5/ command "'dm-tool lock'"
+gset org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom5/ binding "'<Super>l'"
+
 tick "Windows + workspaces + keybindings"
 
 # ── Nautilus ──────────────────────────────────────────────────────────────────

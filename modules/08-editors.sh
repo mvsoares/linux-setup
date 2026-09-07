@@ -23,11 +23,21 @@ metadata_expire=1h" \
         add_apt_repo "VSCodium" "https://gitlab.com/paulcarroty/vscodium-deb-rpm-repo/raw/master/pub.gpg" \
             "/usr/share/keyrings/vscodium-archive-keyring.gpg" \
             "/etc/apt/sources.list.d/vscodium.list" \
-            "deb [signed-by=/usr/share/keyrings/vscodium-archive-keyring.gpg] https://download.vscodium.com/debs vscodium main"
+            "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/vscodium-archive-keyring.gpg] https://download.vscodium.com/debs vscodium main"
         apt_quiet update
         apt_each codium
     fi
 fi
+
+# Ensure Codium launchers use --ozone-platform=x11 to prevent Wayland fractional scaling trembling
+for d in /usr/share/applications/codium*.desktop; do
+    if [[ -f "$d" ]]; then
+        bn="$(basename "$d")"
+        mkdir -p "${USER_HOME}/.local/share/applications"
+        sed 's|Exec=\(/usr/share/codium[^ ]*\)|Exec=\1 --ozone-platform=x11|g' "$d" > "${USER_HOME}/.local/share/applications/${bn}"
+        chown "$REAL_USER:$REAL_USER" "${USER_HOME}/.local/share/applications/${bn}"
+    fi
+done
 
 # Copy VSCode settings to VSCodium if VSCode exists and VSCodium has no settings yet
 VSCODE_SETTINGS="${USER_HOME}/.config/Code/User/settings.json"

@@ -9,14 +9,14 @@ if is_fedora; then
         @development-tools cmake ninja-build pkgconf-pkg-config \
         git git-lfs curl wget aria2 \
         gnupg2 ca-certificates \
-        unzip p7zip p7zip-plugins xclip xdotool dconf-editor bc
+        unzip p7zip p7zip-plugins xclip wl-clipboard flameshot xdotool dconf-editor bc
     dnf_each gparted libsecret libsecret-devel
 else
     apt_quiet install \
         build-essential cmake ninja-build pkg-config \
         git git-lfs git-extras curl wget aria2 \
         gnupg2 ca-certificates software-properties-common apt-transport-https \
-        unzip p7zip-full unrar-free xclip xdotool dconf-editor preload bc
+        unzip p7zip-full unrar-free xclip wl-clipboard flameshot xdotool dconf-editor preload bc
     apt_each gparted stacer libsecret-1-0 libsecret-1-dev
     [[ "$DISTRO_MAJOR" -lt 26 ]] && apt_each p7zip-rar
 fi

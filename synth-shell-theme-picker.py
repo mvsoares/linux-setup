@@ -34,7 +34,7 @@ def detect_current_separator() -> str:
     if not CONFIG_PATH.exists():
         return "\ue0b0"
     for line in CONFIG_PATH.read_text().splitlines():
-        m = re.match(r"^separator_char\s*=\s*['\"]?(.*?)['\"]?\s*$", line)
+        m = re.match(r"^separator_char\s*=\s*\$?['\"]?(.*?)['\"]?\s*$", line)
         if m:
             val = m.group(1).strip()
             if re.match(r"^\\u[0-9a-fA-F]{4}$", val):
@@ -442,12 +442,12 @@ def apply_separator(key: str, glyph: str, code_str: str) -> None:
     found = False
     for line in lines:
         if re.match(r"^separator_char\s*=", line):
-            new_lines.append(f'separator_char="{code_str}"')
+            new_lines.append(f"separator_char=$'{code_str}'")
             found = True
         else:
             new_lines.append(line)
     if not found:
-        new_lines.append(f'separator_char="{code_str}"')
+        new_lines.append(f"separator_char=$'{code_str}'")
     CONFIG_PATH.write_text("\n".join(new_lines) + "\n")
 
 

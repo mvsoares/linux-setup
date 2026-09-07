@@ -179,8 +179,14 @@ Prefix: **`Ctrl+A`**
 | `Super+D` | Show desktop |
 | `Super+S` | Toggle Activities overview |
 | `Super+A` | App launcher |
+| `Super+Shift+S` / `Cmd+Shift+S` | Screenshot region to clipboard |
+| `Super+Shift+F` / `Cmd+Shift+F` | Screenshot region to file (`~/Pictures/cap-XXX-...`) & clipboard |
 | `Super+L` | Lock screen |
 | `Super+Arrow` | Tile window |
+| `Super+T` / `Cmd+T` | Open WezTerm terminal |
+| `Super+B` / `Cmd+B` | Open Google Chrome |
+| `Super+E` / `Cmd+E` | Open File Explorer (Nemo) |
+| `Super+G` / `Cmd+G` | Open Text Editor (Gedit) |
 | `Ctrl+Alt+T` | Open terminal |
 | `Alt+Tab` | Switch windows |
 

@@ -439,13 +439,13 @@ def apply_separators(
     for line in lines:
         if re.match(r"^separator_char\s*=", line):
             if internal is not None:
-                new_lines.append(f'separator_char="{internal[1]}"')
+                new_lines.append(f"separator_char=$'{internal[1]}'")
             else:
                 new_lines.append(line)
             found_main = True
         elif re.match(r"^separator_char_end\s*=", line):
             if end is not None:
-                new_lines.append(f'separator_char_end="{end[1]}"')
+                new_lines.append(f"separator_char_end=$'{end[1]}'")
             else:
                 new_lines.append(line)
             found_end = True
@@ -453,9 +453,9 @@ def apply_separators(
             new_lines.append(line)
 
     if not found_main and internal is not None:
-        new_lines.append(f'separator_char="{internal[1]}"')
+        new_lines.append(f"separator_char=$'{internal[1]}'")
     if not found_end and end is not None:
-        new_lines.append(f'separator_char_end="{end[1]}"')
+        new_lines.append(f"separator_char_end=$'{end[1]}'")
 
     CONFIG_PATH.write_text("\n".join(new_lines) + "\n")
     print()
