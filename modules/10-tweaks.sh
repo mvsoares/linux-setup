@@ -1,7 +1,7 @@
 # =============================================================================
 # Module 10 — System Tweaks · Performance Tuning · Cleanup
 # =============================================================================
-init_sub 10
+init_sub 11
 
 # ── Kernel parameters ────────────────────────────────────────────────────────
 info "Applying kernel parameters..."
@@ -99,6 +99,16 @@ if [[ -f /etc/NetworkManager/conf.d/default-wifi-powersave-on.conf ]]; then
     ok "Wi-Fi powersave disabled (wifi.powersave = 2)"
     tick "Wi-Fi power saving disabled for lower latency"
 fi
+
+# ── NuPhy & QMK/VIA Keyboards: WebHID udev rules ──────────────────────────────
+cat > /etc/udev/rules.d/50-nuphy.rules << 'NUPHY_EOF'
+# NuPhy keyboards & dongles (QMK/VIA / WebHID)
+KERNEL=="hidraw*", ATTRS{idVendor}=="19f5", MODE="0666", TAG+="uaccess"
+SUBSYSTEM=="usb", ATTRS{idVendor}=="19f5", MODE="0666", TAG+="uaccess"
+NUPHY_EOF
+udevadm control --reload-rules >> "$LOG_FILE" 2>&1 || true
+udevadm trigger >> "$LOG_FILE" 2>&1 || true
+tick "NuPhy / QMK WebHID udev rules"
 
 # ── Hardware sensors ─────────────────────────────────────────────────────────
 sensors-detect --auto >> "$LOG_FILE" 2>&1 || true
