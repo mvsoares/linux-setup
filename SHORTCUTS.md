@@ -186,7 +186,7 @@ Prefix: **`Ctrl+A`**
 | `Super+T` / `Cmd+T` | Open WezTerm terminal |
 | `Super+B` / `Cmd+B` | Open Google Chrome |
 | `Super+E` / `Cmd+E` | Open File Explorer (Nemo) |
-| `Super+G` / `Cmd+G` | Open Text Editor (Gedit) |
+| `Super+G` / `Cmd+G` | Open Text Editor (gnome-text-editor) |
 | `Ctrl+Alt+T` | Open terminal |
 | `Alt+Tab` | Switch windows |
 

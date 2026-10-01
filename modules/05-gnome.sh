@@ -1,14 +1,14 @@
 # =============================================================================
 # Module 05 — GNOME Extensions & Desktop Configuration
 # =============================================================================
-init_sub 10
+init_sub 9
 
 # ── Dependencies ──────────────────────────────────────────────────────────────
 if is_fedora; then
-    dnf_each gnome-tweaks gnome-extensions-app gnome-shell-extension-appindicator dconf-editor
+    dnf_each gnome-tweaks gnome-extensions-app gnome-shell-extension-appindicator dconf-editor kolourpaint drawing gnome-text-editor
 else
     apt_each gnome-tweaks gnome-shell-extensions gnome-shell-extension-manager \
-             gnome-shell-extension-appindicator dconf-editor
+             gnome-shell-extension-appindicator dconf-editor kolourpaint drawing gnome-text-editor
 fi
 gtk-update-icon-cache -f /usr/share/icons/hicolor 2>/dev/null || true
 tick "GNOME dependencies"
@@ -230,7 +230,7 @@ fi
 #   Cmd/Super + t -> WezTerm
 #   Cmd/Super + b -> Chrome
 #   Cmd/Super + e -> File Explorer (Nemo)
-#   Cmd/Super + g -> Gedit
+#   Cmd/Super + g -> Text Editor (gnome-text-editor)
 #   Cmd/Super + Shift + s -> Area Screenshot to Clipboard
 #   Cmd/Super + Shift + f -> Capture Region to File & Clipboard (cap-screen)
 
@@ -253,8 +253,8 @@ gset org.cinnamon.desktop.keybindings.custom-keybinding:/org/cinnamon/desktop/ke
 gset org.cinnamon.desktop.keybindings.custom-keybinding:/org/cinnamon/desktop/keybindings/custom-keybindings/custom2/ command "'nemo'"
 gset org.cinnamon.desktop.keybindings.custom-keybinding:/org/cinnamon/desktop/keybindings/custom-keybindings/custom2/ binding "['<Super>e']"
 
-gset org.cinnamon.desktop.keybindings.custom-keybinding:/org/cinnamon/desktop/keybindings/custom-keybindings/custom3/ name "'Gedit'"
-gset org.cinnamon.desktop.keybindings.custom-keybinding:/org/cinnamon/desktop/keybindings/custom-keybindings/custom3/ command "'gedit'"
+gset org.cinnamon.desktop.keybindings.custom-keybinding:/org/cinnamon/desktop/keybindings/custom-keybindings/custom3/ name "'Text Editor'"
+gset org.cinnamon.desktop.keybindings.custom-keybinding:/org/cinnamon/desktop/keybindings/custom-keybindings/custom3/ command "'gnome-text-editor'"
 gset org.cinnamon.desktop.keybindings.custom-keybinding:/org/cinnamon/desktop/keybindings/custom-keybindings/custom3/ binding "['<Super>g']"
 
 gset org.cinnamon.desktop.keybindings.custom-keybinding:/org/cinnamon/desktop/keybindings/custom-keybindings/custom4/ name "'Area Screenshot to Clipboard'"
@@ -281,8 +281,8 @@ gset org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:/org/gnome/s
 gset org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom2/ command "'nemo'"
 gset org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom2/ binding "'<Super>e'"
 
-gset org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom3/ name "'Gedit'"
-gset org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom3/ command "'gedit'"
+gset org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom3/ name "'Text Editor'"
+gset org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom3/ command "'gnome-text-editor'"
 gset org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom3/ binding "'<Super>g'"
 
 gset org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom4/ name "'Capture Region to File and Clipboard'"
