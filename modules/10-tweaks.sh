@@ -148,6 +148,16 @@ else
             ufw --force enable >> "$LOG_FILE" 2>&1 || true
         fi
     fi
+
+    # Quiet LAN broadcast chatter in dmesg (reduces ~2900 log lines per boot)
+    if [[ -f /etc/ufw/before.rules ]] && ! grep -qF "quiet LAN broadcast chatter" /etc/ufw/before.rules; then
+        sed -i '/:ufw-before-input - \[0:0\]/a # BEGIN linux-setup: quiet LAN broadcast chatter\n-A ufw-before-input -p udp --sport 67 --dport 68 -j ACCEPT\n-A ufw-before-input -m addrtype --dst-type BROADCAST -j DROP\n-A ufw-before-input -p udp --dport 3702 -j DROP\n# END linux-setup: quiet LAN broadcast chatter' /etc/ufw/before.rules 2>/dev/null || true
+        command -v ufw &>/dev/null && ufw reload >> "$LOG_FILE" 2>&1 || true
+        ok "UFW: suppressed noisy LAN broadcast chatter"
+    fi
+    if [[ -f /etc/ufw/before6.rules ]] && ! grep -qF "quiet LAN broadcast chatter" /etc/ufw/before6.rules; then
+        sed -i '/:ufw6-before-input - \[0:0\]/a # BEGIN linux-setup: quiet LAN broadcast chatter\n-A ufw6-before-input -p udp --dport 3702 -j DROP\n# END linux-setup: quiet LAN broadcast chatter' /etc/ufw/before6.rules 2>/dev/null || true
+    fi
     tick "UFW firewall"
 fi
 

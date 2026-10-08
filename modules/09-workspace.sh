@@ -97,11 +97,11 @@ npm-debug.log*
 yarn-debug.log*
 GITIGNORE
     chown "$REAL_USER:$REAL_USER" "$GLOBAL_GITIGNORE"
-    as_user "git config --global core.excludesFile '${GLOBAL_GITIGNORE}'"
-    ok "Global .gitignore_global created"
+    ok "Global gitignore deployed"
 else
-    skip "Global gitignore (already exists)"
+    ok "Global gitignore already present"
 fi
+as_user "git config --global core.excludesFile '${GLOBAL_GITIGNORE}'"
 tick "Global gitignore"
 
 # ── Tmux config ──────────────────────────────────────────────────────────────

@@ -81,6 +81,12 @@ backup_file "$HOME/.config/wezterm/wezterm.lua" "wezterm" "wezterm.lua"
 info "Backing up tmux..."
 backup_file "$HOME/.tmux.conf"                 "tmux"   ".tmux.conf"
 
+# ── 7. WirePlumber ───────────────────────────────────────────────────────────
+# Drop-ins that hide phantom S/PDIF profiles on USB headset dongles; without
+# them the Jabra Link 380 can be switched to a silent iec958 output.
+info "Backing up WirePlumber..."
+backup_dir  "$HOME/.config/wireplumber"        "wireplumber" "wireplumber config"
+
 # ── 8. VSCode ────────────────────────────────────────────────────────────────
 info "Backing up VSCode..."
 backup_file "$HOME/.config/Code/User/settings.json"       "vscode" "settings.json"

@@ -72,7 +72,7 @@ bash restore.sh backup.tar.gz --dry-run    # preview what would change
 bash restore.sh backup.tar.gz --only tmux  # restore only tmux config
 ```
 
-Available restore sections: `shell`, `git`, `starship`, `synth-shell`, `wezterm`, `tmux`, `vscode`, `vscodium`, `nvim`, `ssh`, `direnv`, `misc`, `gnome`, `system`, `extensions`.
+Available restore sections: `shell`, `git`, `starship`, `synth-shell`, `wezterm`, `tmux`, `wireplumber`, `vscode`, `vscodium`, `nvim`, `ssh`, `direnv`, `misc`, `gnome`, `system`, `extensions`.
 
 Existing files are saved as `*.pre-restore` before being overwritten.
 

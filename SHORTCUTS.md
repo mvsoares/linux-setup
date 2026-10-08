@@ -276,6 +276,8 @@ Active automatically in `git diff`, `git log -p`, `git show`.
 | `display-setup gamma 1.1` | Adjust gamma (X11 only) |
 | `display-setup brightness 0.9` | Adjust brightness |
 | `display-setup reset` | Reset display to defaults |
+| `cap-screen` | Capture region to sequential timestamped file & clipboard |
+| `git-pull-all.sh [dir]` | Pull latest changes across all Git repositories in a directory |
 
 ---
 

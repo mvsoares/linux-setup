@@ -18,9 +18,8 @@ done
 next_seq=$((max_seq + 1))
 seq_str=$(printf "%03d" "$next_seq")
 
-# 3. Format Date & Time: DD-MM-YYYY HH:MM
-# Note: Linux filesystem does not allow '/' in filenames as it is the path separator.
-date_str=$(date +"%d-%m-%Y %H:%M")
+# 3. Format Date & Time: DD-MM-YYYY_HH-MM (portable: no colons or spaces)
+date_str=$(date +"%d-%m-%Y_%H-%M")
 target_file="${PICTURES_DIR}/cap-${seq_str}-${date_str}.png"
 
 # 4. Trigger area capture

@@ -3,8 +3,8 @@
 # restore.sh — Restore workstation configuration from backup archive
 # Usage:  bash restore.sh <backup-archive.tar.gz> [--dry-run] [--only section]
 #
-# Sections: shell git starship synth-shell wezterm tmux vscode
-#           vscodium nvim ssh direnv misc gnome system extensions
+# Sections: shell git starship synth-shell wezterm tmux wireplumber
+#           vscode vscodium nvim ssh direnv misc gnome system extensions
 # =============================================================================
 set -euo pipefail
 
@@ -29,8 +29,8 @@ while [[ $# -gt 0 ]]; do
         --help|-h)
             echo "Usage: bash restore.sh <backup.tar.gz> [--dry-run] [--only section]"
             echo ""
-            echo "Sections: shell git starship synth-shell wezterm tmux vscode"
-            echo "          vscodium nvim ssh direnv misc gnome system extensions"
+            echo "Sections: shell git starship synth-shell wezterm tmux wireplumber"
+            echo "          vscode vscodium nvim ssh direnv misc gnome system extensions"
             echo ""
             echo "Options:"
             echo "  --dry-run     Show what would be restored without changing anything"
@@ -175,6 +175,13 @@ if should_restore "tmux"; then
     restore_file "${BACKUP_DIR}/tmux/.tmux.conf" "$HOME/.tmux.conf" ".tmux.conf"
 fi
 
+# ── 7. WirePlumber ───────────────────────────────────────────────────────────
+if should_restore "wireplumber"; then
+    info "Restoring WirePlumber..."
+    restore_dir "${BACKUP_DIR}/wireplumber" "$HOME/.config/wireplumber" "wireplumber config"
+    systemctl --user restart wireplumber 2>/dev/null || true
+fi
+
 # ── 8. VSCode ────────────────────────────────────────────────────────────────
 if should_restore "vscode"; then
     info "Restoring VSCode..."
@@ -200,7 +207,11 @@ fi
 # ── 11. SSH ──────────────────────────────────────────────────────────────────
 if should_restore "ssh"; then
     info "Restoring SSH config..."
-    restore_file "${BACKUP_DIR}/ssh/ssh config"   "$HOME/.ssh/config"      "ssh config"
+    if [[ -f "${BACKUP_DIR}/ssh/config" ]]; then
+        restore_file "${BACKUP_DIR}/ssh/config" "$HOME/.ssh/config" "ssh config"
+    else
+        restore_file "${BACKUP_DIR}/ssh/ssh config" "$HOME/.ssh/config" "ssh config"
+    fi
     restore_file "${BACKUP_DIR}/ssh/known_hosts"  "$HOME/.ssh/known_hosts" "known_hosts"
     chmod 700 "$HOME/.ssh" 2>/dev/null || true
     chmod 600 "$HOME/.ssh/config" 2>/dev/null || true

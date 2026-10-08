@@ -79,7 +79,13 @@ else
     alias update='sudo apt update && sudo apt upgrade -y && sudo snap refresh && flatpak update -y 2>/dev/null'
 fi
 alias fonts-list='fc-list | sort'; alias fonts-mono='fc-list :spacing=mono | sort'
-alias pbcopy='xclip -selection clipboard'; alias pbpaste='xclip -selection clipboard -o'
+if [[ -n "${WAYLAND_DISPLAY:-}" ]] && command -v wl-copy &>/dev/null; then
+    alias pbcopy='wl-copy'
+    alias pbpaste='wl-paste'
+elif command -v xclip &>/dev/null; then
+    alias pbcopy='xclip -selection clipboard'
+    alias pbpaste='xclip -selection clipboard -o'
+fi
 
 # Quick extract — handles all common archive formats
 extract() {
