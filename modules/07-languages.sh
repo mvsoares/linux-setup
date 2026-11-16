@@ -119,20 +119,20 @@ else
 fi
 tick "SDKMAN (Java/Gradle/Maven/Kotlin)"
 
-# ── JDK 21 + Maven via SDKMAN ────────────────────────────────────────────────
+# ── JDK 25 + Maven via SDKMAN ────────────────────────────────────────────────
 if [[ -s "${SDKMAN_DIR}/bin/sdkman-init.sh" ]]; then
-    # JDK 21 (Temurin)
-    if as_user "source '${SDKMAN_DIR}/bin/sdkman-init.sh' && sdk list java 2>/dev/null | grep -q '21\..*tem.*installed'" 2>/dev/null; then
-        skip "JDK 21 (Temurin)"
+    # JDK 25 (Temurin)
+    if as_user "source '${SDKMAN_DIR}/bin/sdkman-init.sh' && sdk list java 2>/dev/null | grep -q '25\..*tem.*installed'" 2>/dev/null; then
+        skip "JDK 25 (Temurin)"
     else
-        info "Installing JDK 21 (Temurin)..."
-        JDK21_ID=$(as_user "source '${SDKMAN_DIR}/bin/sdkman-init.sh' && sdk list java 2>/dev/null" \
-            | grep -oE '[0-9]+\.[0-9.]+-tem' | grep '^21\.' | head -1 | tr -d '[:space:]')
-        if [[ -n "$JDK21_ID" ]]; then
-            as_user "source '${SDKMAN_DIR}/bin/sdkman-init.sh' && sdk install java '${JDK21_ID}'" \
-                >> "$LOG_FILE" 2>&1 && ok "JDK 21 (${JDK21_ID})" || warn "JDK 21 install failed"
+        info "Installing JDK 25 (Temurin)..."
+        JDK25_ID=$(as_user "source '${SDKMAN_DIR}/bin/sdkman-init.sh' && sdk list java 2>/dev/null" \
+            | grep -oE '[0-9]+\.[0-9.]+(\+[0-9]+)?-tem' | grep '^25\.' | head -1 | tr -d '[:space:]')
+        if [[ -n "$JDK25_ID" ]]; then
+            as_user "source '${SDKMAN_DIR}/bin/sdkman-init.sh' && sdk install java '${JDK25_ID}'" \
+                >> "$LOG_FILE" 2>&1 && ok "JDK 25 (${JDK25_ID})" || warn "JDK 25 install failed"
         else
-            warn "JDK 21 — could not find Temurin 21 in SDKMAN list"
+            warn "JDK 25 — could not find Temurin 25 in SDKMAN list"
         fi
     fi
 
@@ -161,9 +161,9 @@ JAVABLOCK
         skip "Java/Maven env vars (already in .bashrc)"
     fi
 else
-    warn "SDKMAN not available — skipping JDK 21 and Maven (install manually with: sdk install java 21-tem && sdk install maven)"
+    warn "SDKMAN not available — skipping JDK 25 and Maven (install manually with: sdk install java 25-tem && sdk install maven)"
 fi
-tick "JDK 21 (Temurin) + Maven"
+tick "JDK 25 (Temurin) + Maven"
 
 # ── Common pipx tools ────────────────────────────────────────────────────────
 if command -v pipx &>/dev/null; then
