@@ -237,7 +237,7 @@ else
             || warn "synth-shell setup had errors — check ${LOG_FILE}"
         rm -rf /tmp/synth-shell-install
 
-        # Prompt colors: gallery themes 1–60 (see synth-shell-color-preview.html). Override with SYNTH_SHELL_THEME=N
+        # Prompt colors: gallery themes (see synth-shell-color-preview.html). Override with SYNTH_SHELL_THEME=N
         if [[ -z "${SYNTH_SHELL_THEME:-}" ]] && [[ -z "${CI:-}" ]] && { [[ -t 0 ]] || [[ -r /dev/tty ]]; }; then
             synth_shell_print_theme_gallery
         fi

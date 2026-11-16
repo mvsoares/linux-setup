@@ -306,7 +306,7 @@ def backup_config() -> Path | None:
     return dest
 
 
-def apply_theme(theme: dict) -> None:
+def apply_theme(theme: dict, force_white: bool = False, keep_input: bool = False) -> None:
     """Applies theme to CONFIG_PATH, strictly updating color keys and preserving custom settings."""
     if not CONFIG_PATH.exists():
         print(f"  Config not found at {CONFIG_PATH} — writing fresh from theme file.")
@@ -319,11 +319,45 @@ def apply_theme(theme: dict) -> None:
     lines = CONFIG_PATH.read_text().splitlines()
     new_lines = []
     updated = set()
+
+    # Determine theme title and swatch for header update
+    stem = theme["_path"].stem
+    m_num = re.match(r"^(\d+)", stem)
+    theme_num = f"{int(m_num.group(1))}: " if m_num else ""
+    theme_title = theme.get("_name", "Unknown")
+
+    swatch_line = ""
+    for s_line in theme["_path"].read_text().splitlines():
+        if s_line.startswith("# swatch256:"):
+            swatch_line = s_line
+            break
+
+    first_comment_updated = False
+    swatch_comment_updated = False
+
     for line in lines:
+        if line.startswith("# Theme ") and not first_comment_updated:
+            new_lines.append(f"# Theme {theme_num}{theme_title}")
+            first_comment_updated = True
+            continue
+        if line.startswith("# swatch256:") and not swatch_comment_updated:
+            if swatch_line:
+                new_lines.append(swatch_line)
+            else:
+                new_lines.append(line)
+            swatch_comment_updated = True
+            continue
+
         m = re.match(r'^(\w+)\s*=', line)
         if m and m.group(1) in theme_keys:
             key = m.group(1)
+            if keep_input and key == "font_color_input":
+                new_lines.append(line)
+                updated.add(key)
+                continue
             val = theme[key]
+            if force_white and key.startswith("font_color_") and key != "font_color_input":
+                val = "white"
             if "'" in line and '"' not in line:
                 new_lines.append(f"{key}='{val}'")
             else:
@@ -336,21 +370,33 @@ def apply_theme(theme: dict) -> None:
     if missing:
         new_lines.append("")
         for key in sorted(missing):
-            new_lines.append(f'{key}="{theme[key]}"')
+            val = theme[key]
+            if force_white and key.startswith("font_color_") and key != "font_color_input":
+                val = "white"
+            new_lines.append(f'{key}="{val}"')
 
     CONFIG_PATH.write_text("\n".join(new_lines) + "\n")
 
 
-def apply_and_report(theme: dict, index: int | None = None) -> None:
+def apply_and_report(
+    theme: dict,
+    index: int | None = None,
+    force_white: bool = False,
+    keep_input: bool = False,
+) -> None:
     """Apply selected theme with backup and clear session reload guidance."""
     name = theme.get("_name", "Unknown")
     idx_str = f" (#{index})" if index else ""
     print()
     print(f"  Selected: {BOLD}{name}{RESET}{idx_str}")
+    if force_white:
+        print(f"  Mode:     {BOLD}High-Contrast White Text{RESET} (all segments forced to white)")
+    if keep_input:
+        print(f"  Input:    {BOLD}Preserving current font_color_input{RESET}")
     bak = backup_config()
     if bak:
         print(f"  Backup:   {bak}")
-    apply_theme(theme)
+    apply_theme(theme, force_white=force_white, keep_input=keep_input)
     print(f"  Applied:  {CONFIG_PATH}")
     print()
     print(f"  {BOLD}Theme applied successfully!{RESET}")
@@ -568,7 +614,7 @@ def interactive_picker(themes: list[dict], clear_screen_enabled: bool = True, in
             nav.append("[p]rev")
         if (page + 1) < total_pages:
             nav.append("[n]ext")
-        nav.append("[1-60|name] apply")
+        nav.append(f"[1-{total_all}|name] apply")
         nav.append("[t]separator")
         nav.append("[/]search")
         nav.append("[r]andom")
@@ -653,7 +699,7 @@ def interactive_picker(themes: list[dict], clear_screen_enabled: bool = True, in
             else:
                 status_msg = "\033[31msynth-shell-color-preview.html not found.\033[0m"
         elif cmd in ("?", "help"):
-            status_msg = f"{BOLD}Commands:{RESET} [n]ext, [p]rev, [g 3] page, [t]separator, [/term] search, [c]lear, [r]andom, [w]eb, [1-60] apply, [q]uit"
+            status_msg = f"{BOLD}Commands:{RESET} [n]ext, [p]rev, [g 3] page, [t]separator, [/term] search, [c]lear, [r]andom, [w]eb, [1-{total_all}] apply, [q]uit"
         else:
             # Check if matching theme by number or name
             target_theme, orig_idx = find_theme(choice, themes)
@@ -670,7 +716,9 @@ def main():
     )
     parser.add_argument("-l", "--list", action="store_true", help="List all themes with color swatches and exit")
     parser.add_argument("-c", "--current", action="store_true", help="Print currently active theme and exit")
-    parser.add_argument("-a", "--apply", metavar="THEME", help="Apply theme by number (1-60) or name/slug and exit")
+    parser.add_argument("-a", "--apply", metavar="THEME", help="Apply theme by number or name/slug and exit")
+    parser.add_argument("--force-white-text", action="store_true", help="Force segment fonts to white (high contrast on dark terminals)")
+    parser.add_argument("--keep-input", action="store_true", help="Preserve current font_color_input without overriding it")
     parser.add_argument("-S", "--separators", action="store_true", help="Showcase all 10 Powerline separator styles and exit")
     parser.add_argument("-t", "--separator", metavar="STYLE", help="Set Powerline separator style (arrow, round, slant, flame, pixel, wave, hex, ice, slash, chevron) and exit")
     parser.add_argument("-r", "--random", action="store_true", help="Apply a random theme and exit")
@@ -730,7 +778,7 @@ def main():
     if args.random:
         pick_t = random.choice(themes)
         orig_idx = themes.index(pick_t) + 1
-        apply_and_report(pick_t, orig_idx)
+        apply_and_report(pick_t, orig_idx, force_white=args.force_white_text, keep_input=args.keep_input)
         return
 
     if args.apply:
@@ -738,7 +786,7 @@ def main():
         if not theme:
             print(f"Error: Theme '{args.apply}' not found. Run with --list to view all available themes.")
             sys.exit(1)
-        apply_and_report(theme, idx)
+        apply_and_report(theme, idx, force_white=args.force_white_text, keep_input=args.keep_input)
         return
 
     if args.search:

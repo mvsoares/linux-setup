@@ -34,11 +34,20 @@ synth_shell_theme_swatch_ansi() {
         "${rgb[0]}" "${rgb[1]}" "${rgb[2]}"
 }
 
+synth_shell_get_theme_count() {
+    local dir="${_synth_themes_dir}"
+    local count
+    count=$(find "${dir}" -maxdepth 1 -name '[0-9][0-9]-*.conf' 2>/dev/null | wc -l)
+    printf '%s\n' "${count:-60}"
+}
+
 synth_shell_print_theme_gallery() {
     local dir="${_synth_themes_dir}"
+    local total
+    total=$(synth_shell_get_theme_count)
     local f n title sw
     echo ""
-    echo -e "  ${BOLD}synth-shell prompt — pick a theme (1–60), or wait 10s for default (2)${RESET}"
+    echo -e "  ${BOLD}synth-shell prompt — pick a theme (1–${total}), or wait 10s for default (2)${RESET}"
     echo -e "  ${DIM}Swatches: host · pwd · Git (256-color). Gallery: repo/synth-shell-color-preview.html${RESET}"
     echo ""
     for f in $(printf '%s\n' "${dir}"/[0-9][0-9]-*.conf | sort); do
@@ -54,7 +63,10 @@ synth_shell_print_theme_gallery() {
 
 synth_shell_resolve_theme_choice() {
     local default=${1:-2}
-    if [[ "${SYNTH_SHELL_THEME:-}" =~ ^([1-9]|[1-5][0-9]|60)$ ]]; then
+    local total
+    total=$(synth_shell_get_theme_count)
+
+    if [[ "${SYNTH_SHELL_THEME:-}" =~ ^[0-9]+$ ]] && (( SYNTH_SHELL_THEME >= 1 && SYNTH_SHELL_THEME <= total )); then
         printf '%s\n' "${SYNTH_SHELL_THEME}"
         return 0
     fi
@@ -65,9 +77,9 @@ synth_shell_resolve_theme_choice() {
     local choice=""
     local read_rc=0
     if [[ -t 0 ]]; then
-        read -r -t 10 -p "  Theme number [1–60, default ${default}] (10s → ${default}): " choice || read_rc=$?
+        read -r -t 10 -p "  Theme number [1–${total}, default ${default}] (10s → ${default}): " choice || read_rc=$?
     elif [[ -r /dev/tty ]]; then
-        read -r -t 10 -p "  Theme number [1–60, default ${default}] (10s → ${default}): " choice < /dev/tty > /dev/tty 2>/dev/tty || read_rc=$?
+        read -r -t 10 -p "  Theme number [1–${total}, default ${default}] (10s → ${default}): " choice < /dev/tty > /dev/tty 2>/dev/tty || read_rc=$?
     else
         printf '%s\n' "$default"
         return 0
@@ -78,7 +90,7 @@ synth_shell_resolve_theme_choice() {
         printf '%s\n' "$default"
         return 0
     fi
-    if [[ "$choice" =~ ^([1-9]|[1-5][0-9]|60)$ ]]; then
+    if [[ "$choice" =~ ^[0-9]+$ ]] && (( choice >= 1 && choice <= total )); then
         printf '%s\n' "$choice"
         return 0
     fi
@@ -88,20 +100,28 @@ synth_shell_resolve_theme_choice() {
 
 synth_shell_apply_prompt_theme() {
     local theme_n=$1
-    local dest="${USER_HOME}/.config/synth-shell/synth-shell-prompt.config"
+    local target_user="${REAL_USER:-$USER}"
+    local target_home="${USER_HOME:-$HOME}"
+    local dest="${target_home}/.config/synth-shell/synth-shell-prompt.config"
     local src
     src=$(synth_shell_get_theme_file "$theme_n") || {
         warn "Theme file for #${theme_n} not found"
         return 1
     }
-    mkdir -p "${USER_HOME}/.config/synth-shell"
+    mkdir -p "${target_home}/.config/synth-shell"
 
     local py_picker="${_synth_themes_dir}/../../synth-shell-theme-picker.py"
     if [[ -f "$py_picker" ]] && command -v python3 &>/dev/null; then
-        sudo -u "${REAL_USER}" HOME="${USER_HOME}" python3 "$py_picker" --apply "$theme_n" >/dev/null 2>&1 || cp "$src" "$dest"
+        if [[ "$(id -un)" != "$target_user" && "$EUID" -eq 0 ]]; then
+            sudo -u "$target_user" HOME="$target_home" python3 "$py_picker" --apply "$theme_n" >/dev/null 2>&1 || cp "$src" "$dest"
+        else
+            python3 "$py_picker" --apply "$theme_n" >/dev/null 2>&1 || cp "$src" "$dest"
+        fi
     else
         cp "$src" "$dest"
     fi
-    chown "${REAL_USER}:${REAL_USER}" "$dest"
+    if [[ "$EUID" -eq 0 ]]; then
+        chown "${target_user}:${target_user}" "$dest" 2>/dev/null || true
+    fi
     ok "synth-shell prompt colors → theme ${theme_n} ($(synth_shell_theme_title "$src"))"
 }
