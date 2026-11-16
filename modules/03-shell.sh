@@ -310,7 +310,13 @@ fi
 
 if [[ -f "$SYNTH_CFG" ]]; then
     # Tune max_pwd_char from 25 to 35 for better path visibility
-    sed -i 's/^max_pwd_char="25"$/max_pwd_char="35"/' "$SYNTH_CFG"
+    sed -i 's/^max_pwd_char=.*$/max_pwd_char="35"/' "$SYNTH_CFG"
+    # Default to 2-line prompt and rounded bubble + arrow end separators
+    sed -i 's/^enable_command_on_new_line=.*$/enable_command_on_new_line="true"/' "$SYNTH_CFG"
+    sed -i 's/^separator_char=.*$/separator_char="\\uE0B4"/' "$SYNTH_CFG"
+    if ! grep -q '^separator_char_end=' "$SYNTH_CFG"; then
+        echo 'separator_char_end="\uE0B0"' >> "$SYNTH_CFG"
+    fi
 fi
 tick "synth-shell (prompt · better-ls · better-alias · better-history)"
 
@@ -323,6 +329,99 @@ if [[ -f "$BASHRC" ]]; then
     sed -i 's/^HISTSIZE=1000$/HISTSIZE=50000/' "$BASHRC"
     sed -i 's/^HISTFILESIZE=2000$/HISTFILESIZE=100000/' "$BASHRC"
     sed -i 's/^#shopt -s globstar$/shopt -s globstar/' "$BASHRC"
+
+    # Shorten GKE context in Synth-Shell prompt (pure bash, avoids spawning kubectl)
+    if ! grep -q 'getKube()' "$BASHRC" 2>/dev/null; then
+        cat >> "$BASHRC" << 'KUBEBLOCK'
+
+# Shorten GKE context in Synth-Shell prompt (pure bash, avoids spawning kubectl)
+getKube() {
+    local cfg="${KUBECONFIG%%:*}"
+    cfg="${cfg:-$HOME/.kube/config}"
+    [[ -r "$cfg" ]] || return
+    local line ctx=""
+    while IFS= read -r line; do
+        if [[ "$line" =~ ^current-context:[[:space:]]*(.*)$ ]]; then
+            ctx="${BASH_REMATCH[1]}"
+            ctx="${ctx%"${ctx##*[![:space:]]}"}"
+            ctx="${ctx%\"}" ; ctx="${ctx#\"}"
+            ctx="${ctx%\'}" ; ctx="${ctx#\'}"
+            break
+        fi
+    done < "$cfg"
+    [[ -z "$ctx" ]] && return
+    # gke_<project>_<region>_<cluster> -> <cluster> (strip redundant gke- prefix)
+    if [[ "$ctx" =~ ^gke_[^_]+_[^_]+_(.+)$ ]]; then
+        ctx="${BASH_REMATCH[1]#gke-}"
+    fi
+    (( ${#ctx} > 28 )) && ctx="${ctx:0:25}…"
+    printf '☸ %s' "$ctx"
+}
+KUBEBLOCK
+        ok "getKube() short cluster name helper added to .bashrc"
+    fi
+
+    # Shpool Session Prompt Indicator (dynamic theme matching)
+    if ! grep -q '__shpool_ps1_prefix' "$BASHRC" 2>/dev/null; then
+        cat >> "$BASHRC" << 'SHPOOLBLOCK'
+
+# ── Shpool Session Prompt Indicator ───────────────────────────────────────────
+__shpool_ps1_prefix() {
+    local ret=$?
+    if [ -n "${SHPOOL_SESSION_NAME:-}" ]; then
+        local first_elem="${SSP_ELEMENTS[0]:-HOST}"
+        local -n _colors="SSP_COLORS_${first_elem}" 2>/dev/null || true
+        local fg="${_colors[0]:-white}" bg="${_colors[1]:-141}" eff="${_colors[2]:-bold}"
+
+        local eff_c="0" fg_c="97" bg_c="48;5;141"
+        [ "$eff" = "bold" ] && eff_c="1"
+
+        if [[ "$fg" =~ ^[0-9]+$ ]]; then
+            fg_c="38;5;$fg"
+        else
+            case "$fg" in
+                black)          fg_c="30" ;;
+                red)            fg_c="31" ;;
+                green)          fg_c="32" ;;
+                yellow)         fg_c="33" ;;
+                blue)           fg_c="34" ;;
+                magenta|purple) fg_c="35" ;;
+                cyan)           fg_c="36" ;;
+                white)          fg_c="97" ;;
+            esac
+        fi
+
+        if [[ "$bg" =~ ^[0-9]+$ ]]; then
+            bg_c="48;5;$bg"
+        else
+            case "$bg" in
+                black)          bg_c="40" ;;
+                red)            bg_c="41" ;;
+                green)          bg_c="42" ;;
+                yellow)         bg_c="43" ;;
+                blue)           bg_c="44" ;;
+                magenta|purple) bg_c="45" ;;
+                cyan)           bg_c="46" ;;
+                white)          bg_c="107" ;;
+            esac
+        fi
+
+        local badge="\[\033[${eff_c};${fg_c};${bg_c}m\] ⬢ ${SHPOOL_SESSION_NAME} \[\033[0m\]"
+        if [[ "$PS1" == *"╭"* ]]; then
+            PS1="${PS1/╭/╭$badge }"
+        else
+            PS1="${badge} ${PS1}"
+        fi
+    fi
+    return $ret
+}
+
+if [[ "$PROMPT_COMMAND" != *"__shpool_ps1_prefix"* ]]; then
+    PROMPT_COMMAND="${PROMPT_COMMAND:+$PROMPT_COMMAND; }__shpool_ps1_prefix"
+fi
+SHPOOLBLOCK
+        ok "Shpool session prompt indicator added to .bashrc"
+    fi
     
     # Ensure zoxide is initialized at the very end of .bashrc
     if ! grep -q 'zoxide init bash' "$BASHRC"; then

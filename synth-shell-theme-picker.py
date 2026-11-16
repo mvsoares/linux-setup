@@ -30,11 +30,29 @@ SEPARATOR_STYLES = {
 
 
 def detect_current_separator() -> str:
-    """Return the separator character currently configured in CONFIG_PATH."""
+    """Return the separator character currently configured in CONFIG_PATH, defaulting to \uE0B4."""
+    if not CONFIG_PATH.exists():
+        return "\ue0b4"
+    for line in CONFIG_PATH.read_text().splitlines():
+        m = re.match(r"^separator_char\s*=\s*\$?['\"]?(.*?)['\"]?\s*$", line)
+        if m:
+            val = m.group(1).strip()
+            if re.match(r"^\\u[0-9a-fA-F]{4}$", val):
+                try:
+                    return chr(int(val[2:], 16))
+                except ValueError:
+                    pass
+            if val:
+                return val
+    return "\ue0b4"
+
+
+def detect_current_separator_end() -> str:
+    """Return the separator_char_end currently configured in CONFIG_PATH, defaulting to \uE0B0."""
     if not CONFIG_PATH.exists():
         return "\ue0b0"
     for line in CONFIG_PATH.read_text().splitlines():
-        m = re.match(r"^separator_char\s*=\s*\$?['\"]?(.*?)['\"]?\s*$", line)
+        m = re.match(r"^separator_char_end\s*=\s*\$?['\"]?(.*?)['\"]?\s*$", line)
         if m:
             val = m.group(1).strip()
             if re.match(r"^\\u[0-9a-fA-F]{4}$", val):
@@ -74,6 +92,7 @@ def find_separator(query: str | int) -> tuple[str, str, str, str] | None:
 
 
 SEPARATOR = detect_current_separator()
+SEPARATOR_END = detect_current_separator_end()
 
 NAMED_COLORS = {
     "black": 0, "red": 1, "green": 2, "yellow": 3,
@@ -191,9 +210,10 @@ def render_separator(prev_bg: int | None, next_bg: int | None, sep: str | None =
     return "".join(parts)
 
 
-def render_prompt_line(theme: dict, segments: list[tuple[str, str]], command: str, sep: str | None = None) -> str:
+def render_prompt_line(theme: dict, segments: list[tuple[str, str]], command: str, sep: str | None = None, sep_end: str | None = None) -> str:
     out = []
     sep_char = sep if sep is not None else SEPARATOR
+    sep_end_char = sep_end if sep_end is not None else SEPARATOR_END
     for i, (key, text) in enumerate(segments):
         fg = color_index(theme.get(f"font_color_{key}", "white"))
         bg = color_index(theme.get(f"background_{key}", "0"))
@@ -202,7 +222,9 @@ def render_prompt_line(theme: dict, segments: list[tuple[str, str]], command: st
         if i + 1 < len(segments):
             next_key = segments[i + 1][0]
             next_bg = color_index(theme.get(f"background_{next_key}", "0"))
-        out.append(render_separator(bg, next_bg, sep=sep_char))
+            out.append(render_separator(bg, next_bg, sep=sep_char))
+        else:
+            out.append(render_separator(bg, None, sep=sep_end_char))
     input_fg = color_index(theme.get("font_color_input", "white"))
     out.append(RESET)
     if input_fg is not None:
