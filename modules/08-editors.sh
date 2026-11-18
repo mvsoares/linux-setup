@@ -168,20 +168,11 @@ WEZWRAP
     $_wez_installed || warn "WezTerm install failed"
 fi
 
-WEZTERM_CFG="${USER_HOME}/.config/wezterm/wezterm.lua"
-if [[ -f "$WEZTERM_CFG" ]]; then
-    if grep -q "'JetBrains Mono'" "$WEZTERM_CFG"; then
-        sed -i "s/'JetBrains Mono'/'JetBrainsMono Nerd Font'/g" "$WEZTERM_CFG"
-        ok "WezTerm font fixed: JetBrains Mono -> JetBrainsMono Nerd Font"
-    else
-        ok "WezTerm config already present"
-    fi
+# Loader + defaults are repo-owned; settings.json/user.lua stay untouched.
+if bash "${SCRIPT_DIR}/lib/wezterm-deploy.sh" "$USER_HOME" "$REAL_USER:$(id -gn "$REAL_USER")" >> "$LOG_FILE" 2>&1; then
+    ok "WezTerm config deployed (preferences in ~/.config/wezterm/settings.json)"
 else
-    info "Deploying WezTerm config..."
-    install -d -o "$REAL_USER" -g "$REAL_USER" "$(dirname "$WEZTERM_CFG")"
-    cp "${SCRIPT_DIR}/lib/wezterm.lua" "$WEZTERM_CFG"
-    chown "$REAL_USER:$REAL_USER" "$WEZTERM_CFG"
-    ok "WezTerm config deployed (Monokai Remastered, JetBrainsMono Nerd Font)"
+    warn "WezTerm config deploy failed"
 fi
 
 # Append/upgrade bash hook for running command + cwd in WezTerm tab titles

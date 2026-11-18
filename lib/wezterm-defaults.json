@@ -1,0 +1,146 @@
+{
+  "font": {
+    "family": "VictorMono Nerd Font Mono",
+    "weight": "Regular",
+    "size": 14,
+    "line_height": 1.0,
+    "rules": [
+      { "intensity": "Half", "italic": false, "weight": "Medium" },
+      { "intensity": "Half", "italic": true, "weight": "Medium" }
+    ]
+  },
+  "display": {
+    "use_x11": false,
+    "dpi_by_screen": {}
+  },
+  "colors": {
+    "scheme": "Monokai Vivid",
+    "bold_brightens_ansi_colors": false
+  },
+  "terminal": {
+    "term": "xterm-256color",
+    "unicode_version": 14,
+    "allow_square_glyphs_to_overflow_width": "Never"
+  },
+  "window": {
+    "opacity": 1,
+    "padding": { "left": 10, "right": 10, "top": 10, "bottom": 10 },
+    "initial_cols": 200,
+    "initial_rows": 60,
+    "adjust_window_size_when_changing_font_size": false,
+    "use_resize_increments": false
+  },
+  "tabs": {
+    "hide_if_only_one_tab": false,
+    "fancy": true,
+    "at_bottom": true,
+    "max_width": 32,
+    "frame_font": { "family": "VictorMono Nerd Font", "weight": "Medium", "size": 12 },
+    "theme_file": "tab_theme.lua",
+    "fallback": {
+      "title_len": 15,
+      "palette": [
+        { "bg": "#4285F4", "active_symbol": "⚡ 🔵 ➜ ", "inactive_symbol": " 🔘" },
+        { "bg": "#EA4335", "active_symbol": "⚡ 🔴 ➜ ", "inactive_symbol": " 🔘" },
+        { "bg": "#34A853", "active_symbol": "⚡ 🟢 ➜ ", "inactive_symbol": " 🔘" },
+        { "bg": "#FBBC05", "active_symbol": "⚡ 🟠 ➜ ", "inactive_symbol": " 🔘" }
+      ]
+    }
+  },
+  "status": {
+    "enabled": true,
+    "interval_ms": 5000,
+    "git_branch": true,
+    "git_recheck_s": 10,
+    "battery": true,
+    "clock": "%H:%M",
+    "color": "#a6adc8"
+  },
+  "performance": {
+    "scrollback_lines": 5000,
+    "animation_fps": 1,
+    "max_fps": 60,
+    "front_end": "OpenGL",
+    "automatically_reload_config": true
+  },
+  "cursor": {
+    "style": "BlinkingBar",
+    "blink_rate": 500
+  },
+  "bell": {
+    "audible": "Disabled",
+    "visual": { "fade_in_duration_ms": 0, "fade_out_duration_ms": 0 }
+  },
+  "hyperlinks": {
+    "include_defaults": true,
+    "extra": [
+      {
+        "regex": "\\b((?:[\\w-]+\\.)+(?:com|org|net|io|dev|rs|sh|app|co)(?::\\d+)?(?:/[^\\s]*)?)\\b",
+        "format": "https://$1"
+      },
+      {
+        "regex": "\\b(?:https?://)?(localhost|127\\.0\\.0\\.1)(:\\d+)?\\b",
+        "format": "http://$1$2"
+      }
+    ]
+  },
+  "mux": {
+    "unix_domains": [ { "name": "unix" } ]
+  },
+  "keys": {
+    "leader": { "key": "a", "mods": "SUPER|CTRL", "timeout_milliseconds": 2000 },
+    "bindings": [
+      { "key": "d", "mods": "SUPER", "action": { "SplitHorizontal": { "domain": "CurrentPaneDomain" } } },
+      { "key": "D", "mods": "SUPER", "action": { "SplitVertical": { "domain": "CurrentPaneDomain" } } },
+      { "key": "h", "mods": "SUPER|CTRL", "action": { "ActivatePaneDirection": "Left" } },
+      { "key": "l", "mods": "SUPER|CTRL", "action": { "ActivatePaneDirection": "Right" } },
+      { "key": "k", "mods": "SUPER|CTRL", "action": { "ActivatePaneDirection": "Up" } },
+      { "key": "j", "mods": "SUPER|CTRL", "action": { "ActivatePaneDirection": "Down" } },
+      { "key": "w", "mods": "SUPER", "action": { "CloseCurrentPane": { "confirm": false } } },
+      { "key": "t", "mods": "SUPER", "action": { "SpawnTab": "CurrentPaneDomain" } },
+      { "key": "[", "mods": "SUPER", "action": { "ActivateTabRelative": -1 } },
+      { "key": "]", "mods": "SUPER", "action": { "ActivateTabRelative": 1 } },
+      { "key": "+", "mods": "SUPER", "action": "IncreaseFontSize" },
+      { "key": "-", "mods": "SUPER", "action": "DecreaseFontSize" },
+      { "key": "0", "mods": "SUPER", "action": "ResetFontSize" },
+      { "key": "r", "mods": "SUPER", "action": { "Multiple": [ "DecreaseFontSize", "IncreaseFontSize" ] } },
+      { "key": "r", "mods": "SUPER|CTRL", "action": { "Multiple": [ "DecreaseFontSize", "IncreaseFontSize" ] } },
+      { "key": "f", "mods": "SUPER|CTRL", "action": "ToggleFullScreen" },
+      { "key": "c", "mods": "SUPER", "action": { "CopyTo": "Clipboard" } },
+      { "key": "v", "mods": "SUPER", "action": { "PasteFrom": "Clipboard" } },
+      { "key": "f", "mods": "SUPER", "action": { "Search": { "CaseSensitiveString": "" } } },
+      { "key": "r", "mods": "LEADER", "action": { "ActivateKeyTable": { "name": "resize_pane", "one_shot": false, "timeout_milliseconds": 5000 } } },
+      { "key": "c", "mods": "LEADER", "action": "ActivateCopyMode" },
+      { "key": "z", "mods": "LEADER", "action": "TogglePaneZoomState" },
+      { "key": "g", "mods": "LEADER", "action": { "QuickSelectArgs": { "patterns": [
+          "[0-9a-f]{7,40}",
+          "[A-Z][A-Z0-9]+-[0-9]+",
+          "(?:[0-9]{1,3}\\.){3}[0-9]{1,3}(?::[0-9]+)?"
+        ] } } },
+      { "key": "u", "mods": "LEADER", "action": { "AttachDomain": "unix" } },
+      { "key": "u", "mods": "LEADER|SHIFT", "action": { "DetachDomain": "CurrentPaneDomain" } }
+    ],
+    "tables": {
+      "resize_pane": [
+        { "key": "h", "action": { "AdjustPaneSize": [ "Left", 3 ] } },
+        { "key": "l", "action": { "AdjustPaneSize": [ "Right", 3 ] } },
+        { "key": "k", "action": { "AdjustPaneSize": [ "Up", 3 ] } },
+        { "key": "j", "action": { "AdjustPaneSize": [ "Down", 3 ] } },
+        { "key": "Escape", "action": "PopKeyTable" },
+        { "key": "Enter", "action": "PopKeyTable" }
+      ]
+    }
+  },
+  "mouse": {
+    "bindings": [
+      { "event": { "Up": { "streak": 1, "button": "Left" } }, "mods": "NONE", "action": { "CompleteSelectionOrOpenLinkAtMouseCursor": "ClipboardAndPrimarySelection" } },
+      { "event": { "Up": { "streak": 1, "button": "Left" } }, "mods": "SHIFT", "action": { "CompleteSelectionOrOpenLinkAtMouseCursor": "ClipboardAndPrimarySelection" } },
+      { "event": { "Up": { "streak": 2, "button": "Left" } }, "mods": "NONE", "action": { "CompleteSelection": "ClipboardAndPrimarySelection" } },
+      { "event": { "Up": { "streak": 2, "button": "Left" } }, "mods": "SHIFT", "action": { "CompleteSelection": "ClipboardAndPrimarySelection" } },
+      { "event": { "Down": { "streak": 3, "button": "Left" } }, "mods": "NONE", "action": { "SelectTextAtMouseCursor": "SemanticZone" } },
+      { "event": { "Up": { "streak": 3, "button": "Left" } }, "mods": "NONE", "action": { "CompleteSelection": "ClipboardAndPrimarySelection" } },
+      { "event": { "Up": { "streak": 3, "button": "Left" } }, "mods": "SHIFT", "action": { "CompleteSelection": "ClipboardAndPrimarySelection" } }
+    ]
+  },
+  "extra": {}
+}

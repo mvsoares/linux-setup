@@ -23,7 +23,16 @@ date_str=$(date +"%d-%m-%Y_%H-%M")
 target_file="${PICTURES_DIR}/cap-${seq_str}-${date_str}.png"
 
 # 4. Trigger area capture
-flameshot gui -c -p "$target_file"
+# In KDE Plasma Wayland, Spectacle provides native region capture without the XDG Portal screen chooser prompt.
+if [[ "${XDG_CURRENT_DESKTOP:-}" == *"KDE"* ]] && command -v spectacle &>/dev/null; then
+    spectacle -b -r -o "$target_file" 2>/dev/null || true
+elif command -v flameshot &>/dev/null; then
+    flameshot gui -c -p "$target_file"
+elif command -v spectacle &>/dev/null; then
+    spectacle -b -r -o "$target_file" 2>/dev/null || true
+elif command -v gnome-screenshot &>/dev/null; then
+    gnome-screenshot -a -f "$target_file"
+fi
 
 # 5. If user completed the capture, ensure clipboard and notify
 if [[ -f "$target_file" ]]; then

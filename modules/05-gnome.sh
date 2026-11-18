@@ -217,6 +217,12 @@ gset org.gnome.desktop.wm.keybindings move-to-workspace-3   "['<Super><Shift>3']
 gset org.gnome.desktop.wm.keybindings move-to-workspace-4   "['<Super><Shift>4']"
 gset org.gnome.desktop.wm.keybindings show-desktop          "['<Super>d']"
 gset org.gnome.shell.keybindings toggle-overview            "['<Super>s']"
+# GNOME binds Super+1..4 to "open dash app N" by default, which collides with
+# the workspace switches above.
+gset org.gnome.shell.keybindings switch-to-application-1    "[]"
+gset org.gnome.shell.keybindings switch-to-application-2    "[]"
+gset org.gnome.shell.keybindings switch-to-application-3    "[]"
+gset org.gnome.shell.keybindings switch-to-application-4    "[]"
 
 # Helper script: cap-screen
 if [[ -f "${SCRIPT_DIR}/scripts/cap-screen" ]]; then
@@ -266,9 +272,9 @@ gset org.cinnamon.desktop.keybindings.custom-keybinding:/org/cinnamon/desktop/ke
 gset org.cinnamon.desktop.keybindings.custom-keybinding:/org/cinnamon/desktop/keybindings/custom-keybindings/custom5/ binding "['<Super><Shift>f', '<Shift><Super>f', '<Super><Shift>F', '<Shift><Super>F']"
 
 # GNOME custom keybindings
-gset org.gnome.settings-daemon.plugins.media-keys screensaver "@as []"
+gset org.gnome.settings-daemon.plugins.media-keys screensaver "['<Super>l']"
 gset org.gnome.shell.keybindings show-screenshot-ui "['<Super><Shift>s', 'Print']"
-gset org.gnome.settings-daemon.plugins.media-keys custom-keybindings "['/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom0/', '/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom1/', '/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom2/', '/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom3/', '/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom4/', '/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom5/']"
+gset org.gnome.settings-daemon.plugins.media-keys custom-keybindings "['/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom0/', '/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom1/', '/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom2/', '/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom3/', '/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom4/']"
 gset org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom0/ name "'WezTerm'"
 gset org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom0/ command "'wezterm'"
 gset org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom0/ binding "'<Super>t'"
@@ -288,10 +294,6 @@ gset org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:/org/gnome/s
 gset org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom4/ name "'Capture Region to File and Clipboard'"
 gset org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom4/ command "'/usr/local/bin/cap-screen'"
 gset org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom4/ binding "'<Super><Shift>f'"
-
-gset org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom5/ name "'Lock Screen'"
-gset org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom5/ command "'dm-tool lock'"
-gset org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom5/ binding "'<Super>l'"
 
 tick "Windows + workspaces + keybindings"
 

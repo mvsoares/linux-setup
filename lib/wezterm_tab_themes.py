@@ -12,6 +12,9 @@ Covers:
 6. Minimalist, Modern, Badges & CRT (51-60)
 """
 
+import json
+import math
+
 THEMES = [   {   'bg_bar': '#15161c',
         'category': 'Google & Material',
         'description': 'Tons pastéis suaves (Azul, Vermelho, Verde, Amarelo) com texto de alto contraste.',
@@ -58,14 +61,18 @@ THEMES = [   {   'bg_bar': '#15161c',
         'use_fancy': True},
     {   'bg_bar': '#16171d',
         'category': 'Google & Material',
-        'description': 'Barra horizontal sutil com realce sublinhado e fundos escurecidos nas cores Google.',
+        'description': 'Cor fixa por projeto: o nome do diretório escolhe a cor, então o mesmo projeto aparece sempre com a mesma cor, em qualquer aba.',
         'id': 5,
-        'name': 'Google Underline Accent',
-        'palette': [   {'active_sym': '⚡ ➜ ', 'bg': '#1e293b', 'fg': '#60a5fa', 'inactive_sym': '  '},
-                       {'active_sym': '⚡ ➜ ', 'bg': '#2d1b22', 'fg': '#f87171', 'inactive_sym': '  '},
-                       {'active_sym': '⚡ ➜ ', 'bg': '#142b20', 'fg': '#4ade80', 'inactive_sym': '  '},
-                       {'active_sym': '⚡ ➜ ', 'bg': '#2d2714', 'fg': '#facc15', 'inactive_sym': '  '}],
-        'style': 'underline',
+        'name': 'Google Project Colors',
+        'palette': [   {'active_sym': '\U000f024b ', 'bg': '#1a73e8', 'fg': '#ffffff', 'inactive_sym': ''},
+                       {'active_sym': '\U000f024b ', 'bg': '#d93025', 'fg': '#ffffff', 'inactive_sym': ''},
+                       {'active_sym': '\U000f024b ', 'bg': '#188038', 'fg': '#ffffff', 'inactive_sym': ''},
+                       {'active_sym': '\U000f024b ', 'bg': '#f9ab00', 'fg': '#202124', 'inactive_sym': ''},
+                       {'active_sym': '\U000f024b ', 'bg': '#9334e6', 'fg': '#ffffff', 'inactive_sym': ''},
+                       {'active_sym': '\U000f024b ', 'bg': '#12b5cb', 'fg': '#202124', 'inactive_sym': ''},
+                       {'active_sym': '\U000f024b ', 'bg': '#e8710a', 'fg': '#202124', 'inactive_sym': ''},
+                       {'active_sym': '\U000f024b ', 'bg': '#c51162', 'fg': '#ffffff', 'inactive_sym': ''}],
+        'style': 'project_color',
         'use_fancy': True},
     {   'bg_bar': '#0f1117',
         'category': 'Google & Material',
@@ -79,26 +86,29 @@ THEMES = [   {   'bg_bar': '#15161c',
         'style': 'pills',
         'use_fancy': True},
     {   'bg_bar': '#13161f',
+        'alert_color': '#fdd663',
         'category': 'Google & Material',
-        'description': 'Inspirado no console do GCP com ícone de nuvem e as 4 cores oficiais de status.',
+        'description': 'Mostra ● nas abas com saída nova que você ainda não viu e ⏳ enquanto um comando roda — ideal para acompanhar jobs longos.',
         'id': 7,
-        'name': 'Google Cloud Ops',
-        'palette': [   {'active_sym': '⚡ ☁ ➜ ', 'bg': '#1a73e8', 'fg': '#ffffff', 'inactive_sym': ' ☁'},
-                       {'active_sym': '⚡ ☁ ➜ ', 'bg': '#ea4335', 'fg': '#ffffff', 'inactive_sym': ' ☁'},
-                       {'active_sym': '⚡ ☁ ➜ ', 'bg': '#1e8e3e', 'fg': '#ffffff', 'inactive_sym': ' ☁'},
-                       {'active_sym': '⚡ ☁ ➜ ', 'bg': '#f9ab00', 'fg': '#ffffff', 'inactive_sym': ' ☁'}],
-        'style': 'pills',
+        'name': 'Google Activity Radar',
+        'palette': [   {'active_sym': '⚡ ', 'bg': '#174ea6', 'fg': '#ffffff', 'inactive_sym': ''},
+                       {'active_sym': '⚡ ', 'bg': '#a50e0e', 'fg': '#ffffff', 'inactive_sym': ''},
+                       {'active_sym': '⚡ ', 'bg': '#0d652d', 'fg': '#ffffff', 'inactive_sym': ''},
+                       {'active_sym': '⚡ ', 'bg': '#8d4e00', 'fg': '#ffffff', 'inactive_sym': ''}],
+        'style': 'activity',
         'use_fancy': True},
-    {   'bg_bar': '#181a20',
+    {   'bg_bar': '#202124',
         'category': 'Google & Material',
-        'description': 'Visual translúcido fosco sofisticado com tinturas elegantes Azul, Vermelho, Verde e Âmbar.',
+        'description': 'Abas inativas em grafite discreto, só com o número na cor da aba; apenas a aba ativa ganha cor — visual calmo, sem arco-íris.',
         'id': 8,
-        'name': 'Material Glass Surface',
-        'palette': [   {'active_sym': '◆ ', 'bg': '#2c3b52', 'fg': '#bfdbfe', 'inactive_sym': '◇ '},
-                       {'active_sym': '◆ ', 'bg': '#43282f', 'fg': '#fecaca', 'inactive_sym': '◇ '},
-                       {'active_sym': '◆ ', 'bg': '#203e30', 'fg': '#bbf7d0', 'inactive_sym': '◇ '},
-                       {'active_sym': '◆ ', 'bg': '#403920', 'fg': '#fef08a', 'inactive_sym': '◇ '}],
-        'style': 'google_cycle',
+        'muted_bg': '#303134',
+        'muted_fg': '#9aa0a6',
+        'name': 'Material Mono Accent',
+        'palette': [   {'active_sym': '● ', 'bg': '#8ab4f8', 'fg': '#202124', 'inactive_sym': ''},
+                       {'active_sym': '● ', 'bg': '#f28b82', 'fg': '#202124', 'inactive_sym': ''},
+                       {'active_sym': '● ', 'bg': '#81c995', 'fg': '#202124', 'inactive_sym': ''},
+                       {'active_sym': '● ', 'bg': '#fdd663', 'fg': '#202124', 'inactive_sym': ''}],
+        'style': 'mono_accent',
         'use_fancy': True},
     {   'bg_bar': '#1b1b1f',
         'category': 'Google & Material',
@@ -111,16 +121,16 @@ THEMES = [   {   'bg_bar': '#15161c',
                        {'active_sym': '⚡ ➜ ', 'bg': '#f0e1a1', 'fg': '#3e3000', 'inactive_sym': ' ·'}],
         'style': 'google_cycle',
         'use_fancy': True},
-    {   'bg_bar': '#181920',
+    {   'bg_bar': '#0b1220',
         'category': 'Google & Material',
-        'description': 'Tema clássico original: 4 cores sólidas e vibrantes do Google com ciclo Blue/Red/Green/Yellow.',
+        'description': 'Quatro tons do azul Google, do mais escuro ao mais claro — um tema de cor única, sem o arco-íris de sempre.',
         'id': 10,
-        'name': 'Chrome Clean Original',
-        'palette': [   {'active_sym': '⚡ 🔵 ➜ ', 'bg': '#4285F4', 'fg': '#ffffff', 'inactive_sym': ' 🔘'},
-                       {'active_sym': '⚡ 🔴 ➜ ', 'bg': '#EA4335', 'fg': '#ffffff', 'inactive_sym': ' 🔘'},
-                       {'active_sym': '⚡ 🟢 ➜ ', 'bg': '#34A853', 'fg': '#ffffff', 'inactive_sym': ' 🔘'},
-                       {'active_sym': '⚡ 🟠 ➜ ', 'bg': '#FBBC05', 'fg': '#ffffff', 'inactive_sym': ' 🔘'}],
-        'style': 'google_cycle',
+        'name': 'Google Blue Gradient',
+        'palette': [   {'active_sym': '❯ ', 'bg': '#0842a0', 'fg': '#ffffff', 'inactive_sym': ' ·'},
+                       {'active_sym': '❯ ', 'bg': '#0b57d0', 'fg': '#ffffff', 'inactive_sym': ' ·'},
+                       {'active_sym': '❯ ', 'bg': '#4c8df6', 'fg': '#041e49', 'inactive_sym': ' ·'},
+                       {'active_sym': '❯ ', 'bg': '#a8c7fa', 'fg': '#041e49', 'inactive_sym': ' ·'}],
+        'style': 'pills',
         'use_fancy': True},
     {   'bg_bar': '#0f172a',
         'category': 'Powerline & Geometrias',
@@ -704,6 +714,45 @@ THEMES = [   {   'bg_bar': '#15161c',
         'style': 'crt_amber',
         'use_fancy': False}]
 
+def _luminance(hex_color: str) -> float:
+    h = hex_color.lstrip("#")
+    c = [int(h[i:i + 2], 16) / 255 for i in (0, 2, 4)]
+    c = [x / 12.92 if x <= 0.03928 else ((x + 0.055) / 1.055) ** 2.4 for x in c]
+    return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
+
+
+def contrast_ratio(a: str, b: str) -> float:
+    hi, lo = sorted((_luminance(a), _luminance(b)), reverse=True)
+    return (hi + 0.05) / (lo + 0.05)
+
+
+# WCAG AA for large/bold text. Tab titles are short bold-ish labels, and 4.5:1
+# would turn the white-on-Google-blue look (3.56:1) black in dozens of themes.
+MIN_TAB_CONTRAST = 3.0
+
+
+def readable_fg(bg: str, fg: str) -> str:
+    """fg if it is readable on bg, otherwise whichever of white/near-black reads best."""
+    if contrast_ratio(bg, fg) >= MIN_TAB_CONTRAST:
+        return fg
+    return max(("#ffffff", "#1a1a1a"), key=lambda c: contrast_ratio(bg, c))
+
+
+# Unreadable text colors (e.g. white on #FBBC05, 1.7:1) are fixed at load time,
+# so the picker previews and the generated Lua get the same readable colors.
+for _theme in THEMES:
+    for _p in _theme["palette"]:
+        _p["fg"] = readable_fg(_p["bg"], _p["fg"])
+
+
+def project_slot(name: str, size: int) -> int:
+    """Stable 0-based palette slot for a project name; mirrors the Lua in project_color."""
+    h = 0
+    for b in name.encode("utf-8"):
+        h = (h * 31 + b) % 2147483648
+    return h % size
+
+
 def get_theme_by_id(theme_id: int) -> dict | None:
     for t in THEMES:
         if t["id"] == theme_id:
@@ -724,12 +773,179 @@ def find_theme(query: str) -> dict | None:
             return t
     return None
 
-def generate_lua_for_theme(t: dict, tab_title_len: int = 15) -> str:
+# ── Symbol builder ──────────────────────────────────────────────────────────
+# The active-tab symbol is composed as "<prefix> <marker> <arrow> " and the
+# inactive one as " <inactive>". A marker holds one glyph per palette color
+# (tab 1..4) or a single glyph shared by all tabs. Emoji with a VS16
+# selector (e.g. ❤️) are left out: terminals disagree on their width.
+SYMBOL_PREFIXES = [
+    {"key": "none", "name": "Nenhum", "chars": [""]},
+    {"key": "bolt", "name": "Raio", "chars": ["⚡"]},
+    {"key": "fire", "name": "Fogo", "chars": ["🔥"]},
+    {"key": "sparkles", "name": "Brilho", "chars": ["✨"]},
+    {"key": "rocket", "name": "Foguete", "chars": ["🚀"]},
+    {"key": "star", "name": "Estrela", "chars": ["★"]},
+    {"key": "diamond", "name": "Losango", "chars": ["◆"]},
+    {"key": "flag", "name": "Bandeira", "chars": ["\U000f023b"]},
+]
+
+# Colored markers ("match") pick, per tab, the emoji whose color is closest to
+# that tab's background, so a red tab gets 🔴 whatever the palette order.
+# Reference colors approximate Noto Color Emoji.
+_EMOJI_COLORS = {
+    "red": "#e53935", "orange": "#fb8c00", "yellow": "#fdd835", "green": "#43a047",
+    "blue": "#1e88e5", "purple": "#8e24aa", "black": "#212121", "white": "#eeeeee",
+}
+_BALLS = {"red": "🔴", "orange": "🟠", "yellow": "🟡", "green": "🟢", "blue": "🔵",
+          "purple": "🟣", "black": "⚫", "white": "⚪"}
+_SQUARES = {"red": "🟥", "orange": "🟧", "yellow": "🟨", "green": "🟩", "blue": "🟦",
+            "purple": "🟪", "black": "⬛", "white": "⬜"}
+# No red heart: ❤️ needs a VS16 selector, whose width terminals disagree on.
+# No brown anywhere: its hue is orange's, so orange tabs would turn brown.
+_HEARTS = {"orange": "🧡", "yellow": "💛", "green": "💚", "blue": "💙",
+           "purple": "💜", "black": "🖤", "white": "🤍"}
+
+SYMBOL_MARKERS = [
+    {"key": "none", "name": "Nenhum", "chars": [""]},
+    {"key": "balls", "name": "Bolas (cor da aba)", "match": _BALLS,
+     "chars": ["🔴", "🟠", "🟡", "🟢", "🔵", "🟣"]},
+    {"key": "balls_google", "name": "Bolas Google fixas", "chars": ["🔵", "🔴", "🟢", "🟠"]},
+    {"key": "squares", "name": "Quadrados (cor da aba)", "match": _SQUARES,
+     "chars": ["🟥", "🟧", "🟨", "🟩", "🟦", "🟪"]},
+    {"key": "hearts", "name": "Corações (cor da aba)", "match": _HEARTS,
+     "chars": ["🧡", "💛", "💚", "💙", "💜"]},
+    {"key": "moons", "name": "Luas", "chars": ["🌑", "🌓", "🌕", "🌗"]},
+    {"key": "dot", "name": "Ponto", "chars": ["●"]},
+    {"key": "ring", "name": "Anel", "chars": ["◉"]},
+    {"key": "square", "name": "Quadrado", "chars": ["■"]},
+    {"key": "triangle", "name": "Triângulo", "chars": ["▶"]},
+    {"key": "circled", "name": "Números ❶", "chars": ["❶", "❷", "❸", "❹"]},
+    {"key": "nerd", "name": "Ícones Nerd", "chars": ["\U000f02a2", "\U000f0169", "\U000f048b", "\U000f070e"]},
+]
+
+SYMBOL_ARROWS = [
+    {"key": "none", "name": "Nenhuma", "chars": [""]},
+    {"key": "arrow", "name": "Seta grossa", "chars": ["➜"]},
+    {"key": "chevron", "name": "Chevron", "chars": ["❯"]},
+    {"key": "play", "name": "Play", "chars": ["▶"]},
+    {"key": "guillemet", "name": "Aspas »", "chars": ["»"]},
+    {"key": "thin", "name": "Seta fina", "chars": ["→"]},
+    {"key": "angle", "name": "Ângulo", "chars": ["⟩"]},
+    {"key": "powerline", "name": "Powerline", "chars": [""]},
+]
+
+SYMBOL_INACTIVE = [
+    {"key": "none", "name": "Nenhum", "chars": [""]},
+    {"key": "radio", "name": "Botão 🔘", "chars": ["🔘"]},
+    {"key": "same", "name": "Igual ao marcador", "chars": None},
+    {"key": "circle", "name": "Círculo", "chars": ["○"]},
+    {"key": "middot", "name": "Ponto médio", "chars": ["·"]},
+    {"key": "diamond", "name": "Losango vazado", "chars": ["◇"]},
+    {"key": "white", "name": "Bola branca", "chars": ["⚪"]},
+    {"key": "dash", "name": "Traço", "chars": ["–"]},
+]
+
+# The look of the classic Google theme: "⚡ 🔵 ➜ 1 setup" / "2 🔘 mvsoares".
+DEFAULT_SYMBOLS = {"prefix": "bolt", "marker": "balls", "arrow": "arrow", "inactive": "radio"}
+
+SYMBOL_GROUPS = [
+    ("prefix", "p", "Prefixo", SYMBOL_PREFIXES),
+    ("marker", "m", "Marcador", SYMBOL_MARKERS),
+    ("arrow", "a", "Seta", SYMBOL_ARROWS),
+    ("inactive", "i", "Aba inativa", SYMBOL_INACTIVE),
+]
+
+# Styles whose format-tab-title ignores active_sym/inactive_sym.
+NO_SYMBOL_STYLES = {"smart_badges", "circle_numbers", "crt_amber", "left_bar", "top_neon", "ghost", "outline"}
+
+
+def theme_uses_symbols(t: dict) -> bool:
+    return t.get("style", "pills") not in NO_SYMBOL_STYLES
+
+
+def _symbol_option(options: list[dict], key: str) -> dict:
+    return next((o for o in options if o["key"] == key), options[0])
+
+
+def _glyph(option: dict, i: int) -> str:
+    chars = option["chars"] or [""]
+    return chars[i % len(chars)]
+
+
+def _lch(hex_color: str) -> tuple[float, float, float]:
+    """CIE LCh (lightness, chroma, hue in degrees) of an sRGB hex color."""
+    h = hex_color.lstrip("#")
+    rgb = [int(h[i:i + 2], 16) / 255 for i in (0, 2, 4)]
+    r, g, b = [c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4 for c in rgb]
+    xyz = ((0.4124 * r + 0.3576 * g + 0.1805 * b) / 0.95047,
+           0.2126 * r + 0.7152 * g + 0.0722 * b,
+           (0.0193 * r + 0.1192 * g + 0.9505 * b) / 1.08883)
+    fx, fy, fz = [t ** (1 / 3) if t > 0.008856 else 7.787 * t + 16 / 116 for t in xyz]
+    a, bb = 500 * (fx - fy), 200 * (fy - fz)
+    return 116 * fy - 16, math.hypot(a, bb), math.degrees(math.atan2(bb, a)) % 360
+
+
+def matching_glyph(option: dict, bg: str) -> str:
+    """The emoji of a "match" marker whose color is closest to bg.
+
+    Chromatic backgrounds are matched by hue, so dark or pastel tabs still get
+    their hue's emoji; near-gray ones get black or white by lightness.
+    """
+    glyphs = option["match"]
+    light, chroma, hue = _lch(bg)
+    if chroma < 12:
+        gray = "black" if light < 50 else "white"
+        if gray in glyphs:
+            return glyphs[gray]
+
+    def hue_gap(name: str) -> float:
+        _, c, h = _lch(_EMOJI_COLORS[name])
+        gap = abs(h - hue) % 360
+        return min(gap, 360 - gap) if c >= 12 else 999.0
+
+    return glyphs[min(glyphs, key=hue_gap)]
+
+
+def compose_symbols(sel: dict, i: int, bg: str | None = None) -> tuple[str, str]:
+    """Return (active_sym, inactive_sym) for palette slot i, whose tab color is bg."""
+    sel = {**DEFAULT_SYMBOLS, **sel}
+    marker_opt = _symbol_option(SYMBOL_MARKERS, sel["marker"])
+    if "match" in marker_opt and bg:
+        marker = matching_glyph(marker_opt, bg)
+    else:
+        marker = _glyph(marker_opt, i)
+    parts = [
+        _glyph(_symbol_option(SYMBOL_PREFIXES, sel["prefix"]), i),
+        marker,
+        _glyph(_symbol_option(SYMBOL_ARROWS, sel["arrow"]), i),
+    ]
+    parts = [p for p in parts if p]
+    active = " ".join(parts) + " " if parts else ""
+    inactive_opt = _symbol_option(SYMBOL_INACTIVE, sel["inactive"])
+    inactive = marker if inactive_opt["chars"] is None else _glyph(inactive_opt, i)
+    return active, (f" {inactive}" if inactive else "")
+
+
+def apply_symbols(t: dict, sel: dict | None) -> dict:
+    """Copy of theme t with its palette symbols replaced by selection sel."""
+    if not sel:
+        return t
+    palette = []
+    for i, p in enumerate(t.get("palette", [])):
+        active, inactive = compose_symbols(sel, i, p["bg"])
+        palette.append({**p, "active_sym": active, "inactive_sym": inactive})
+    return {**t, "palette": palette}
+
+
+def generate_lua_for_theme(t: dict, tab_title_len: int = 15, symbols: dict | None = None) -> str:
     """Produce Lua code for ~/.config/wezterm/tab_theme.lua.
-    
+
     Guarantees every theme applies 4-color cycling across all open tabs,
     and formats tab text with uniform fixed length (tab_title_len, default 15).
+    symbols, when set, overrides the theme's tab symbols (see compose_symbols)
+    and is recorded in a "-- Symbols:" header line so it can be read back.
     """
+    t = apply_symbols(t, symbols)
     style = t.get("style", "pills")
     use_fancy = t.get("use_fancy", True)
     bg_bar = t.get("bg_bar", "#15161c")
@@ -744,6 +960,7 @@ def generate_lua_for_theme(t: dict, tab_title_len: int = 15) -> str:
         f"-- Auto-generated by WezTerm Tab Theme Picker",
         f"-- Theme #{t['id']:02d}: {t['name']} ({t['category']})",
         f"-- Style: {style}",
+        *([f"-- Symbols: {json.dumps(symbols, ensure_ascii=False, sort_keys=True)}"] if symbols else []),
         f"",
         f"local M = {{}}",
         f"",
@@ -761,6 +978,13 @@ def generate_lua_for_theme(t: dict, tab_title_len: int = 15) -> str:
         f"    new_tab = {{ bg_color = '{bg_bar}', fg_color = '#64748b' }},",
         f"    new_tab_hover = {{ bg_color = '{palette[0]['bg']}', fg_color = '{palette[0]['fg']}' }},",
         f"  }}",
+        f"  -- The fancy tab bar paints its strip with the window frame colors, not",
+        f"  -- colors.tab_bar.background; keep them on the theme's bar color.",
+        f"  if config.use_fancy_tab_bar then",
+        f"    config.window_frame = config.window_frame or {{}}",
+        f"    config.window_frame.active_titlebar_bg = '{bg_bar}'",
+        f"    config.window_frame.inactive_titlebar_bg = '{bg_bar}'",
+        f"  end",
         f"",
         f"  local TAB_TITLE_LEN = {int(tab_title_len)}",
         f"",
@@ -836,13 +1060,13 @@ def generate_lua_for_theme(t: dict, tab_title_len: int = 15) -> str:
             f"      local next_c = palette[(next_tab.tab_index % #palette) + 1]",
             f"      next_bg = next_c.bg",
             f"    end",
-            f"    local sym = is_act and c.active_sym or c.inactive_sym",
+            f"    local text = is_act and (c.active_sym .. index) or (index .. c.inactive_sym)",
             f"    return wezterm.format {{",
             f"      {{ Background = {{ Color = c.bg }} }},",
             f"      {{ Foreground = {{ Color = c.fg }} }},",
             f"      {{ Attribute = {{ Intensity = is_act and 'Bold' or 'Normal' }} }},",
             f"      {{ Attribute = {{ Underline = is_act and 'Single' or 'None' }} }},",
-            f"      {{ Text = ' ' .. sym .. index .. ' ' .. label .. ' ' }},",
+            f"      {{ Text = ' ' .. text .. ' ' .. label .. ' ' }},",
             f"      {{ Background = {{ Color = next_bg }} }},",
             f"      {{ Foreground = {{ Color = c.bg }} }},",
             f"      {{ Text = '{sep}' }},",
@@ -966,6 +1190,87 @@ def generate_lua_for_theme(t: dict, tab_title_len: int = 15) -> str:
             f"      {{ Attribute = {{ Intensity = is_act and 'Bold' or 'Normal' }} }},",
             f"      {{ Attribute = {{ Underline = is_act and 'Single' or 'None' }} }},",
             f"      {{ Text = ' ' .. index .. ' ' .. label .. ' ✕ ' }},",
+            f"    }}",
+            f"  end)",
+        ])
+    elif style == "project_color":
+        lua.extend([
+            f"  -- Same hash as project_slot() in wezterm_tab_themes.py: a project keeps its color.",
+            f"  local function project_slot(name)",
+            f"    local h = 0",
+            f"    for i = 1, #name do",
+            f"      h = (h * 31 + name:byte(i)) % 2147483648",
+            f"    end",
+            f"    return (h % #palette) + 1",
+            f"  end",
+            f"",
+            f"  wezterm.on('format-tab-title', function(tab, tabs, panes, config, hover, max_width)",
+            f"    local index, label, process, dir = get_title_info(tab)",
+            f"    local is_act = tab.is_active",
+            f"    local c = palette[project_slot(dir)]",
+            f"    local text = is_act and (c.active_sym .. index) or (index .. c.inactive_sym)",
+            f"    return wezterm.format {{",
+            f"      {{ Background = {{ Color = c.bg }} }},",
+            f"      {{ Foreground = {{ Color = c.fg }} }},",
+            f"      {{ Attribute = {{ Intensity = is_act and 'Bold' or 'Normal' }} }},",
+            f"      {{ Attribute = {{ Underline = is_act and 'Single' or 'None' }} }},",
+            f"      {{ Text = ' ' .. text .. ' ' .. label .. ' ✕ ' }},",
+            f"    }}",
+            f"  end)",
+        ])
+    elif style == "activity":
+        alert = t.get("alert_color", "#fdd663")
+        lua.extend([
+            f"  -- Remote sessions keep ssh/shpool in the foreground forever; don't flag them busy.",
+            f"  local not_busy = {{ ssh = true, shpool = true, mosh = true, ['mosh-client'] = true }}",
+            f"",
+            f"  wezterm.on('format-tab-title', function(tab, tabs, panes, config, hover, max_width)",
+            f"    local index, label, process, dir = get_title_info(tab)",
+            f"    local is_act = tab.is_active",
+            f"    local c = palette[(tab.tab_index % #palette) + 1]",
+            f"    local items = {{",
+            f"      {{ Background = {{ Color = c.bg }} }},",
+            f"      {{ Foreground = {{ Color = c.fg }} }},",
+            f"      {{ Attribute = {{ Intensity = is_act and 'Bold' or 'Normal' }} }},",
+            f"      {{ Attribute = {{ Underline = is_act and 'Single' or 'None' }} }},",
+            f"      {{ Text = ' ' }},",
+            f"    }}",
+            f"    if not is_act and tab.active_pane.has_unseen_output then",
+            f"      table.insert(items, {{ Foreground = {{ Color = '{alert}' }} }})",
+            f"      table.insert(items, {{ Text = '● ' }})",
+            f"      table.insert(items, {{ Foreground = {{ Color = c.fg }} }})",
+            f"    end",
+            f"    if process ~= '' and not not_busy[process] then",
+            f"      table.insert(items, {{ Text = '⏳ ' }})",
+            f"    end",
+            f"    local text = is_act and (c.active_sym .. index) or (index .. c.inactive_sym)",
+            f"    table.insert(items, {{ Text = text .. ' ' .. label .. ' ✕ ' }})",
+            f"    return wezterm.format(items)",
+            f"  end)",
+        ])
+    elif style == "mono_accent":
+        muted_bg = t.get("muted_bg", "#303134")
+        muted_fg = t.get("muted_fg", "#9aa0a6")
+        lua.extend([
+            f"  wezterm.on('format-tab-title', function(tab, tabs, panes, config, hover, max_width)",
+            f"    local index, label, process, dir = get_title_info(tab)",
+            f"    local c = palette[(tab.tab_index % #palette) + 1]",
+            f"    if tab.is_active then",
+            f"      return wezterm.format {{",
+            f"        {{ Background = {{ Color = c.bg }} }},",
+            f"        {{ Foreground = {{ Color = c.fg }} }},",
+            f"        {{ Attribute = {{ Intensity = 'Bold' }} }},",
+            f"        {{ Text = ' ' .. c.active_sym .. index .. ' ' .. label .. ' ✕ ' }},",
+            f"      }}",
+            f"    end",
+            f"    return wezterm.format {{",
+            f"      {{ Background = {{ Color = '{muted_bg}' }} }},",
+            f"      {{ Foreground = {{ Color = c.bg }} }},",
+            f"      {{ Attribute = {{ Intensity = 'Bold' }} }},",
+            f"      {{ Text = ' ' .. index }},",
+            f"      {{ Attribute = {{ Intensity = 'Normal' }} }},",
+            f"      {{ Foreground = {{ Color = '{muted_fg}' }} }},",
+            f"      {{ Text = c.inactive_sym .. ' ' .. label .. ' ✕ ' }},",
             f"    }}",
             f"  end)",
         ])

@@ -157,6 +157,26 @@ python3 synth-shell-separator-picker.py --random               # Apply random se
 - **Live Preview:** Previews every separator combination with your actual active color scheme.
 - **Safe Config Merge:** Updates `separator_char` and `separator_char_end` cleanly while preserving all custom formatting options.
 
+## WezTerm Config (settings as data)
+
+`~/.config/wezterm/wezterm.lua` is a fixed loader: every preference lives in JSON next to it, so tools never regex-edit Lua.
+
+| File | Owner | Purpose |
+|------|-------|---------|
+| `wezterm.lua` | repo (`lib/wezterm.lua`) | Loader. Replaced on install — do not edit. |
+| `defaults.json` | repo (`lib/wezterm-defaults.json`) | Default fonts, tabs, colors, keys, mouse… Replaced on install. |
+| `settings.json` | you | Machine overrides, deep-merged over the defaults (objects merge, arrays replace). Never overwritten. |
+| `user.lua` | you | Optional code run last: `return function(config, wezterm, settings) … end`. |
+| `tab_theme.lua` | `wezterm-tab-theme` | Active tab bar theme module. |
+
+Example `settings.json` for a laptop running WezTerm on X11 with a smaller panel DPI:
+
+```json
+{ "display": { "use_x11": true, "dpi_by_screen": { "eDP-1": 216 } } }
+```
+
+`display.use_x11` also picks the window decorations (GNOME title bar on X11, integrated buttons on Wayland). Set it back to `false` if X11 windows stop appearing — that means XWayland is broken until the next GNOME login. Options with no dedicated setting go under `"extra": { "option_name": value }`. A broken `settings.json` is logged and ignored, so WezTerm falls back to the defaults. `install-wezterm.sh` and module 08 deploy through `lib/wezterm-deploy.sh`, which backs up a hand-written `wezterm.lua` before switching it to the loader.
+
 ## WezTerm Tab Bar Theme Picker
 
 An interactive terminal tool with live Truecolor previews to browse and apply 60 high-definition visual themes for the WezTerm tab bar — with instant hot-reloading without restarting panes or sessions.
@@ -212,7 +232,9 @@ wezterm-tab-theme --restore [INDEX]    # Restore previous backup (default: 1 = m
 ├── wezterm-tab-color-preview.html  # Interactive HTML gallery for tab themes
 ├── lib/
 │   ├── common.sh                   # Shared functions (logging, progress, apt helpers)
-│   ├── wezterm.lua                 # WezTerm terminal config (deployed by module 08)
+│   ├── wezterm.lua                 # WezTerm loader: reads defaults.json + settings.json
+│   ├── wezterm-defaults.json       # WezTerm default settings (fonts, tabs, keys, mouse…)
+│   ├── wezterm-deploy.sh           # Installs loader + defaults, keeps user settings
 │   ├── wezterm_tab_themes.py       # 60 Tab bar themes registry & Lua code generator
 │   ├── wezterm_tab_theme.lua       # Active tab bar theme (generated)
 │   ├── synth-shell-theme-picker.sh # Shell helper for theme selection during setup

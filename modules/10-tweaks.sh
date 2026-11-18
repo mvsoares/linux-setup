@@ -100,6 +100,38 @@ if [[ -f /etc/NetworkManager/conf.d/default-wifi-powersave-on.conf ]]; then
     tick "Wi-Fi power saving disabled for lower latency"
 fi
 
+# ── Network: TCP BBR + fq, no slow-start after idle ──────────────────────────
+if grep -qw bbr /proc/sys/net/ipv4/tcp_available_congestion_control 2>/dev/null \
+    || modprobe tcp_bbr >> "$LOG_FILE" 2>&1; then
+    echo tcp_bbr > /etc/modules-load.d/tcp_bbr.conf
+    cat > /etc/sysctl.d/99-network-tuning.conf << 'NET_EOF'
+net.core.default_qdisc = fq
+net.ipv4.tcp_congestion_control = bbr
+net.ipv4.tcp_slow_start_after_idle = 0
+NET_EOF
+    sysctl -p /etc/sysctl.d/99-network-tuning.conf >> "$LOG_FILE" 2>&1 || true
+    ok "TCP BBR + fq enabled"
+    tick "Network: TCP BBR + fq, slow-start after idle off"
+fi
+
+# ── USB-C dock: keep Thunderbolt xHCI always on (no runtime PM) ──────────────
+# Wavlink/DisplayLink dock hangs off the Tiger Lake TB4 xHCI (00:0d.0).
+if lspci -s 00:0d.0 2>/dev/null | grep -qi 'Thunderbolt.*USB Controller'; then
+    if [[ -d /etc/tlp.d ]]; then
+        cat > /etc/tlp.d/02-usbc-dock.conf << 'TLPDOCK_EOF'
+# Never runtime-suspend the Thunderbolt USB controller the dock sits on.
+RUNTIME_PM_DENYLIST="00:0d.0"
+TLPDOCK_EOF
+        tlp start >> "$LOG_FILE" 2>&1 || true
+    else
+        cat > /etc/udev/rules.d/60-usbc-dock-pm.rules << 'UDEVDOCK_EOF'
+ACTION=="add", SUBSYSTEM=="pci", KERNEL=="0000:00:0d.0", ATTR{power/control}="on"
+UDEVDOCK_EOF
+    fi
+    echo on > /sys/bus/pci/devices/0000:00:0d.0/power/control 2>/dev/null || true
+    tick "USB-C dock controller: runtime PM disabled"
+fi
+
 # ── NuPhy & QMK/VIA Keyboards: WebHID udev rules ──────────────────────────────
 cat > /etc/udev/rules.d/50-nuphy.rules << 'NUPHY_EOF'
 # NuPhy keyboards & dongles (QMK/VIA / WebHID)

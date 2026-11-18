@@ -96,30 +96,10 @@ WEZWRAP
 fi
 
 # ── Deploy config ────────────────────────────────────────────────────────────
-WEZTERM_CFG="${USER_HOME}/.config/wezterm/wezterm.lua"
-SRC_CFG="${SCRIPT_DIR}/lib/wezterm.lua"
-
-if [[ ! -f "$SRC_CFG" ]]; then
-    fail "Config source not found: ${SRC_CFG}"
-fi
-
-if [[ -f "$WEZTERM_CFG" ]]; then
-    if diff -q "$SRC_CFG" "$WEZTERM_CFG" &>/dev/null; then
-        ok "WezTerm config already up to date"
-    else
-        # Back up existing config before overwriting
-        cp "$WEZTERM_CFG" "${WEZTERM_CFG}.bak.$(date +%Y%m%d-%H%M%S)"
-        cp "$SRC_CFG" "$WEZTERM_CFG"
-        chown "$REAL_USER:$REAL_GROUP" "$WEZTERM_CFG"
-        ok "WezTerm config updated (backup saved as .bak.*)"
-    fi
-else
-    info "Deploying WezTerm config..."
-    install -d -o "$REAL_USER" -g "$REAL_GROUP" "$(dirname "$WEZTERM_CFG")"
-    cp "$SRC_CFG" "$WEZTERM_CFG"
-    chown "$REAL_USER:$REAL_GROUP" "$WEZTERM_CFG"
-    ok "WezTerm config deployed"
-fi
+# Loader + defaults are repo-owned; settings.json/user.lua stay untouched.
+bash "${SCRIPT_DIR}/lib/wezterm-deploy.sh" "$USER_HOME" "$REAL_USER:$REAL_GROUP" \
+    || fail "WezTerm config deploy failed"
+ok "WezTerm config deployed (preferences in ~/.config/wezterm/settings.json)"
 
 # ── Bash hook for process name in tab titles ─────────────────────────────────
 BASHRC="${USER_HOME}/.bashrc"
