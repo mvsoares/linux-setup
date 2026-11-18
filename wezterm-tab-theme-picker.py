@@ -38,12 +38,13 @@ from wezterm_tab_themes import (
 
 CONFIG_DIR = Path.home() / ".config" / "wezterm"
 CONFIG_FILE = CONFIG_DIR / "wezterm.lua"
+SETTINGS_FILE = CONFIG_DIR / "settings.json"
 THEME_FILE = CONFIG_DIR / "tab_theme.lua"
 REPO_THEME_FILE = SCRIPT_DIR / "lib" / "wezterm_tab_theme.lua"
 BACKUP_DIR = CONFIG_DIR / "backups"
 MAX_AUTO_BACKUPS = 20
 HTML_PATH = SCRIPT_DIR / "wezterm-tab-color-preview.html"
-TMP_HTML_PATH = Path("/home/mvsoares/tmp/catalogo_interativo.html")
+TMP_HTML_PATH = Path.home() / "tmp" / "catalogo_interativo.html"
 
 RESET = "\033[0m"
 BOLD = "\033[1m"
@@ -94,45 +95,111 @@ def visible_len(s: str) -> int:
 
 
 def detect_current_theme_id() -> int:
-    """Read active theme ID from tab_theme.lua if present, default to 10."""
-    if not THEME_FILE.exists():
-        return 10
-    try:
-        content = THEME_FILE.read_text(encoding="utf-8")
-        m = re.search(r"-- Theme #(\d+):", content)
-        if m:
-            return int(m.group(1))
-    except Exception:
-        pass
+    """Read active theme ID from tab_theme.lua if present, or settings.json, default to 10."""
+    if THEME_FILE.exists():
+        try:
+            content = THEME_FILE.read_text(encoding="utf-8")
+            m = re.search(r"-- Theme #(\d+):", content)
+            if m:
+                return int(m.group(1))
+        except Exception:
+            pass
+    if SETTINGS_FILE.exists():
+        try:
+            data = json.loads(SETTINGS_FILE.read_text(encoding="utf-8"))
+            if isinstance(data, dict) and "tabs" in data and isinstance(data["tabs"], dict):
+                tid = data["tabs"].get("theme_id")
+                if isinstance(tid, int):
+                    return tid
+        except Exception:
+            pass
     return 10
 
 
 def detect_current_tab_title_len() -> int:
-    """Read TAB_TITLE_LEN from tab_theme.lua if present, default to 15."""
-    if not THEME_FILE.exists():
-        return 15
-    try:
-        content = THEME_FILE.read_text(encoding="utf-8")
-        m = re.search(r"TAB_TITLE_LEN\s*=\s*(\d+)", content)
-        if m:
-            return int(m.group(1))
-    except Exception:
-        pass
+    """Read TAB_TITLE_LEN from tab_theme.lua if present, or settings.json, default to 15."""
+    if THEME_FILE.exists():
+        try:
+            content = THEME_FILE.read_text(encoding="utf-8")
+            m = re.search(r"TAB_TITLE_LEN\s*=\s*(\d+)", content)
+            if m:
+                return int(m.group(1))
+        except Exception:
+            pass
+    if SETTINGS_FILE.exists():
+        try:
+            data = json.loads(SETTINGS_FILE.read_text(encoding="utf-8"))
+            if isinstance(data, dict) and "tabs" in data and isinstance(data["tabs"], dict):
+                tlen = data["tabs"].get("tab_title_len")
+                if isinstance(tlen, int):
+                    return tlen
+        except Exception:
+            pass
     return 15
 
 
 def detect_current_symbols() -> dict | None:
-    """Read the custom symbol selection from tab_theme.lua (None = theme default)."""
-    if not THEME_FILE.exists():
-        return None
-    try:
-        content = THEME_FILE.read_text(encoding="utf-8")
-        m = re.search(r"^-- Symbols: (\{.*\})$", content, re.MULTILINE)
-        if m:
-            return json.loads(m.group(1))
-    except Exception:
-        pass
+    """Read custom symbol selection from tab_theme.lua or settings.json (None = theme default)."""
+    if THEME_FILE.exists():
+        try:
+            content = THEME_FILE.read_text(encoding="utf-8")
+            m = re.search(r"^-- Symbols: (\{.*\})$", content, re.MULTILINE)
+            if m:
+                return json.loads(m.group(1))
+        except Exception:
+            pass
+    if SETTINGS_FILE.exists():
+        try:
+            data = json.loads(SETTINGS_FILE.read_text(encoding="utf-8"))
+            if isinstance(data, dict) and "tabs" in data and isinstance(data["tabs"], dict):
+                syms = data["tabs"].get("symbols")
+                if isinstance(syms, dict):
+                    return syms
+        except Exception:
+            pass
     return None
+
+
+def sync_settings_tabs(theme_id: int | None = None, tab_title_len: int | None = None, symbols: dict | None = None) -> bool:
+    """Sync active tab theme settings into ~/.config/wezterm/settings.json."""
+    data = {}
+    if SETTINGS_FILE.exists():
+        try:
+            raw = SETTINGS_FILE.read_text(encoding="utf-8").strip()
+            if raw:
+                data = json.loads(raw)
+            if not isinstance(data, dict):
+                data = {}
+        except Exception:
+            data = {}
+
+    tabs = data.setdefault("tabs", {})
+    if not isinstance(tabs, dict):
+        tabs = {}
+        data["tabs"] = tabs
+
+    changed = False
+    if theme_id is not None and tabs.get("theme_id") != theme_id:
+        tabs["theme_id"] = theme_id
+        changed = True
+    if tab_title_len is not None and tabs.get("tab_title_len") != tab_title_len:
+        tabs["tab_title_len"] = tab_title_len
+        changed = True
+    if symbols is not None and tabs.get("symbols") != symbols:
+        tabs["symbols"] = symbols
+        changed = True
+    elif symbols is None and "symbols" in tabs:
+        tabs.pop("symbols", None)
+        changed = True
+
+    if changed:
+        try:
+            CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+            SETTINGS_FILE.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+            return True
+        except Exception:
+            pass
+    return False
 
 
 def backup_current_config(label: str = None) -> Path | None:
@@ -189,6 +256,10 @@ def validate_config(config_path: Path) -> str | None:
 
 def validate_theme_lua(lua_code: str) -> str | None:
     """Check a generated tab_theme.lua on its own, before WezTerm ever sees it."""
+    # Strict anti-regression check: never allow invalid config keys
+    if "show_tab_index_in_tab_title" in lua_code:
+        return "Configuração contém chave inválida 'show_tab_index_in_tab_title'; use 'show_tab_index_in_tab_bar'."
+
     with tempfile.TemporaryDirectory() as tmp:
         theme_path = Path(tmp) / "tab_theme.lua"
         theme_path.write_text(lua_code, encoding="utf-8")
@@ -288,6 +359,12 @@ def restore_backup(target_spec: str | int = 1) -> tuple[bool, str]:
         if error:
             return False, f"O WezTerm rejeitou esse backup; a configuração atual foi mantida. {error.strip().splitlines()[-1][:160]}"
 
+        sync_settings_tabs(
+            theme_id=detect_current_theme_id(),
+            tab_title_len=detect_current_tab_title_len(),
+            symbols=detect_current_symbols(),
+        )
+
         idx_display = backups.index(selected) + 1
         return True, f"Backup [{idx_display}] ({selected['theme_info']} - {selected['date_str']}) restaurado com sucesso!"
     except Exception as e:
@@ -346,6 +423,10 @@ def install_theme_lua(lua_code: str) -> str | None:
     The module is checked on its own first, then the full config is loaded with
     it in place; if that fails the previous tab_theme.lua is put back.
     """
+    # Proactive auto-healing: sanitize any legacy or deprecated keys before anything touches disk or validation
+    if "show_tab_index_in_tab_title" in lua_code:
+        lua_code = lua_code.replace("show_tab_index_in_tab_title", "show_tab_index_in_tab_bar")
+
     error = validate_theme_lua(lua_code)
     if error:
         return error
@@ -385,7 +466,11 @@ def apply_theme(theme: dict, tab_title_len: int = None, symbols=_KEEP) -> tuple[
     bkp_path = backup_current_config()
 
     lua_code = generate_lua_for_theme(theme, tab_title_len=tab_title_len, symbols=symbols)
+    if "show_tab_index_in_tab_title" in lua_code:
+        lua_code = lua_code.replace("show_tab_index_in_tab_title", "show_tab_index_in_tab_bar")
     error = install_theme_lua(lua_code)
+    if error is None:
+        sync_settings_tabs(theme_id=theme["id"], tab_title_len=tab_title_len, symbols=symbols)
     return (error is None, bkp_path, error)
 
 
@@ -656,7 +741,6 @@ def interactive_picker(themes: list[dict], initial_filter: str = ""):
     """Clear, uncluttered interactive TUI picker."""
     filter_query = initial_filter
     page = 0
-    page_size = 5
     status_msg = ""
 
     while True:
@@ -668,13 +752,30 @@ def interactive_picker(themes: list[dict], initial_filter: str = ""):
         cur_len = detect_current_tab_title_len()
         cur_syms = detect_current_symbols()
 
-        # Filter items
+        # Dynamic page size based on current terminal height
+        term_lines = shutil.get_terminal_size((80, 24)).lines
+        overhead = 21 if filter_query else 18
+        page_size = max(2, min(8, (term_lines - overhead) // 6))
+
+        # Filter items (matches name, category, description, style, or numeric ID)
         filtered = themes
         if filter_query:
-            q = filter_query.lower()
+            q = filter_query.lower().strip()
+            num_match = None
+            if q.startswith("#") and q[1:].isdigit():
+                num_match = int(q[1:])
+            elif q.isdigit():
+                num_match = int(q)
+
             filtered = [
                 t for t in themes
-                if q in t["name"].lower() or q in t["category"].lower() or q == str(t["id"])
+                if (
+                    (num_match is not None and t["id"] == num_match)
+                    or q in t["name"].lower()
+                    or q in t["category"].lower()
+                    or q in t.get("description", "").lower()
+                    or q in t.get("style", "").lower()
+                )
             ]
 
         total_pages = max((len(filtered) + page_size - 1) // page_size, 1)

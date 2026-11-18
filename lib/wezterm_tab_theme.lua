@@ -19,6 +19,13 @@ function M.apply(config, wezterm)
     new_tab = { bg_color = '#181818', fg_color = '#64748b' },
     new_tab_hover = { bg_color = '#007acc', fg_color = '#ffffff' },
   }
+  -- The fancy tab bar paints its strip with the window frame colors, not
+  -- colors.tab_bar.background; keep them on the theme's bar color.
+  if config.use_fancy_tab_bar then
+    config.window_frame = config.window_frame or {}
+    config.window_frame.active_titlebar_bg = '#181818'
+    config.window_frame.inactive_titlebar_bg = '#181818'
+  end
 
   local TAB_TITLE_LEN = 15
 

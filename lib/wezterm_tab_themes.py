@@ -760,10 +760,11 @@ def get_theme_by_id(theme_id: int) -> dict | None:
     return None
 
 def find_theme(query: str) -> dict | None:
-    """Find a theme by numeric ID (e.g. '10', '01') or name substring."""
+    """Find a theme by numeric ID (e.g. '10', '#10', '01') or name substring."""
     q = query.strip()
-    if q.isdigit():
-        return get_theme_by_id(int(q))
+    q_num = q.lstrip("#").strip()
+    if q_num.isdigit():
+        return get_theme_by_id(int(q_num))
     q_lower = q.lower()
     for t in THEMES:
         if t["name"].lower() == q_lower:
