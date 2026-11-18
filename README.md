@@ -157,6 +157,47 @@ python3 synth-shell-separator-picker.py --random               # Apply random se
 - **Live Preview:** Previews every separator combination with your actual active color scheme.
 - **Safe Config Merge:** Updates `separator_char` and `separator_char_end` cleanly while preserving all custom formatting options.
 
+## WezTerm Tab Bar Theme Picker
+
+An interactive terminal tool with live Truecolor previews to browse and apply 60 high-definition visual themes for the WezTerm tab bar — with instant hot-reloading without restarting panes or sessions.
+
+```bash
+# Global command (available anywhere in PATH)
+wezterm-tab-theme
+
+# Or run the script directly
+./wezterm-tab-theme-picker.sh
+python3 wezterm-tab-theme-picker.py
+
+# CLI options
+wezterm-tab-theme --list               # List all 60 themes categorized with color swatches
+wezterm-tab-theme --current            # Show active tab bar theme and current tab title length
+wezterm-tab-theme --tab-len 15         # Set uniform fixed width for all tabs (e.g. 15 chars)
+wezterm-tab-theme --set 31             # Apply by ID (1-60) or slug (e.g. cyberpunk-edgerunners)
+wezterm-tab-theme --set 10 -t 12       # Apply theme with custom fixed tab width
+wezterm-tab-theme --random             # Apply a random theme
+wezterm-tab-theme --filter synth       # Filter themes interactively
+wezterm-tab-theme --web                # Open interactive HTML visual gallery in browser
+wezterm-tab-theme --backup [NAME]      # Save a backup snapshot of current tab configuration
+wezterm-tab-theme --backups            # List all saved backups with index, timestamp and theme
+wezterm-tab-theme --restore [INDEX]    # Restore previous backup (default: 1 = most recent)
+```
+
+**Key Features:**
+- **60 Distinct Themes Across 6 Curated Categories:**
+  1. **Google & Material (#01 - #10):** Soft Pastels, Material You Floating Pills, Chrome Dark, Minimal Color Dots, Underline Accent, Badge Chips, Cloud Ops, Glass Surface, Android 14 Monet, Chrome Clean Original.
+  2. **Powerline & Geometrias (#11 - #20):** Classic Arrow (``), Rounded Bubble (``/``), Slanted (``), Flame (``), Chevron (``), Hexagon (``), Sine Wave (``), Trapezoid Notch (``), Pixel 8-Bit (``), Diagonal Slash (`╱`).
+  3. **Paletas Populares Devs (#21 - #30):** Monokai Vivid Match, Catppuccin Mocha, Tokyo Night Storm, Nord Frost Arctic, Dracula Punch, Gruvbox Dark Warm, One Dark Pro Atom, Rosé Pine Moon, GitHub Dark Dimmed, VS Code Modern Dark.
+  4. **Synth & Cyberpunk (#31 - #40):** Cyberpunk Edgerunners, Miami Vice 80s, Neon Genesis Evangelion, Synthwave Pink Glow, Horizon Synth, Cyberdream Matrix, Andromeda Galaxy, Midnight Amethyst, Vaporwave Sunset, Bioluminescence Deep.
+  5. **Natureza & Tons Terrosos (#41 - #50):** Everforest Dark, Kanagawa Wave, Sakura Blossom, Matcha Cream Latte, Desert Dunes, Emerald Forest, Volcanic Magma, Glacier Mint Ice, Mocha Caramel Warm, Zen Garden Stone.
+  6. **Minimalista, Badges & CRT (#51 - #60):** Left Accent Bar (`▌`), Top Neon Highlight, Borderless Ghost, Outline Neon Frame, macOS Sonoma Dark, Compact Micro Bar, Smart Process & Git Context, Number Circle Badges (`❶ ❷`), Status Pulse Dots (`🟢 🟡`), Retro Terminal Amber CRT.
+- **Uniform Tab Width (Strict Size Limiting & Padding):** All tabs maintain identical, balanced width (default: 15 characters). Long directory/process titles are cleanly truncated with ellipsis (`…`) and shorter titles are automatically padded with spaces (`wezterm.pad_right`). Customizable on-the-fly via `--tab-len <N>` or interactive command `len <N>`.
+- **Instant Hot-Reload:** Generates self-contained Lua module `~/.config/wezterm/tab_theme.lua`. WezTerm hot-reloads within 0.1s via inotify.
+- **Fail-Safe Fallback:** If no theme file is present, WezTerm gracefully defaults to the Google 4-color cycling tab styling.
+- **Automatic & Manual Backups:** Automatically creates dated snapshots before any theme change. Create manual labeled snapshots with `--backup <NOME>` or pressing `[b]` in the interactive menu.
+- **One-Click Restore / Undo:** Undo theme changes anytime with `wezterm-tab-theme --restore` or pressing `[u]` in the interactive TUI.
+- **Interactive TUI & Web Gallery:** ANSI Truecolor terminal cards + interactive HTML gallery (`wezterm-tab-color-preview.html`).
+
 ## Project Structure
 
 ```
@@ -166,9 +207,14 @@ python3 synth-shell-separator-picker.py --random               # Apply random se
 ├── synth-shell-theme-picker.py     # Interactive terminal theme picker (64 themes)
 ├── synth-shell-separator-picker.py # Interactive Powerline & Nerd Font separator editor
 ├── synth-shell-color-preview.html  # Browser-based theme gallery
+├── wezterm-tab-theme-picker.py     # Interactive WezTerm tab theme picker (60 themes)
+├── wezterm-tab-theme-picker.sh     # Wrapper script (symlinked to ~/.local/bin/wezterm-tab-theme)
+├── wezterm-tab-color-preview.html  # Interactive HTML gallery for tab themes
 ├── lib/
 │   ├── common.sh                   # Shared functions (logging, progress, apt helpers)
 │   ├── wezterm.lua                 # WezTerm terminal config (deployed by module 08)
+│   ├── wezterm_tab_themes.py       # 60 Tab bar themes registry & Lua code generator
+│   ├── wezterm_tab_theme.lua       # Active tab bar theme (generated)
 │   ├── synth-shell-theme-picker.sh # Shell helper for theme selection during setup
 │   └── synth-shell-themes/         # 64 prompt color theme .conf files
 └── modules/

@@ -306,6 +306,163 @@ if old_code in content:
     p.write_text(content)
 " 2>/dev/null && ok "synth-shell dual separator support enabled"
     fi
+
+    # 4. Patch getColorCode / getBackgroundCode for 256-color parity with theme picker
+    for _synth_file in "$SYNTH_DIR"/synth-shell-prompt.sh "$SYNTH_DIR"/alias.sh "$SYNTH_DIR"/better-ls.sh "$SYNTH_DIR"/better-history.sh; do
+        [[ -f "$_synth_file" ]] || continue
+        if grep -q 'COLORCODE=\$((\$BITCODE + 30))' "$_synth_file" 2>/dev/null; then
+            python3 -c "
+from pathlib import Path
+p = Path('$_synth_file')
+content = p.read_text()
+old_codes = '''getColorCode()
+{
+	COLOR=\$1
+	## Check if color is a 256-color code
+	if [ \$COLOR -eq \$COLOR ] 2> /dev/null; then
+		if [ \$COLOR -gt 0 -a \$COLOR -lt 256 ]; then
+			echo \"38;5;\$COLOR\"
+		else
+			echo 0
+		fi
+	## Or if color key-workd
+	else
+		BITCODE=\$(get8bitCode \$COLOR)
+		COLORCODE=\$((\$BITCODE + 30))
+		echo \$COLORCODE
+	fi
+}
+##------------------------------------------------------------------------------
+##
+getBackgroundCode()
+{
+	COLOR=\$1
+	## Check if color is a 256-color code
+	if [ \$COLOR -eq \$COLOR ] 2> /dev/null; then
+		if [ \$COLOR -gt 0 -a \$COLOR -lt 256 ]; then
+			echo \"48;5;\$COLOR\"
+		else
+			echo 0
+		fi
+	## Or if color key-workd
+	else
+		BITCODE=\$(get8bitCode \$COLOR)
+		COLORCODE=\$((\$BITCODE + 40))
+		echo \$COLORCODE
+	fi
+}'''
+
+# Also handle variant without ## comments (alias.sh, better-ls.sh, better-history.sh)
+old_codes_short = '''getColorCode()
+{
+	COLOR=\$1
+	if [ \$COLOR -eq \$COLOR ] 2> /dev/null; then
+		if [ \$COLOR -gt 0 -a \$COLOR -lt 256 ]; then
+			echo \"38;5;\$COLOR\"
+		else
+			echo 0
+		fi
+	else
+		BITCODE=\$(get8bitCode \$COLOR)
+		COLORCODE=\$((\$BITCODE + 30))
+		echo \$COLORCODE
+	fi
+}
+getBackgroundCode()
+{
+	COLOR=\$1
+	if [ \$COLOR -eq \$COLOR ] 2> /dev/null; then
+		if [ \$COLOR -gt 0 -a \$COLOR -lt 256 ]; then
+			echo \"48;5;\$COLOR\"
+		else
+			echo 0
+		fi
+	else
+		BITCODE=\$(get8bitCode \$COLOR)
+		COLORCODE=\$((\$BITCODE + 40))
+		echo \$COLORCODE
+	fi
+}'''
+
+new_codes = '''getColorCode()
+{
+	local COLOR=\$1
+	if [ -z \"\$COLOR\" ]; then
+		echo 39
+		return
+	fi
+	if [ \"\$COLOR\" -eq \"\$COLOR\" ] 2> /dev/null; then
+		if [ \"\$COLOR\" -ge 0 -a \"\$COLOR\" -lt 256 ]; then
+			echo \"38;5;\$COLOR\"
+		else
+			echo 39
+		fi
+	else
+		case \$COLOR in
+			black)        echo \"38;5;0\" ;;
+			red)          echo \"38;5;1\" ;;
+			green)        echo \"38;5;2\" ;;
+			yellow)       echo \"38;5;3\" ;;
+			blue)         echo \"38;5;4\" ;;
+			purple|magenta|pink) echo \"38;5;5\" ;;
+			cyan)         echo \"38;5;6\" ;;
+			light-gray)   echo \"38;5;7\" ;;
+			dark-gray)    echo \"38;5;8\" ;;
+			light-red)    echo \"38;5;9\" ;;
+			light-green)  echo \"38;5;10\" ;;
+			light-yellow) echo \"38;5;11\" ;;
+			light-blue)   echo \"38;5;12\" ;;
+			light-purple|light-magenta) echo \"38;5;13\" ;;
+			light-cyan)   echo \"38;5;14\" ;;
+			white)        echo \"38;5;15\" ;;
+			none|transparent|default) echo \"39\" ;;
+			*) echo \"39\" ;;
+		esac
+	fi
+}
+getBackgroundCode()
+{
+	local COLOR=\$1
+	if [ -z \"\$COLOR\" ]; then
+		echo 49
+		return
+	fi
+	if [ \"\$COLOR\" -eq \"\$COLOR\" ] 2> /dev/null; then
+		if [ \"\$COLOR\" -ge 0 -a \"\$COLOR\" -lt 256 ]; then
+			echo \"48;5;\$COLOR\"
+		else
+			echo 49
+		fi
+	else
+		case \$COLOR in
+			black)        echo \"48;5;0\" ;;
+			red)          echo \"48;5;1\" ;;
+			green)        echo \"48;5;2\" ;;
+			yellow)       echo \"48;5;3\" ;;
+			blue)         echo \"48;5;4\" ;;
+			purple|magenta|pink) echo \"48;5;5\" ;;
+			cyan)         echo \"48;5;6\" ;;
+			light-gray)   echo \"48;5;7\" ;;
+			dark-gray)    echo \"48;5;8\" ;;
+			light-red)    echo \"48;5;9\" ;;
+			light-green)  echo \"48;5;10\" ;;
+			light-yellow) echo \"48;5;11\" ;;
+			light-blue)   echo \"48;5;12\" ;;
+			light-purple|light-magenta) echo \"48;5;13\" ;;
+			light-cyan)   echo \"48;5;14\" ;;
+			white)        echo \"48;5;15\" ;;
+			none|transparent|default) echo \"49\" ;;
+			*) echo \"49\" ;;
+		esac
+	fi
+}'''
+if old_codes in content:
+    p.write_text(content.replace(old_codes, new_codes))
+elif old_codes_short in content:
+    p.write_text(content.replace(old_codes_short, new_codes))
+" 2>/dev/null && ok "synth-shell 256-color parity patched ($(basename "$_synth_file"))"
+        fi
+    done
 fi
 
 if [[ -f "$SYNTH_CFG" ]]; then
