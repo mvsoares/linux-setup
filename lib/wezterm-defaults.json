@@ -81,6 +81,8 @@
   },
   "hyperlinks": {
     "include_defaults": true,
+    "open_in_editor": true,
+    "editor": "",
     "extra": [
       {
         "regex": "\\b((?:[\\w-]+\\.)+(?:com|org|net|io|dev|rs|sh|app|co)(?::\\d+)?(?:/[^\\s]*)?)\\b",
@@ -89,6 +91,18 @@
       {
         "regex": "\\b(?:https?://)?(localhost|127\\.0\\.0\\.1)(:\\d+)?\\b",
         "format": "http://$1$2"
+      },
+      {
+        "regex": "\\b([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+)#(\\d+)\\b",
+        "format": "https://github.com/$1/$2/issues/$3"
+      },
+      {
+        "regex": "\\b((?:[A-Za-z0-9_.-]+/)*[A-Za-z0-9_.-]+\\.(?:py|rs|lua|js|ts|tsx|jsx|go|c|cc|cpp|h|hpp|java|kt|rb|sh|zsh|json|ya?ml|toml|md|html|css|sql)):(\\d+)(?::\\d+)?\\b",
+        "format": "editfile://$1:$2"
+      },
+      {
+        "regex": "((?:/[A-Za-z0-9_.-]|\\.\\.?/)[A-Za-z0-9_./-]*\\.[A-Za-z0-9]{1,8}):(\\d+)(?::\\d+)?\\b",
+        "format": "editfile://$1:$2"
       }
     ]
   },
@@ -100,10 +114,10 @@
     "bindings": [
       { "key": "d", "mods": "SUPER", "action": { "SplitHorizontal": { "domain": "CurrentPaneDomain" } } },
       { "key": "D", "mods": "SUPER", "action": { "SplitVertical": { "domain": "CurrentPaneDomain" } } },
-      { "key": "h", "mods": "SUPER|CTRL", "action": { "ActivatePaneDirection": "Left" } },
-      { "key": "l", "mods": "SUPER|CTRL", "action": { "ActivatePaneDirection": "Right" } },
-      { "key": "k", "mods": "SUPER|CTRL", "action": { "ActivatePaneDirection": "Up" } },
-      { "key": "j", "mods": "SUPER|CTRL", "action": { "ActivatePaneDirection": "Down" } },
+      { "key": "h", "mods": "SUPER|CTRL", "action": { "SmartActivatePaneDirection": { "direction": "Left", "key": "h", "mods": "SUPER|CTRL" } } },
+      { "key": "l", "mods": "SUPER|CTRL", "action": { "SmartActivatePaneDirection": { "direction": "Right", "key": "l", "mods": "SUPER|CTRL" } } },
+      { "key": "k", "mods": "SUPER|CTRL", "action": { "SmartActivatePaneDirection": { "direction": "Up", "key": "k", "mods": "SUPER|CTRL" } } },
+      { "key": "j", "mods": "SUPER|CTRL", "action": { "SmartActivatePaneDirection": { "direction": "Down", "key": "j", "mods": "SUPER|CTRL" } } },
       { "key": "w", "mods": "SUPER", "action": { "CloseCurrentPane": { "confirm": false } } },
       { "key": "t", "mods": "SUPER", "action": { "SpawnTab": "CurrentPaneDomain" } },
       { "key": "[", "mods": "SUPER", "action": { "ActivateTabRelative": -1 } },
@@ -125,6 +139,7 @@
       { "key": "w", "mods": "LEADER", "action": { "ShowLauncherArgs": { "flags": "FUZZY|WORKSPACES|TABS|DOMAINS" } } },
       { "key": ",", "mods": "LEADER", "action": "RenameTab" },
       { "key": "e", "mods": "LEADER", "action": "EditLastOutput" },
+      { "key": "o", "mods": "LEADER", "action": "OpenUrlQuickSelect" },
       { "key": "g", "mods": "LEADER", "action": { "QuickSelectArgs": { "patterns": [
           "[0-9a-f]{7,40}",
           "[A-Z][A-Z0-9]+-[0-9]+",

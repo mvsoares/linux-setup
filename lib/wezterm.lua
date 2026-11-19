@@ -139,7 +139,11 @@ local custom_actions = {
       end
       fh:write(text)
       fh:close()
-      local editor = os.getenv('EDITOR') or os.getenv('VISUAL') or 'nvim'
+      local h_cfg = section('hyperlinks')
+      local editor = (h_cfg.editor and h_cfg.editor ~= '' and h_cfg.editor)
+        or os.getenv('EDITOR')
+        or os.getenv('VISUAL')
+        or 'nvim'
       window:perform_action(
         act.SpawnCommandInNewTab {
           args = { 'sh', '-c', editor .. ' "$1"; rm -f "$1"', 'sh', path },
@@ -147,6 +151,21 @@ local custom_actions = {
         pane
       )
     end)
+  end,
+  OpenUrlQuickSelect = function()
+    return act.QuickSelectArgs {
+      label = 'open url',
+      patterns = {
+        'https?://\\S+',
+      },
+      action = wezterm.action_callback(function(window, pane)
+        local url = window:get_selection_text_for_pane(pane)
+        if url and url ~= '' then
+          url = url:gsub('[.,;:%)%]>\"\']+$', '')
+          wezterm.open_with(url)
+        end
+      end),
+    }
   end,
 }
 
@@ -165,6 +184,19 @@ local function action(spec)
       list[i] = action(a)
     end
     return act.Multiple(list)
+  end
+  if name == 'SmartActivatePaneDirection' then
+    return wezterm.action_callback(function(window, pane)
+      local ok_uv, uv = pcall(function()
+        return pane:get_user_vars()
+      end)
+      local is_nvim = ok_uv and type(uv) == 'table' and (uv.IS_NVIM == 'true' or uv.IS_NVIM == true)
+      if is_nvim then
+        window:perform_action(act.SendKey { key = args.key, mods = args.mods }, pane)
+      else
+        window:perform_action(act.ActivatePaneDirection(args.direction), pane)
+      end
+    end)
   end
   return act[name](args)
 end
@@ -514,7 +546,7 @@ if st.enabled then
         table.insert(elements, { Foreground = { Color = badge.fg } })
         table.insert(elements, { Attribute = { Intensity = 'Bold' } })
         table.insert(elements, { Text = badge.text })
-        table.insert(elements, { ResetAttributes = {} })
+        table.insert(elements, 'ResetAttributes')
       end
     end
 
@@ -554,6 +586,52 @@ if h.include_defaults ~= false or h.extra then
   for _, rule in ipairs(h.extra or {}) do
     table.insert(config.hyperlink_rules, rule)
   end
+end
+
+if h.open_in_editor ~= false then
+  local function build_editor_args(ed, file_path, line_num)
+    local base = (ed:match('([^/\\]+)$') or ed):lower()
+    if base:find('^code') or base:find('^codium') or base:find('^cursor') or base == 'subl' then
+      return { ed, '-g', file_path .. ':' .. line_num }
+    elseif base == 'hx' or base == 'helix' or base == 'zed' then
+      return { ed, file_path .. ':' .. line_num }
+    end
+    return { ed, '+' .. line_num, file_path }
+  end
+
+  wezterm.on('open-uri', function(window, pane, uri)
+    local raw_target = type(uri) == 'string' and uri:match('^editfile://(.+)$') or nil
+    if not raw_target then
+      return
+    end
+    local file_part, line_num = raw_target:match('^(.+):(%d+)$')
+    if not file_part then
+      file_part = raw_target
+      line_num = '1'
+    end
+    local resolved = file_part
+    if not resolved:match('^/') and not resolved:match('^%a:[/\\]') then
+      local cwd_uri = pane:get_current_working_dir()
+      local cwd = cwd_uri
+          and (type(cwd_uri) == 'string' and cwd_uri:gsub('^file://[^/]*', '') or cwd_uri.file_path)
+        or ''
+      cwd = cwd:gsub('/+$', '')
+      if cwd ~= '' then
+        resolved = cwd .. '/' .. resolved
+      end
+    end
+    local editor = (h.editor and h.editor ~= '' and h.editor)
+      or os.getenv('EDITOR')
+      or os.getenv('VISUAL')
+      or 'nvim'
+    window:perform_action(
+      act.SpawnCommandInNewTab {
+        args = build_editor_args(editor, resolved, line_num),
+      },
+      pane
+    )
+    return false
+  end)
 end
 
 -- ─── Multiplexer domains ─────────────────────────────────────────────────────
