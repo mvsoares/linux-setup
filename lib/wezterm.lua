@@ -167,6 +167,260 @@ local custom_actions = {
       end),
     }
   end,
+  ProjectSessionizer = function()
+    return wezterm.action_callback(function(window, pane)
+      local choices = {}
+      local seen = {}
+      local open_ws = {}
+      local ok_mw, ws_list = pcall(function()
+        return wezterm.mux.get_workspace_names()
+      end)
+      if ok_mw and type(ws_list) == 'table' then
+        for _, wname in ipairs(ws_list) do
+          open_ws[wname] = true
+          seen['ws:' .. wname] = true
+          table.insert(choices, {
+            id = 'ws:' .. wname,
+            label = '★ [active workspace] ' .. wname,
+          })
+        end
+      end
+
+      local function add_dir(raw_path)
+        if not raw_path or raw_path == '' then
+          return
+        end
+        local clean = raw_path:gsub('/+$', '')
+        if clean == '' or seen[clean] then
+          return
+        end
+        seen[clean] = true
+        local name = clean:match('([^/\\]+)$') or clean
+        local tag = open_ws[name] and '● ' or '󰉋 '
+        table.insert(choices, {
+          id = 'dir:' .. clean,
+          label = tag .. name .. '  (' .. clean .. ')',
+        })
+      end
+
+      local home = wezterm.home_dir or os.getenv('HOME') or ''
+      for _, sub in ipairs { '/projetos', '/projects', '/src', '/work' } do
+        local root = home .. sub
+        local ok_rd, entries = pcall(wezterm.read_dir, root)
+        if ok_rd and type(entries) == 'table' then
+          table.sort(entries)
+          for _, entry in ipairs(entries) do
+            local base = entry:match('([^/\\]+)$') or ''
+            if not base:match('^%.') then
+              add_dir(entry)
+            end
+          end
+        end
+      end
+
+      local ok_z, z_ok, z_out = pcall(wezterm.run_child_process, { 'zoxide', 'query', '-l' })
+      if ok_z and z_ok and z_out then
+        for line in z_out:gmatch('[^\r\n]+') do
+          add_dir(line)
+        end
+      end
+
+      if #choices == 0 then
+        add_dir(home)
+      end
+
+      window:perform_action(
+        act.InputSelector {
+          title = '󱂬 Switch / Spawn Project Workspace',
+          choices = choices,
+          fuzzy = true,
+          fuzzy_description = 'Project or workspace: ',
+          action = wezterm.action_callback(function(win, p, id, _label)
+            if not id then
+              return
+            end
+            local ws_only = id:match('^ws:(.+)$')
+            if ws_only then
+              win:perform_action(act.SwitchToWorkspace { name = ws_only }, p)
+              return
+            end
+            local dir_target = id:match('^dir:(.+)$')
+            if dir_target then
+              local ws_name = dir_target:match('([^/\\]+)$') or 'project'
+              win:perform_action(
+                act.SwitchToWorkspace {
+                  name = ws_name,
+                  spawn = { cwd = dir_target },
+                },
+                p
+              )
+            end
+          end),
+        },
+        pane
+      )
+    end)
+  end,
+  BroadcastToPanes = function()
+    return act.PromptInputLine {
+      description = '📡 Broadcast command to ALL split panes in active tab:',
+      action = wezterm.action_callback(function(window, _pane, line)
+        if not line or line == '' then
+          return
+        end
+        local tab = window:active_tab()
+        if not tab then
+          return
+        end
+        for _, p in ipairs(tab:panes()) do
+          p:send_text(line .. '\n')
+        end
+      end),
+    }
+  end,
+  ToggleZenMode = function()
+    return wezterm.action_callback(function(window, _pane)
+      wezterm.GLOBAL.zen_windows = wezterm.GLOBAL.zen_windows or {}
+      local wid = tostring(window:window_id())
+      local overrides = window:get_config_overrides() or {}
+      if wezterm.GLOBAL.zen_windows[wid] then
+        wezterm.GLOBAL.zen_windows[wid] = nil
+        overrides.font_size = nil
+        overrides.enable_tab_bar = nil
+        overrides.window_background_opacity = nil
+        overrides.window_padding = nil
+      else
+        wezterm.GLOBAL.zen_windows[wid] = true
+        overrides.font_size = (config.font_size or 14) + 4
+        overrides.enable_tab_bar = false
+        overrides.window_background_opacity = 1.0
+        overrides.window_padding = { left = 48, right = 48, top = 24, bottom = 24 }
+      end
+      window:set_config_overrides(overrides)
+    end)
+  end,
+  SaveSession = function()
+    return wezterm.action_callback(function(window, _pane)
+      local ok_m, all_wins = pcall(function()
+        return wezterm.mux.all_windows()
+      end)
+      if not ok_m or type(all_wins) ~= 'table' then
+        return
+      end
+      local snapshot = {
+        saved_at = os.date('!%Y-%m-%dT%H:%M:%SZ'),
+        active_workspace = window:active_workspace(),
+        windows = {},
+      }
+      local total_tabs = 0
+      for _, mw in ipairs(all_wins) do
+        local w_entry = {
+          workspace = mw:get_workspace() or 'default',
+          tabs = {},
+        }
+        for _, mtab in ipairs(mw:tabs()) do
+          local ap = mtab:active_pane()
+          local cwd_str = ''
+          if ap then
+            local ok_c, u = pcall(function()
+              return ap:get_current_working_dir()
+            end)
+            if ok_c and u then
+              cwd_str = type(u) == 'string' and u:gsub('^file://[^/]*', '') or (u.file_path or '')
+            end
+          end
+          table.insert(w_entry.tabs, {
+            title = mtab:get_title() or '',
+            cwd = cwd_str,
+          })
+          total_tabs = total_tabs + 1
+        end
+        table.insert(snapshot.windows, w_entry)
+      end
+      local encode = (wezterm.serde and wezterm.serde.json_encode_pretty)
+        or (wezterm.serde and wezterm.serde.json_encode)
+        or wezterm.json_encode
+      local snap_path = dir .. '/session-snapshot.json'
+      local fh = io.open(snap_path, 'w')
+      if fh then
+        fh:write(encode(snapshot) .. '\n')
+        fh:close()
+        pcall(function()
+          window:toast_notification(
+            'WezTerm Session Saved',
+            string.format('Saved %d window(s), %d tab(s) to session-snapshot.json', #snapshot.windows, total_tabs),
+            nil,
+            3000
+          )
+        end)
+      end
+    end)
+  end,
+  RestoreSession = function()
+    return wezterm.action_callback(function(window, pane)
+      local snap_path = dir .. '/session-snapshot.json'
+      local snap = read_json(snap_path)
+      if not snap or type(snap.windows) ~= 'table' or #snap.windows == 0 then
+        pcall(function()
+          window:toast_notification('WezTerm Session', 'No saved session-snapshot.json found.', nil, 3000)
+        end)
+        return
+      end
+      local existing_ws = {}
+      local ok_w, ws_names = pcall(function()
+        return wezterm.mux.get_workspace_names()
+      end)
+      if ok_w and type(ws_names) == 'table' then
+        for _, n in ipairs(ws_names) do
+          existing_ws[n] = true
+        end
+      end
+      local restored_tabs = 0
+      for _, w_entry in ipairs(snap.windows) do
+        local ws_name = w_entry.workspace or 'default'
+        local tabs = w_entry.tabs or {}
+        if #tabs > 0 and not existing_ws[ws_name] then
+          existing_ws[ws_name] = true
+          local first_cwd = (tabs[1].cwd and tabs[1].cwd ~= '') and tabs[1].cwd or nil
+          local ok_sp, mtab, _mpane, mwin = pcall(wezterm.mux.spawn_window, {
+            workspace = ws_name,
+            cwd = first_cwd,
+          })
+          if ok_sp and mwin then
+            if mtab and tabs[1].title and tabs[1].title ~= '' then
+              pcall(function()
+                mtab:set_title(tabs[1].title)
+              end)
+            end
+            restored_tabs = restored_tabs + 1
+            for idx = 2, #tabs do
+              local tc = (tabs[idx].cwd and tabs[idx].cwd ~= '') and tabs[idx].cwd or nil
+              local ok_t, nt = pcall(function()
+                return mwin:spawn_tab { cwd = tc }
+              end)
+              if ok_t and nt and tabs[idx].title and tabs[idx].title ~= '' then
+                pcall(function()
+                  nt:set_title(tabs[idx].title)
+                end)
+              end
+              restored_tabs = restored_tabs + 1
+            end
+          end
+        end
+      end
+      if snap.active_workspace and snap.active_workspace ~= '' then
+        window:perform_action(act.SwitchToWorkspace { name = snap.active_workspace }, pane)
+      end
+      pcall(function()
+        window:toast_notification(
+          'WezTerm Session Restored',
+          string.format('Restored %d tab(s) from session-snapshot.json', restored_tabs),
+          nil,
+          3000
+        )
+      end)
+    end)
+  end,
 }
 
 -- JSON action → KeyAssignment: "Name" for unit/custom actions, { "Name": args } otherwise.
@@ -287,6 +541,7 @@ end
 -- Tab theme module written by wezterm-theme; it returns
 -- { apply = function(config, wezterm) } and installs its own format-tab-title.
 local theme_applied = false
+local loaded_theme = nil
 if tb.theme_file then
   local path = dir .. '/' .. tb.theme_file
   if exists(path) then
@@ -295,7 +550,9 @@ if tb.theme_file then
     if ok and type(theme) == 'table' and type(theme.apply) == 'function' then
       local applied, err = pcall(theme.apply, config, wezterm)
       theme_applied = applied
-      if not applied then
+      if applied then
+        loaded_theme = theme
+      else
         wezterm.log_error('wezterm settings: tab theme failed: ' .. tostring(err))
       end
     else
@@ -482,6 +739,43 @@ if st.enabled then
     search_mode = { text = ' 󰍉 SEARCH ', bg = '#c58af9', fg = '#202124' },
   }
 
+  local function detect_ssh_target(pane)
+    local ok_uv, uv = pcall(function()
+      return pane:get_user_vars()
+    end)
+    uv = (ok_uv and type(uv) == 'table') and uv or {}
+    local cmdline = uv.WEZTERM_PROG or uv.WEZTERM_CMD or uv.cmd or ''
+    if cmdline ~= '' then
+      local first = cmdline:match('^%s*(%S+)') or ''
+      local bin = (first:match('([^/\\]+)$') or first):lower():gsub('%.exe$', '')
+      if bin == 'ssh' or bin == 'mosh' or bin == 'mosh-client' then
+        local skip_next = false
+        for tok in cmdline:gmatch('%S+') do
+          if tok ~= first then
+            if skip_next then
+              skip_next = false
+            elseif tok:match('^-[pPiJlFobcSDEeLKRW]$') then
+              skip_next = true
+            elseif not tok:match('^-') then
+              return tok
+            end
+          end
+        end
+        return 'remote'
+      end
+    end
+    local ok_fg, fg = pcall(function()
+      return pane:get_foreground_process_name()
+    end)
+    local fg_bin = ((ok_fg and fg) and (fg:match('([^/\\]+)$') or fg) or ''):lower():gsub('%.exe$', '')
+    if fg_bin == 'ssh' or fg_bin == 'mosh' or fg_bin == 'mosh-client' then
+      return 'remote'
+    end
+    return nil
+  end
+
+  wezterm.GLOBAL._wt_agent_notified = wezterm.GLOBAL._wt_agent_notified or {}
+
   wezterm.on('update-status', function(window, pane)
     local cols = 200
     local ok_dims, dims = pcall(function()
@@ -493,6 +787,59 @@ if st.enabled then
     local wide = cols >= 90
 
     local segments = {}
+    local ssh_danger_badge = nil
+
+    if st.ssh_host ~= false then
+      local ssh_host = detect_ssh_target(pane)
+      if ssh_host then
+        local low_h = ssh_host:lower()
+        if low_h:find('prod') or low_h:find('prd') or low_h:find('^root@') then
+          ssh_danger_badge = { text = ' ⚠ PROD:' .. ssh_host .. ' ', bg = '#dc2626', fg = '#ffffff' }
+        else
+          table.insert(segments, '󰣀 ssh:' .. ssh_host)
+        end
+      end
+    end
+
+    if st.agent_toast then
+      pcall(function()
+        wezterm.GLOBAL._wt_agent_notified = wezterm.GLOBAL._wt_agent_notified or {}
+        local mw = window:mux_window()
+        if not mw then
+          return
+        end
+        local tlist = mw.tabs_with_info and mw:tabs_with_info() or nil
+        if not tlist and mw.tabs then
+          tlist = {}
+          for _, mt in ipairs(mw:tabs()) do
+            table.insert(tlist, { is_active = false, tab = mt })
+          end
+        end
+        for _, item in ipairs(tlist or {}) do
+          local mtab = item.tab or item
+          local ap = mtab and mtab:active_pane() or nil
+          if ap then
+            local pid = tostring((ap.pane_id and ap:pane_id()) or (mtab.tab_id and mtab:tab_id()) or '0')
+            local unseen = (not item.is_active) and (ap.has_unseen_output and ap:has_unseen_output() or false)
+            if not unseen then
+              wezterm.GLOBAL._wt_agent_notified[pid] = nil
+            elseif not wezterm.GLOBAL._wt_agent_notified[pid] then
+              local uv = (ap.get_user_vars and ap:get_user_vars()) or {}
+              local ucmd = ((uv.WEZTERM_PROG or uv.WEZTERM_CMD or uv.cmd or ''):match('^%s*(%S+)') or ''):lower()
+              local ptitle = (ap.get_title and ap:get_title() or ''):lower()
+              local pfg = ((ap.get_foreground_process_name and ap:get_foreground_process_name() or ''):match('([^/\\]+)$') or ''):lower()
+              local probe = ucmd .. ' ' .. pfg .. ' ' .. ptitle
+              local ag = probe:match('claude') or probe:match('gemini') or probe:match('antigravity') or probe:match('codex') or probe:match('aider') or probe:match('opencode') or probe:match('goose') or probe:match('cline')
+              if ag then
+                wezterm.GLOBAL._wt_agent_notified[pid] = true
+                local ttitle = (mtab.get_title and mtab:get_title()) or ''
+                window:toast_notification('AI Agent Ready', 'Agent (' .. ag .. ') has new output' .. (ttitle ~= '' and (' in ' .. ttitle) or ''), nil, 3500)
+              end
+            end
+          end
+        end
+      end)
+    end
 
     if st.mux_domain ~= false then
       local ok_dom, domain = pcall(function()
@@ -548,6 +895,14 @@ if st.enabled then
         table.insert(elements, { Text = badge.text })
         table.insert(elements, 'ResetAttributes')
       end
+    end
+
+    if ssh_danger_badge then
+      table.insert(elements, { Background = { Color = ssh_danger_badge.bg } })
+      table.insert(elements, { Foreground = { Color = ssh_danger_badge.fg } })
+      table.insert(elements, { Attribute = { Intensity = 'Bold' } })
+      table.insert(elements, { Text = ssh_danger_badge.text })
+      table.insert(elements, 'ResetAttributes')
     end
 
     if #segments > 0 then
@@ -656,6 +1011,63 @@ end
 local m = section('mouse')
 if m.bindings then
   config.mouse_bindings = bindings(m.bindings)
+end
+
+-- ─── Command Palette (Ctrl+Shift+P) ──────────────────────────────────────────
+if tb.command_palette ~= false then
+  wezterm.on('augment-command-palette', function(window, pane)
+    local entries = {
+      {
+        brief = 'Workflow: Switch / Spawn Project Workspace (zoxide + ~/projetos)',
+        icon = 'md_folder_pound',
+        action = custom_actions.ProjectSessionizer(),
+      },
+      {
+        brief = 'Workflow: Broadcast Command to All Split Panes in Tab',
+        icon = 'md_broadcast',
+        action = custom_actions.BroadcastToPanes(),
+      },
+      {
+        brief = 'Workflow: Toggle Zen / Presentation Mode (+4pt, distraction-free)',
+        icon = 'md_meditation',
+        action = custom_actions.ToggleZenMode(),
+      },
+      {
+        brief = 'Workflow: Save Workspace & Tab Session Snapshot',
+        icon = 'md_content_save',
+        action = custom_actions.SaveSession(),
+      },
+      {
+        brief = 'Workflow: Restore Workspace & Tab Session Snapshot',
+        icon = 'md_backup_restore',
+        action = custom_actions.RestoreSession(),
+      },
+      {
+        brief = 'Workflow: Rename Active Tab',
+        icon = 'md_rename_box',
+        action = custom_actions.RenameTab(),
+      },
+      {
+        brief = 'Workflow: Open Last Command Output in $EDITOR',
+        icon = 'md_file_document_edit',
+        action = custom_actions.EditLastOutput(),
+      },
+      {
+        brief = 'Workflow: Open URL on Screen (QuickSelect)',
+        icon = 'md_open_in_new',
+        action = custom_actions.OpenUrlQuickSelect(),
+      },
+    }
+    if loaded_theme and type(loaded_theme.command_palette_entries) == 'function' then
+      local ok_e, extra = pcall(loaded_theme.command_palette_entries, config, wezterm, window, pane)
+      if ok_e and type(extra) == 'table' then
+        for _, item in ipairs(extra) do
+          table.insert(entries, item)
+        end
+      end
+    end
+    return entries
+  end)
 end
 
 -- ─── Escape hatches ──────────────────────────────────────────────────────────
