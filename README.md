@@ -78,7 +78,7 @@ Existing files are saved as `*.pre-restore` before being overwritten.
 
 ## Synth-Shell Theme Studio (`synth-shell-theme`)
 
-The interactive `synth-shell` Prompt Theme Picker (64 themes), Dual Powerline Separator Editor (48 presets + 60+ Nerd Font glyphs), Runtime Speed Optimizer, and Live Web Studio now live in the standalone, zero-dependency Python package **`synth-shell-theme`** (`~/projetos/synth-shell-theme`):
+The interactive `synth-shell` Prompt Theme Picker (64 themes), Dual Powerline Separator Editor (48 presets + 60+ Nerd Font glyphs), Runtime Speed Optimizer, and Live Web Studio now live in the standalone, zero-dependency Python package **[synth-shell-theme](https://github.com/mvsoares/synth-shell-theme)** ([PyPI](https://pypi.org/project/synth-shell-theme/)):
 
 ```bash
 # Install via pipx (provides `synth-shell-theme` and `synth-shell-separator` in PATH)
