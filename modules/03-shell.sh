@@ -212,12 +212,9 @@ fi
 tick "Starship configuration"
 
 # ── synth-shell ───────────────────────────────────────────────────────────────
-# shellcheck source=../lib/synth-shell-theme-picker.sh
-source "${SCRIPT_DIR}/lib/synth-shell-theme-picker.sh"
-
 SYNTH_DIR="${USER_HOME}/.config/synth-shell"
 SYNTH_PROMPT="${SYNTH_DIR}/synth-shell-prompt.sh"
-SYNTH_CFG="${SYNTH_DIR}/synth-shell-prompt.config"
+SYNTH_FRESH_INSTALL=0
 
 if [[ -n "$REAL_USER" ]] && [[ -f "$SYNTH_PROMPT" ]]; then
     skip "synth-shell (already installed)"
@@ -230,249 +227,53 @@ else
         chmod +x /tmp/synth-shell-install/setup.sh
         # synth-shell prompts: read -s -n 1 (single char, no echo)
         # Answers: i=install, u=user, n=skip greeter, y=prompt, y=better-ls, y=alias, y=better-history
-        printf 'iunyyyy' | \
+        if printf 'iunyyyy' | \
             sudo -u "$REAL_USER" HOME="$USER_HOME" \
-            bash /tmp/synth-shell-install/setup.sh >> "$LOG_FILE" 2>&1 \
-            && ok "synth-shell installed" \
-            || warn "synth-shell setup had errors — check ${LOG_FILE}"
-        rm -rf /tmp/synth-shell-install
-
-        # Prompt colors: gallery themes (see synth-shell-color-preview.html). Override with SYNTH_SHELL_THEME=N
-        if [[ -z "${SYNTH_SHELL_THEME:-}" ]] && [[ -z "${CI:-}" ]] && { [[ -t 0 ]] || [[ -r /dev/tty ]]; }; then
-            synth_shell_print_theme_gallery
+            bash /tmp/synth-shell-install/setup.sh >> "$LOG_FILE" 2>&1; then
+            ok "synth-shell installed"
+            SYNTH_FRESH_INSTALL=1
+        else
+            warn "synth-shell setup had errors — check ${LOG_FILE}"
         fi
-        theme_n=$(synth_shell_resolve_theme_choice 2)
-        synth_shell_apply_prompt_theme "$theme_n" || true
+        rm -rf /tmp/synth-shell-install
     else
         warn "synth-shell clone failed"
     fi
 fi
 
-# ── synth-shell patches & performance optimizations (idempotent) ──────────────
-if [[ -f "$SYNTH_PROMPT" ]]; then
-    # 1. Fix synth-shell kube segment: fast context check without yq dependency
-    if grep -q "yq '\.contexts" "$SYNTH_PROMPT" || grep -q "type yq" "$SYNTH_PROMPT"; then
-        sed -i '/type yq/d' "$SYNTH_PROMPT"
-        sed -i 's|echo -n "\$(kubectl config view.*yq.*head -n 1)"|echo -n "\$(kubectl config current-context 2>/dev/null)"|' "$SYNTH_PROMPT"
-        ok "synth-shell kube segment patched"
+# Apply runtime optimizations & theme via standalone `synth-shell-theme` package
+SYNTH_THEME_REPO="$(cd "${SCRIPT_DIR}/.." && pwd)/synth-shell-theme"
+SYNTH_THEME_BIN="${USER_HOME}/.local/bin/synth-shell-theme"
+
+if [[ -n "$REAL_USER" ]] && [[ ! -x "$SYNTH_THEME_BIN" ]] && command -v pipx &>/dev/null; then
+    if [[ -d "$SYNTH_THEME_REPO" ]]; then
+        as_user "pipx install -e '${SYNTH_THEME_REPO}' --force" >> "$LOG_FILE" 2>&1 || true
+    else
+        as_user "pipx install synth-shell-theme --force" >> "$LOG_FILE" 2>&1 || true
     fi
-
-    # 2. Optimize git status in prompt: single-pass porcelain check (4x speedup)
-    if grep -q '\[\[ -n "\$(git status --porcelain)" \]\]' "$SYNTH_PROMPT"; then
-        python3 -c "
-from pathlib import Path
-p = Path('$SYNTH_PROMPT')
-content = p.read_text()
-old_git = '''    local is_dirty=false &&\\\\
-                [[ -n \"\$(git status --porcelain)\" ]] &&\\\\
-                is_dirty=true
-    local is_ahead=false &&\\\\
-                [[ \"\$(git status --porcelain -u no -b)\" == *\"ahead\"* ]] &&\\\\
-                is_ahead=true
-    local is_behind=false &&\\\\
-                [[ \"\$(git status --porcelain -u no -b)\" == *\"behind\"* ]] &&\\\\
-                is_behind=true'''
-
-new_git = '''    local status_out=\"\$(git status --porcelain -b 2>/dev/null)\"
-    local is_dirty=false
-    [[ \"\$status_out\" =~ $\x27\\\\n\x27 ]] && is_dirty=true
-    local branch_line=\"\${status_out%%$\x27\\\\n\x27*}\"
-    local is_ahead=false && [[ \"\$branch_line\" == *\"ahead\"* ]] && is_ahead=true
-    local is_behind=false && [[ \"\$branch_line\" == *\"behind\"* ]] && is_behind=true'''
-
-if old_git in content:
-    p.write_text(content.replace(old_git, new_git))
-" 2>/dev/null && ok "synth-shell git status optimized (single-pass)"
-    fi
-
-    # 3. Support independent end separator (separator_char_end)
-    if grep -q 'printSegment "$text" "$text_color" "$bg_color" "$next_bg_color" "$text_effect"$' "$SYNTH_PROMPT"; then
-        python3 -c "
-from pathlib import Path
-p = Path('$SYNTH_PROMPT')
-content = p.read_text()
-old_code = '''\tlocal text_effect=\${colors_first[2]}
-\tprintSegment \"\$text\" \"\$text_color\" \"\$bg_color\" \"\$next_bg_color\" \"\$text_effect\"'''
-new_code = '''\tlocal text_effect=\${colors_first[2]}
-\tlocal sep_char=\"\$separator_char\"
-\tif [ \"\$second\" = \"INPUT\" ] && [ -n \"\${separator_char_end:-}\" ]; then
-\t\tsep_char=\"\$separator_char_end\"
-\tfi
-\tprintSegment \"\$text\" \"\$text_color\" \"\$bg_color\" \"\$next_bg_color\" \"\$text_effect\" \"\$sep_char\"'''
-if old_code in content:
-    content = content.replace(old_code, new_code)
-    content = content.replace('printSegment()\n{\n\t## GET PARAMETERS\n\tlocal text=\$1\n\tlocal font_color=\$2\n\tlocal background_color=\$3\n\tlocal next_background_color=\$4\n\tlocal font_effect=\$5', 'printSegment()\n{\n\t## GET PARAMETERS\n\tlocal text=\$1\n\tlocal font_color=\$2\n\tlocal background_color=\$3\n\tlocal next_background_color=\$4\n\tlocal font_effect=\$5\n\tlocal sep_char=\"\${6:-\$separator_char}\"')
-    content = content.replace('\${separator_format}\${separator_char}\${separator_padding_right}', '\${separator_format}\${sep_char}\${separator_padding_right}')
-    p.write_text(content)
-" 2>/dev/null && ok "synth-shell dual separator support enabled"
-    fi
-
-    # 4. Patch getColorCode / getBackgroundCode for 256-color parity with theme picker
-    for _synth_file in "$SYNTH_DIR"/synth-shell-prompt.sh "$SYNTH_DIR"/alias.sh "$SYNTH_DIR"/better-ls.sh "$SYNTH_DIR"/better-history.sh; do
-        [[ -f "$_synth_file" ]] || continue
-        if grep -q 'COLORCODE=\$((\$BITCODE + 30))' "$_synth_file" 2>/dev/null; then
-            python3 -c "
-from pathlib import Path
-p = Path('$_synth_file')
-content = p.read_text()
-old_codes = '''getColorCode()
-{
-	COLOR=\$1
-	## Check if color is a 256-color code
-	if [ \$COLOR -eq \$COLOR ] 2> /dev/null; then
-		if [ \$COLOR -gt 0 -a \$COLOR -lt 256 ]; then
-			echo \"38;5;\$COLOR\"
-		else
-			echo 0
-		fi
-	## Or if color key-workd
-	else
-		BITCODE=\$(get8bitCode \$COLOR)
-		COLORCODE=\$((\$BITCODE + 30))
-		echo \$COLORCODE
-	fi
-}
-##------------------------------------------------------------------------------
-##
-getBackgroundCode()
-{
-	COLOR=\$1
-	## Check if color is a 256-color code
-	if [ \$COLOR -eq \$COLOR ] 2> /dev/null; then
-		if [ \$COLOR -gt 0 -a \$COLOR -lt 256 ]; then
-			echo \"48;5;\$COLOR\"
-		else
-			echo 0
-		fi
-	## Or if color key-workd
-	else
-		BITCODE=\$(get8bitCode \$COLOR)
-		COLORCODE=\$((\$BITCODE + 40))
-		echo \$COLORCODE
-	fi
-}'''
-
-# Also handle variant without ## comments (alias.sh, better-ls.sh, better-history.sh)
-old_codes_short = '''getColorCode()
-{
-	COLOR=\$1
-	if [ \$COLOR -eq \$COLOR ] 2> /dev/null; then
-		if [ \$COLOR -gt 0 -a \$COLOR -lt 256 ]; then
-			echo \"38;5;\$COLOR\"
-		else
-			echo 0
-		fi
-	else
-		BITCODE=\$(get8bitCode \$COLOR)
-		COLORCODE=\$((\$BITCODE + 30))
-		echo \$COLORCODE
-	fi
-}
-getBackgroundCode()
-{
-	COLOR=\$1
-	if [ \$COLOR -eq \$COLOR ] 2> /dev/null; then
-		if [ \$COLOR -gt 0 -a \$COLOR -lt 256 ]; then
-			echo \"48;5;\$COLOR\"
-		else
-			echo 0
-		fi
-	else
-		BITCODE=\$(get8bitCode \$COLOR)
-		COLORCODE=\$((\$BITCODE + 40))
-		echo \$COLORCODE
-	fi
-}'''
-
-new_codes = '''getColorCode()
-{
-	local COLOR=\$1
-	if [ -z \"\$COLOR\" ]; then
-		echo 39
-		return
-	fi
-	if [ \"\$COLOR\" -eq \"\$COLOR\" ] 2> /dev/null; then
-		if [ \"\$COLOR\" -ge 0 -a \"\$COLOR\" -lt 256 ]; then
-			echo \"38;5;\$COLOR\"
-		else
-			echo 39
-		fi
-	else
-		case \$COLOR in
-			black)        echo \"38;5;0\" ;;
-			red)          echo \"38;5;1\" ;;
-			green)        echo \"38;5;2\" ;;
-			yellow)       echo \"38;5;3\" ;;
-			blue)         echo \"38;5;4\" ;;
-			purple|magenta|pink) echo \"38;5;5\" ;;
-			cyan)         echo \"38;5;6\" ;;
-			light-gray)   echo \"38;5;7\" ;;
-			dark-gray)    echo \"38;5;8\" ;;
-			light-red)    echo \"38;5;9\" ;;
-			light-green)  echo \"38;5;10\" ;;
-			light-yellow) echo \"38;5;11\" ;;
-			light-blue)   echo \"38;5;12\" ;;
-			light-purple|light-magenta) echo \"38;5;13\" ;;
-			light-cyan)   echo \"38;5;14\" ;;
-			white)        echo \"38;5;15\" ;;
-			none|transparent|default) echo \"39\" ;;
-			*) echo \"39\" ;;
-		esac
-	fi
-}
-getBackgroundCode()
-{
-	local COLOR=\$1
-	if [ -z \"\$COLOR\" ]; then
-		echo 49
-		return
-	fi
-	if [ \"\$COLOR\" -eq \"\$COLOR\" ] 2> /dev/null; then
-		if [ \"\$COLOR\" -ge 0 -a \"\$COLOR\" -lt 256 ]; then
-			echo \"48;5;\$COLOR\"
-		else
-			echo 49
-		fi
-	else
-		case \$COLOR in
-			black)        echo \"48;5;0\" ;;
-			red)          echo \"48;5;1\" ;;
-			green)        echo \"48;5;2\" ;;
-			yellow)       echo \"48;5;3\" ;;
-			blue)         echo \"48;5;4\" ;;
-			purple|magenta|pink) echo \"48;5;5\" ;;
-			cyan)         echo \"48;5;6\" ;;
-			light-gray)   echo \"48;5;7\" ;;
-			dark-gray)    echo \"48;5;8\" ;;
-			light-red)    echo \"48;5;9\" ;;
-			light-green)  echo \"48;5;10\" ;;
-			light-yellow) echo \"48;5;11\" ;;
-			light-blue)   echo \"48;5;12\" ;;
-			light-purple|light-magenta) echo \"48;5;13\" ;;
-			light-cyan)   echo \"48;5;14\" ;;
-			white)        echo \"48;5;15\" ;;
-			none|transparent|default) echo \"49\" ;;
-			*) echo \"49\" ;;
-		esac
-	fi
-}'''
-if old_codes in content:
-    p.write_text(content.replace(old_codes, new_codes))
-elif old_codes_short in content:
-    p.write_text(content.replace(old_codes_short, new_codes))
-" 2>/dev/null && ok "synth-shell 256-color parity patched ($(basename "$_synth_file"))"
-        fi
-    done
 fi
 
-if [[ -f "$SYNTH_CFG" ]]; then
-    # Tune max_pwd_char from 25 to 35 for better path visibility
-    sed -i 's/^max_pwd_char=.*$/max_pwd_char="35"/' "$SYNTH_CFG"
-    # Default to 2-line prompt and rounded bubble + arrow end separators
-    sed -i 's/^enable_command_on_new_line=.*$/enable_command_on_new_line="true"/' "$SYNTH_CFG"
-    sed -i 's/^separator_char=.*$/separator_char="\\uE0B4"/' "$SYNTH_CFG"
-    if ! grep -q '^separator_char_end=' "$SYNTH_CFG"; then
-        echo 'separator_char_end="\uE0B0"' >> "$SYNTH_CFG"
+if [[ -f "$SYNTH_PROMPT" ]] && [[ -n "$REAL_USER" ]]; then
+    SYNTH_INIT_ARGS=("init")
+    if [[ "$SYNTH_FRESH_INSTALL" -eq 1 ]]; then
+        SYNTH_INIT_ARGS+=("--apply" "${SYNTH_SHELL_THEME:-2}")
+    else
+        SYNTH_INIT_ARGS+=("--no-tune")
+        [[ -n "${SYNTH_SHELL_THEME:-}" ]] && SYNTH_INIT_ARGS+=("--apply" "${SYNTH_SHELL_THEME}")
+    fi
+
+    if [[ -x "$SYNTH_THEME_BIN" ]]; then
+        sudo -u "$REAL_USER" HOME="$USER_HOME" \
+            "$SYNTH_THEME_BIN" "${SYNTH_INIT_ARGS[@]}" >> "$LOG_FILE" 2>&1 \
+            && ok "synth-shell runtime patches & theme verified (synth-shell-theme)" \
+            || warn "synth-shell-theme init reported an issue — check ${LOG_FILE}"
+    elif [[ -d "${SYNTH_THEME_REPO}/src" ]]; then
+        sudo -u "$REAL_USER" HOME="$USER_HOME" PYTHONPATH="${SYNTH_THEME_REPO}/src" \
+            python3 -m synth_shell_theme "${SYNTH_INIT_ARGS[@]}" >> "$LOG_FILE" 2>&1 \
+            && ok "synth-shell runtime patches & theme verified (local synth-shell-theme)" \
+            || warn "synth-shell-theme init reported an issue — check ${LOG_FILE}"
+    else
+        info "Install 'synth-shell-theme' via pipx to manage 64 prompt themes & runtime optimizations"
     fi
 fi
 tick "synth-shell (prompt · better-ls · better-alias · better-history)"

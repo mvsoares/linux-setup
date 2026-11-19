@@ -76,6 +76,11 @@ local function set(key, value)
   end
 end
 
+local function is_appearance_dark()
+  local appearance = (wezterm.gui and wezterm.gui.get_appearance and wezterm.gui.get_appearance()) or 'Dark'
+  return appearance:find('Dark') ~= nil
+end
+
 local function font(family, weight, italic)
   local attrs = {}
   if weight then
@@ -87,9 +92,70 @@ local function font(family, weight, italic)
   return wezterm.font(family, attrs)
 end
 
--- JSON action → KeyAssignment: "Name" for unit actions, { "Name": args } otherwise.
+-- Custom high-level workflow actions referenceable by string name in JSON.
+local custom_actions = {
+  RenameTab = function()
+    return act.PromptInputLine {
+      description = 'Rename tab (leave empty to reset automatic title):',
+      action = wezterm.action_callback(function(window, _pane, line)
+        if line ~= nil then
+          window:active_tab():set_title(line)
+        end
+      end),
+    }
+  end,
+  EditLastOutput = function()
+    return wezterm.action_callback(function(window, pane)
+      local text = nil
+      local ok_z, zones = pcall(function()
+        return pane:get_semantic_zones('Output')
+      end)
+      if ok_z and type(zones) == 'table' and #zones > 0 then
+        for idx = #zones, 1, -1 do
+          local ok_t, ztxt = pcall(function()
+            return pane:get_text_from_semantic_zone(zones[idx])
+          end)
+          if ok_t and ztxt and ztxt:match('%S') then
+            text = ztxt
+            break
+          end
+        end
+      end
+      if not text or not text:match('%S') then
+        local ok_l, lines = pcall(function()
+          return pane:get_lines_as_text(config.scrollback_lines or 5000)
+        end)
+        if ok_l then
+          text = lines
+        end
+      end
+      if not text or text == '' then
+        return
+      end
+      local path = os.tmpname() .. '.log'
+      local fh = io.open(path, 'w')
+      if not fh then
+        return
+      end
+      fh:write(text)
+      fh:close()
+      local editor = os.getenv('EDITOR') or os.getenv('VISUAL') or 'nvim'
+      window:perform_action(
+        act.SpawnCommandInNewTab {
+          args = { 'sh', '-c', editor .. ' "$1"; rm -f "$1"', 'sh', path },
+        },
+        pane
+      )
+    end)
+  end,
+}
+
+-- JSON action → KeyAssignment: "Name" for unit/custom actions, { "Name": args } otherwise.
 local function action(spec)
   if type(spec) == 'string' then
+    if custom_actions[spec] then
+      return custom_actions[spec]()
+    end
     return act[spec]
   end
   local name, args = next(spec)
@@ -130,6 +196,9 @@ if f.family then
 end
 set('font_size', f.size)
 set('line_height', f.line_height)
+if f.ligatures == false then
+  config.harfbuzz_features = { 'calt=0', 'clig=0', 'liga=0' }
+end
 
 -- ─── Display backend & per-screen scaling ────────────────────────────────────
 -- X11 (XWayland) gets GNOME's real title bar, so maximize and edge resize
@@ -142,13 +211,19 @@ set('dpi_by_screen', d.dpi_by_screen)
 
 -- ─── Colors & terminal emulation ─────────────────────────────────────────────
 local c = section('colors')
-set('color_scheme', c.scheme)
+local dark_ui = is_appearance_dark()
+if not dark_ui and c.scheme_light and c.scheme_light ~= '' then
+  config.color_scheme = c.scheme_light
+else
+  set('color_scheme', c.scheme)
+end
 set('bold_brightens_ansi_colors', c.bold_brightens_ansi_colors)
 
 local t = section('terminal')
 set('term', t.term)
 set('unicode_version', t.unicode_version)
 set('allow_square_glyphs_to_overflow_width', t.allow_square_glyphs_to_overflow_width)
+set('exit_behavior', t.exit_behavior)
 
 -- ─── Window & geometry ───────────────────────────────────────────────────────
 -- GNOME draws no frame for Wayland clients, so without X11 the window buttons
@@ -162,6 +237,7 @@ set('initial_cols', w.initial_cols)
 set('initial_rows', w.initial_rows)
 set('adjust_window_size_when_changing_font_size', w.adjust_window_size_when_changing_font_size)
 set('use_resize_increments', w.use_resize_increments)
+set('inactive_pane_hsb', w.inactive_pane_hsb)
 
 -- ─── Tab bar ─────────────────────────────────────────────────────────────────
 local tb = section('tabs')
@@ -196,10 +272,52 @@ if tb.theme_file then
   end
 end
 
+-- Optional Oklab background gradient & 1px accent frame border (applied after theme
+-- so active tab accent and color scheme are already resolved).
+if w.background_gradient then
+  local schemes = (wezterm.color and wezterm.color.get_builtin_schemes and wezterm.color.get_builtin_schemes()) or {}
+  local active_scheme = schemes[config.color_scheme or ''] or {}
+  local base_hex = active_scheme.background
+    or (config.colors and config.colors.tab_bar and config.colors.tab_bar.background)
+    or (dark_ui and '#15161c' or '#f8fafc')
+  local ok_col, base_col = pcall(wezterm.color.parse, base_hex)
+  if ok_col and base_col then
+    local edge_col = dark_ui and base_col:lighten(0.06) or base_col:darken(0.06)
+    config.window_background_gradient = {
+      colors = { tostring(edge_col), tostring(base_col) },
+      blend = 'Oklab',
+      orientation = { Radial = { cx = 0.8, cy = 0.85, radius = 1.15 } },
+    }
+  end
+end
+
+if w.accent_border then
+  local border_col = type(w.accent_border) == 'string' and w.accent_border
+    or (config.colors and config.colors.tab_bar and config.colors.tab_bar.active_tab and config.colors.tab_bar.active_tab.bg_color)
+    or '#4285F4'
+  config.window_frame = config.window_frame or {}
+  config.window_frame.border_left_width = '1px'
+  config.window_frame.border_right_width = '1px'
+  config.window_frame.border_top_height = '1px'
+  config.window_frame.border_bottom_height = '1px'
+  config.window_frame.border_left_color = border_col
+  config.window_frame.border_right_color = border_col
+  config.window_frame.border_top_color = border_col
+  config.window_frame.border_bottom_color = border_col
+  config.colors = config.colors or {}
+  config.colors.split = config.colors.split or border_col
+end
+
 -- Without a theme: cycle the fallback palette, "process|dir" titles.
 local fb = tb.fallback
 if not theme_applied and fb and fb.palette then
   local title_len = tb.tab_title_len or fb.title_len or 15
+  local sup_digits = { '', '²', '³', '⁴', '⁵', '⁶', '⁷', '⁸', '⁹' }
+  local idle_shells = {
+    bash = true, zsh = true, fish = true, sh = true, dash = true, ksh = true,
+    pwsh = true, powershell = true, cmd = true, nu = true, tmux = true,
+    wezterm = true, ['wezterm-gui'] = true,
+  }
 
   local function format_fixed(text)
     if wezterm.column_width(text) > title_len then
@@ -208,43 +326,76 @@ if not theme_applied and fb and fb.palette then
     return wezterm.pad_right(text, title_len)
   end
 
-  wezterm.on('format-tab-title', function(tab)
+  wezterm.on('format-tab-title', function(tab, _tabs, panes, _cfg, hover)
     local pane = tab.active_pane
     local index = tab.tab_index + 1
     local colors = fb.palette[(tab.tab_index % #fb.palette) + 1]
 
-    -- Directory name from OSC 7 (needs shell integration) or fallback
-    local dir_name = '~'
-    if pane.current_working_dir then
-      local cwd = pane.current_working_dir.file_path
-      dir_name = cwd:match('([^/]+)/?$') or cwd
+    local raw = ''
+    if tab.tab_title and tab.tab_title ~= '' then
+      raw = tab.tab_title
+    else
+      local dir_name = '~'
+      if pane.current_working_dir then
+        local cwd = type(pane.current_working_dir) == 'string'
+          and pane.current_working_dir
+          or (pane.current_working_dir.file_path or '')
+        cwd = cwd:gsub('^file://[^/]*', ''):gsub('\\\\', '/'):gsub('/+$', '')
+        if cwd ~= '' then
+          dir_name = cwd:match('([^/]+)$') or cwd
+        end
+      end
+
+      local uv = pane.user_vars or {}
+      local prog = uv.cmd or uv.WEZTERM_CMD or ''
+      if prog == '' and uv.WEZTERM_PROG and uv.WEZTERM_PROG ~= '' then
+        prog = uv.WEZTERM_PROG:match('^%S+') or ''
+      end
+      if prog == '' then
+        prog = pane.foreground_process_name or ''
+      end
+      local process = prog:match('([^/\\]+)$') or prog
+      process = process:gsub('%.[eE][xX][eE]$', '')
+      if idle_shells[process:lower()] then
+        process = ''
+      end
+      raw = process ~= '' and (process .. '|' .. dir_name) or dir_name
     end
 
-    -- Process name from bash hook (user_vars.cmd), fallback to foreground_process_name
-    local process = (pane.user_vars or {}).cmd or ''
-    if process == '' then
-      process = (pane.foreground_process_name or ''):match('([^/\\]+)$') or ''
+    local label = format_fixed(raw)
+    local extra = ''
+    if pane.is_zoomed then
+      extra = extra .. '🔍'
     end
-    -- Hide common shells so the tab just shows the directory when idle
-    if process == 'bash' or process == 'zsh' or process == 'fish' or process == 'tmux' or process == 'wezterm' then
-      process = ''
+    local n_panes = panes and #panes or 1
+    if n_panes > 1 then
+      extra = extra .. (sup_digits[math.min(n_panes, #sup_digits)] or '⁺')
+    end
+    if extra ~= '' then
+      extra = extra .. ' '
     end
 
-    local label = format_fixed(process ~= '' and (process .. '|' .. dir_name) or dir_name)
+    local bg = colors.bg
+    if hover and not tab.is_active then
+      local ok_c, parsed = pcall(wezterm.color.parse, bg)
+      if ok_c and parsed then
+        bg = tostring(parsed:lighten(0.12))
+      end
+    end
 
     if tab.is_active then
       return wezterm.format {
-        { Background = { Color = colors.bg } },
+        { Background = { Color = bg } },
         { Foreground = { Color = '#ffffff' } },
         { Attribute = { Intensity = 'Bold' } },
         { Attribute = { Underline = 'Single' } },
-        { Text = colors.active_symbol .. index .. ' ' .. label .. ' ' },
+        { Text = colors.active_symbol .. index .. ' ' .. extra .. label .. ' ' },
       }
     end
     return wezterm.format {
-      { Background = { Color = colors.bg } },
+      { Background = { Color = bg } },
       { Foreground = { Color = '#ffffff' } },
-      { Text = index .. ' ' .. colors.inactive_symbol .. ' ' .. label .. ' ' },
+      { Text = index .. ' ' .. colors.inactive_symbol .. ' ' .. extra .. label .. ' ' },
     }
   end)
 end
@@ -252,54 +403,127 @@ end
 -- ─── Status bar ──────────────────────────────────────────────────────────────
 -- WezTerm's default tick is 1000ms; the clock only has minute resolution, so a
 -- slower tick costs nothing visible and cuts the battery/git work per window.
+-- Leader/key-table transitions trigger update-status immediately with zero lag.
 local st = section('status')
 if st.enabled then
   set('status_update_interval', st.interval_ms)
 
-  local last_branch_check = 0
-  local cached_branch = ''
+  wezterm.GLOBAL.git_branch_cache = wezterm.GLOBAL.git_branch_cache or {}
 
   local function git_branch(cwd)
-    if not cwd then
+    if not cwd or cwd == '' then
       return ''
     end
-    local p = io.popen('git -C ' .. wezterm.shell_quote_arg(cwd) .. ' rev-parse --abbrev-ref HEAD 2>/dev/null')
-    if not p then
-      return ''
+    local now = os.time()
+    local cache = wezterm.GLOBAL.git_branch_cache
+    local entry = cache[cwd]
+    if entry and (now - entry.ts) < (st.git_recheck_s or 10) then
+      return entry.branch
     end
-    local branch = p:read('*l') or ''
-    p:close()
+    local ok, success, stdout = pcall(wezterm.run_child_process, {
+      'git',
+      '-C',
+      cwd,
+      'rev-parse',
+      '--abbrev-ref',
+      'HEAD',
+    })
+    local branch = ''
+    if ok and success and stdout then
+      branch = stdout:gsub('%s+$', '')
+    end
+    local count = 0
+    for _ in pairs(cache) do
+      count = count + 1
+    end
+    if count > 64 then
+      cache = {}
+      wezterm.GLOBAL.git_branch_cache = cache
+    end
+    cache[cwd] = { branch = branch, ts = now }
     return branch
   end
 
+  local mode_badges = {
+    resize_pane = { text = ' 󰙕 RESIZE ', bg = '#f9ab00', fg = '#202124' },
+    copy_mode   = { text = ' 󰆏 COPY ',   bg = '#8ab4f8', fg = '#202124' },
+    search_mode = { text = ' 󰍉 SEARCH ', bg = '#c58af9', fg = '#202124' },
+  }
+
   wezterm.on('update-status', function(window, pane)
-    -- Branches change rarely: recheck at most every git_recheck_s seconds.
-    if st.git_branch then
-      local now = os.time()
-      if now - last_branch_check >= (st.git_recheck_s or 10) then
-        last_branch_check = now
-        local cwd_uri = pane:get_current_working_dir()
-        cached_branch = git_branch(cwd_uri and cwd_uri.file_path)
+    local cols = 200
+    local ok_dims, dims = pcall(function()
+      return pane:get_dimensions()
+    end)
+    if ok_dims and dims and dims.cols then
+      cols = dims.cols
+    end
+    local wide = cols >= 90
+
+    local segments = {}
+
+    if st.mux_domain ~= false then
+      local ok_dom, domain = pcall(function()
+        return pane:get_domain_name()
+      end)
+      if ok_dom and domain and domain ~= '' and domain ~= 'local' then
+        local ok_meta, meta = pcall(function()
+          return pane:get_metadata()
+        end)
+        local lag = (ok_meta and type(meta) == 'table' and meta.since_last_response_ms) or nil
+        if lag and lag > 0 then
+          table.insert(segments, string.format('󰌘 %s %dms', domain, lag))
+        else
+          table.insert(segments, '󰌘 ' .. domain)
+        end
       end
     end
 
-    local segments = {}
-    if st.git_branch and cached_branch ~= '' then
-      table.insert(segments, ' ' .. cached_branch)
+    if wide and st.git_branch then
+      local cwd_uri = pane:get_current_working_dir()
+      local cwd_path = cwd_uri and (type(cwd_uri) == 'string' and cwd_uri:gsub('^file://[^/]*', '') or cwd_uri.file_path)
+      local branch = git_branch(cwd_path)
+      if branch ~= '' then
+        table.insert(segments, ' ' .. branch)
+      end
     end
-    if st.battery then
+
+    if wide and st.battery then
       for _, b in ipairs(wezterm.battery_info()) do
         table.insert(segments, string.format('%.0f%%', b.state_of_charge * 100))
       end
     end
+
     if st.clock then
       table.insert(segments, wezterm.strftime(st.clock))
     end
 
-    window:set_right_status(wezterm.format {
-      { Foreground = { Color = st.color or '#a6adc8' } },
-      { Text = '  ' .. table.concat(segments, '   ') .. '  ' },
-    })
+    local elements = {}
+    if st.mode_indicator ~= false then
+      local badge = nil
+      if window:leader_is_active() then
+        badge = { text = ' ⚡ LEADER ', bg = '#ea4335', fg = '#ffffff' }
+      else
+        local kt = window:active_key_table()
+        if kt then
+          badge = mode_badges[kt] or { text = ' 󰌌 ' .. kt:upper() .. ' ', bg = '#81c995', fg = '#202124' }
+        end
+      end
+      if badge then
+        table.insert(elements, { Background = { Color = badge.bg } })
+        table.insert(elements, { Foreground = { Color = badge.fg } })
+        table.insert(elements, { Attribute = { Intensity = 'Bold' } })
+        table.insert(elements, { Text = badge.text })
+        table.insert(elements, { ResetAttributes = {} })
+      end
+    end
+
+    if #segments > 0 then
+      table.insert(elements, { Foreground = { Color = st.color or '#a6adc8' } })
+      table.insert(elements, { Text = '  ' .. table.concat(segments, '   ') .. '  ' })
+    end
+
+    window:set_right_status(wezterm.format(elements))
   end)
 end
 

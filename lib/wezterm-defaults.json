@@ -4,6 +4,7 @@
     "weight": "Regular",
     "size": 14,
     "line_height": 1.0,
+    "ligatures": true,
     "rules": [
       { "intensity": "Half", "italic": false, "weight": "Medium" },
       { "intensity": "Half", "italic": true, "weight": "Medium" }
@@ -15,12 +16,14 @@
   },
   "colors": {
     "scheme": "Monokai Vivid",
+    "scheme_light": "",
     "bold_brightens_ansi_colors": false
   },
   "terminal": {
     "term": "xterm-256color",
     "unicode_version": 14,
-    "allow_square_glyphs_to_overflow_width": "Never"
+    "allow_square_glyphs_to_overflow_width": "Never",
+    "exit_behavior": "Close"
   },
   "window": {
     "opacity": 1,
@@ -28,7 +31,10 @@
     "initial_cols": 200,
     "initial_rows": 60,
     "adjust_window_size_when_changing_font_size": false,
-    "use_resize_increments": false
+    "use_resize_increments": false,
+    "inactive_pane_hsb": { "saturation": 0.9, "brightness": 0.78 },
+    "background_gradient": false,
+    "accent_border": false
   },
   "tabs": {
     "hide_if_only_one_tab": false,
@@ -50,6 +56,8 @@
   "status": {
     "enabled": true,
     "interval_ms": 5000,
+    "mode_indicator": true,
+    "mux_domain": true,
     "git_branch": true,
     "git_recheck_s": 10,
     "battery": true,
@@ -100,6 +108,8 @@
       { "key": "t", "mods": "SUPER", "action": { "SpawnTab": "CurrentPaneDomain" } },
       { "key": "[", "mods": "SUPER", "action": { "ActivateTabRelative": -1 } },
       { "key": "]", "mods": "SUPER", "action": { "ActivateTabRelative": 1 } },
+      { "key": "UpArrow", "mods": "SUPER", "action": { "ScrollToPrompt": -1 } },
+      { "key": "DownArrow", "mods": "SUPER", "action": { "ScrollToPrompt": 1 } },
       { "key": "+", "mods": "SUPER", "action": "IncreaseFontSize" },
       { "key": "-", "mods": "SUPER", "action": "DecreaseFontSize" },
       { "key": "0", "mods": "SUPER", "action": "ResetFontSize" },
@@ -112,6 +122,9 @@
       { "key": "r", "mods": "LEADER", "action": { "ActivateKeyTable": { "name": "resize_pane", "one_shot": false, "timeout_milliseconds": 5000 } } },
       { "key": "c", "mods": "LEADER", "action": "ActivateCopyMode" },
       { "key": "z", "mods": "LEADER", "action": "TogglePaneZoomState" },
+      { "key": "w", "mods": "LEADER", "action": { "ShowLauncherArgs": { "flags": "FUZZY|WORKSPACES|TABS|DOMAINS" } } },
+      { "key": ",", "mods": "LEADER", "action": "RenameTab" },
+      { "key": "e", "mods": "LEADER", "action": "EditLastOutput" },
       { "key": "g", "mods": "LEADER", "action": { "QuickSelectArgs": { "patterns": [
           "[0-9a-f]{7,40}",
           "[A-Z][A-Z0-9]+-[0-9]+",

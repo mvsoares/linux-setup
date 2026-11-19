@@ -22,7 +22,7 @@ The setup is split into **10 ordered modules**, each independently skippable and
 |---|--------|------------|
 | 1 | **Repos & NVIDIA** | Universe/multiverse, Brave, GitHub CLI, Flatpak/Flathub, NVIDIA drivers + Vulkan + power rules |
 | 2 | **System & CLI** | build-essential, git, Podman, fzf, ripgrep, fd, bat, eza, zoxide, git-delta, lazygit, lazydocker, dust, procs, btm, hyperfine, glow, and more |
-| 3 | **Shell** | Starship prompt, synth-shell (64 prompt themes + interactive picker), global aliases, fzf integration, zoxide init, history tuning |
+| 3 | **Shell** | Starship prompt, synth-shell (managed via standalone `synth-shell-theme`), global aliases, fzf integration, zoxide init, history tuning |
 | 4 | **Fonts & Themes** | 25+ Nerd Fonts, Inter, Monaspace, Geist; Dracula & Catppuccin GTK themes; Papirus & Tela icons; Bibata cursors |
 | 5 | **GNOME** | Dash to Dock, Blur my Shell, Just Perfection, Caffeine, Clipboard Indicator, Vitals, Space Bar; dark mode, workspace shortcuts, Nautilus tree view |
 | 6 | **Cloud & K8s** | AWS CLI v2, gcloud, azure-cli, kubectl, helm, k9s, stern, kubectx/kubens, kustomize, eksctl |
@@ -76,86 +76,33 @@ Available restore sections: `shell`, `git`, `starship`, `synth-shell`, `wezterm`
 
 Existing files are saved as `*.pre-restore` before being overwritten.
 
-## Synth-Shell Theme Picker
+## Synth-Shell Theme Studio (`synth-shell-theme`)
 
-An interactive terminal tool to preview and apply synth-shell prompt color themes — 64 themes with live 256-color powerline previews rendered side-by-side.
-
-```bash
-# Interactive mode
-python3 synth-shell-theme-picker.py
-
-# Non-interactive CLI options
-python3 synth-shell-theme-picker.py --list               # List all themes with swatches
-python3 synth-shell-theme-picker.py --current            # Show active theme
-python3 synth-shell-theme-picker.py --apply tokyo-night  # Apply by name or number (1-64)
-python3 synth-shell-theme-picker.py --apply 32 --force-white-text # Force segment text to white (high-contrast)
-python3 synth-shell-theme-picker.py --apply 32 --keep-input      # Preserve current command typing color
-python3 synth-shell-theme-picker.py --separators         # Showcase all 10 Powerline separator styles
-python3 synth-shell-theme-picker.py --separator round    # Set separator (arrow, round, slant, flame, pixel, wave, hex, ice, slash, chevron)
-python3 synth-shell-theme-picker.py --search catppuccin  # Preview themes matching keyword
-python3 synth-shell-theme-picker.py --random             # Apply a random theme
-python3 synth-shell-theme-picker.py --web                # Open HTML preview gallery
-```
-
-**What it does:**
-
-- Shows all 64 themes in a 2-column grid with real colored powerline segments and color swatches
-- Lets you choose from 10 distinct Powerline separator styles (`arrow`, `round`, `slant`, `flame`, `pixel`, `wave`, `hex`, `ice`, `slash`, `chevron`)
-- Auto-detects your current active theme and active separator
-- Backs up your config to `~/.config/synth-shell/backups/` before applying
-- Merges only color values — strictly preserves your git symbols, padding, and custom formatting
-- Prints prompt reload commands (`source ~/.bashrc`)
-
-**Interactive Controls:**
-- `[n]ext` / `[p]rev`: Navigate pages
-- `[g 3]` or `[page 3]`: Jump directly to page 3
-- `[t]separator`: Open the interactive separator style chooser
-- `[/term]` or `[s term]`: Filter themes in real-time (e.g. `/nord`, `/pastel`)
-- `[c]lear`: Reset search filter
-- `[1-64]` or `[theme-name]`: Apply selected theme
-- `[r]andom`: Apply a random theme
-- `[w]eb`: Open browser gallery
-- `[q]uit`: Exit
-
-**Included themes:** Screenshot Match, Current Live, Dracula Punch, Nord Ice, Matrix Green, Amber Heat, Cloud Ops, Catppuccin Mauve, Solarized Night, Gruvbox Dark, Monokai Neon, Tokyo Night, Synthwave Pink, Forest Mint, Ruby Steel, Ice Gold, Aqua Slate, Cyber Lime, Lavender Sunset, Minimal Mono, Rosé Pine, Kanagawa, Everforest, One Dark, Ayu Dark, Nightfox, Palenight, Cyberdream, Moonlight, Poimandres, Tokyo Storm, Catppuccin Mocha, Nordic Aurora, Horizon Synth, Gruvbox Material, Oxocarbon, Catppuccin Latte, Tokyo Twilight, Solarized Ocean, Vaporwave Sunset, Deep Abyss, Sakura Blossom, Emerald Forest, Vesper, Cobalt Neon, Desert Dunes, Cyber Samurai, Glacier Mint, Carbon Titanium, Matcha Latte, Volcanic Magma, Catppuccin Frappé, Bioluminescence, Mocha Caramel, Neon Genesis, Midnight Amethyst, Andromeda, Golden Velvet, Miami Vice, Zen Garden, Google Cloud, GitHub Dark, Cyberpunk Edgerunners, VS Code Dark.
-
-You can also browse all themes visually by opening `synth-shell-color-preview.html` in a browser.
-
-## Synth-Shell Separator Editor
-
-A dedicated interactive editor to browse, preview, and configure Powerline and Nerd Font segment separators:
+The interactive `synth-shell` Prompt Theme Picker (64 themes), Dual Powerline Separator Editor (48 presets + 60+ Nerd Font glyphs), Runtime Speed Optimizer, and Live Web Studio now live in the standalone, zero-dependency Python package **`synth-shell-theme`** (`~/projetos/synth-shell-theme`):
 
 ```bash
-# Interactive mode (dual separator builder, 48 presets + custom palette)
-python3 synth-shell-separator-picker.py
+# Install via pipx (provides `synth-shell-theme` and `synth-shell-separator` in PATH)
+pipx install synth-shell-theme
+# (or local editable dev install: pipx install -e ~/projetos/synth-shell-theme --force)
 
-# Dual separator combination (e.g. arrow first, zap bolt last)
-python3 synth-shell-separator-picker.py --dual arrow zap
-python3 synth-shell-separator-picker.py --preview-dual round lightning
+# Apply all 4 runtime speed & compatibility patches to ~/.config/synth-shell
+synth-shell-theme init
 
-# CLI options
-python3 synth-shell-separator-picker.py --list                 # Showcase all presets with prompt previews
-python3 synth-shell-separator-picker.py --palette              # Show 60+ glyph Nerd Font visual table
-python3 synth-shell-separator-picker.py --current              # Show active internal and ending separators
-python3 synth-shell-separator-picker.py --internal round       # Change first/internal separator only
-python3 synth-shell-separator-picker.py --end zap              # Change ending separator only
-python3 synth-shell-separator-picker.py --preview "\uf0e7"     # Preview any Nerd Font / Unicode character
-python3 synth-shell-separator-picker.py --custom "\uE0CA"      # Apply custom hex code or character
-python3 synth-shell-separator-picker.py --random               # Apply random separator
+# Interactive 2-column 256-color terminal picker
+synth-shell-theme
+
+# Live browser-based Web Studio (64 themes + dual separator builder + segment layout)
+synth-shell-theme web
+
+# Dedicated interactive Dual Separator & 60+ Nerd Font Glyph Editor
+synth-shell-separator
+
+# Direct CLI commands
+synth-shell-theme --list
+synth-shell-theme --apply tokyo-night
+synth-shell-theme --dual round arrow
+synth-shell-theme doctor
 ```
-
-**Features:**
-- **Dual Separator Engine:** Mix and match different characters for internal segments (Host/PWD/Git) and the prompt ending (e.g. `arrow` inside + `zap` at the end).
-- **48 Curated Presets across 6 Categories:**
-  - **Powerline Solid (Hard Dividers):** `arrow` (), `round` (), `slant` (), `slant-up` (), `flame` (), `pixel` (), `wave` (), `hex` (), `ice` (), `sharp-slant` (), `trapezoid` ()
-  - **Powerline Thin (Soft Dividers):** `thin-arrow` (), `thin-round` (), `thin-flame` (), `thin-hex` ()
-  - **Geometric & Minimalist:** `slash` (╱), `backslash` (╲), `bar` (│), `heavy-bar` (┃), `half-block` (▌), `diamond` (◆), `bullet` (●)
-  - **Chevrons & Terminal Arrows:** `chevron` (»), `single-chevron` (›), `arrow-right` (→), `heavy-arrow` (➤), `octicon-chevron` (), `fa-angle` ()
-  - **⚡ Electricity, Sparks & High Voltage:** `zap` (⚡), `lightning` (), `thunder` (↯), `flash` (󱐋), `flash-wire` (󱐌), `sparkle` (✦), `starburst` (✧), `sparkles` (✨), `burst` (✹), `flare` (✸), `octo-flame` (), `plasma-fire` (󰈸), `overdrive` (󰓅), `wave-pulse` (↝), `squiggle` (⇝)
-  - **Nerd Font Emblems & Icons:** `star` (★), `rocket` (), `lock` (), `git` (), `terminal` ()
-- **Custom Character & Hex Parser:** Type or paste any Unicode hex (e.g. `\uE0B4`, `U+E0B4`, `0xe0b4`) or literal Nerd Font glyph.
-- **Live Preview:** Previews every separator combination with your actual active color scheme.
-- **Safe Config Merge:** Updates `separator_char` and `separator_char_end` cleanly while preserving all custom formatting options.
 
 ## WezTerm Config (settings as data)
 
@@ -206,16 +153,11 @@ wezterm-theme doctor
 ├── setup.sh                        # Main entry point — orchestrates all modules
 ├── backup.sh                       # Backup current workstation configs
 ├── restore.sh                      # Restore configs from backup archive
-├── synth-shell-theme-picker.py     # Interactive terminal theme picker (64 themes)
-├── synth-shell-separator-picker.py # Interactive Powerline & Nerd Font separator editor
-├── synth-shell-color-preview.html  # Browser-based theme gallery
 ├── lib/
 │   ├── common.sh                   # Shared functions (logging, progress, apt helpers)
 │   ├── wezterm.lua                 # WezTerm loader: reads defaults.json + settings.json
 │   ├── wezterm-defaults.json       # WezTerm default settings (fonts, tabs, keys, mouse…)
-│   ├── wezterm-deploy.sh           # Installs loader + defaults, keeps user settings
-│   ├── synth-shell-theme-picker.sh # Shell helper for theme selection during setup
-│   └── synth-shell-themes/         # 64 prompt color theme .conf files
+│   └── wezterm-deploy.sh           # Installs loader + defaults, keeps user settings
 └── modules/
     ├── 01-repos-nvidia.sh
     ├── 02-system-cli.sh
