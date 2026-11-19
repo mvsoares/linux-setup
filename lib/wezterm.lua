@@ -176,7 +176,7 @@ if tb.frame_font then
   }
 end
 
--- Tab theme module written by wezterm-tab-theme-picker; it returns
+-- Tab theme module written by wezterm-theme; it returns
 -- { apply = function(config, wezterm) } and installs its own format-tab-title.
 local theme_applied = false
 if tb.theme_file then
@@ -199,7 +199,7 @@ end
 -- Without a theme: cycle the fallback palette, "process|dir" titles.
 local fb = tb.fallback
 if not theme_applied and fb and fb.palette then
-  local title_len = fb.title_len or 15
+  local title_len = tb.tab_title_len or fb.title_len or 15
 
   local function format_fixed(text)
     if wezterm.column_width(text) > title_len then
