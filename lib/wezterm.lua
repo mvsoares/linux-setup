@@ -262,8 +262,14 @@ local custom_actions = {
     end)
   end,
   BroadcastToPanes = function()
+    local skip_apps = {
+      nvim = true, vim = true, vi = true, hx = true, helix = true, nano = true, emacs = true,
+      less = true, more = true, man = true, top = true, htop = true, btop = true,
+      claude = true, gemini = true, antigravity = true, agy = true, codex = true,
+      aider = true, opencode = true, goose = true, cline = true, amp = true,
+    }
     return act.PromptInputLine {
-      description = '📡 Broadcast command to ALL split panes in active tab:',
+      description = '📡 Broadcast command to shell panes in active tab (skips editors/AI agents/prod SSH):',
       action = wezterm.action_callback(function(window, _pane, line)
         if not line or line == '' then
           return
@@ -272,25 +278,52 @@ local custom_actions = {
         if not tab then
           return
         end
+        local sent, skipped = 0, 0
         for _, p in ipairs(tab:panes()) do
-          p:send_text(line .. '\n')
+          local ok_uv, uv = pcall(function() return p:get_user_vars() end)
+          uv = (ok_uv and type(uv) == 'table') and uv or {}
+          local cmdline = uv.WEZTERM_PROG or uv.WEZTERM_CMD or uv.cmd or ''
+          local ufirst = (cmdline:match('^%s*(%S+)') or ''):match('([^/\\]+)$') or ''
+          ufirst = ufirst:lower():gsub('%.exe$', '')
+          local ok_fg, fg = pcall(function() return p:get_foreground_process_name() end)
+          local fg_bin = ((ok_fg and fg) and (fg:match('([^/\\]+)$') or fg) or ''):lower():gsub('%.exe$', '')
+          local low_cmd = cmdline:lower()
+          local is_prod_ssh = (ufirst == 'ssh' or fg_bin == 'ssh')
+            and (low_cmd:find('prod') or low_cmd:find('prd') or low_cmd:find('root@'))
+          if skip_apps[ufirst] or skip_apps[fg_bin] or is_prod_ssh then
+            skipped = skipped + 1
+          else
+            p:send_text(line .. '\n')
+            sent = sent + 1
+          end
+        end
+        if skipped > 0 then
+          pcall(function()
+            window:toast_notification(
+              'Broadcast Guard',
+              string.format('Sent to %d shell pane(s); skipped %d interactive/agent/prod pane(s)', sent, skipped),
+              nil,
+              3000
+            )
+          end)
         end
       end),
     }
   end,
   ToggleZenMode = function()
     return wezterm.action_callback(function(window, _pane)
-      wezterm.GLOBAL.zen_windows = wezterm.GLOBAL.zen_windows or {}
-      local wid = tostring(window:window_id())
+      wezterm.GLOBAL._wt_zen_windows = wezterm.GLOBAL._wt_zen_windows or {}
+      local ok_wid, raw_wid = pcall(function() return window:window_id() end)
+      local wid = tostring((ok_wid and raw_wid) or '0')
       local overrides = window:get_config_overrides() or {}
-      if wezterm.GLOBAL.zen_windows[wid] then
-        wezterm.GLOBAL.zen_windows[wid] = nil
+      if wezterm.GLOBAL._wt_zen_windows[wid] then
+        wezterm.GLOBAL._wt_zen_windows[wid] = nil
         overrides.font_size = nil
         overrides.enable_tab_bar = nil
         overrides.window_background_opacity = nil
         overrides.window_padding = nil
       else
-        wezterm.GLOBAL.zen_windows[wid] = true
+        wezterm.GLOBAL._wt_zen_windows[wid] = true
         overrides.font_size = (config.font_size or 14) + 4
         overrides.enable_tab_bar = false
         overrides.window_background_opacity = 1.0
@@ -310,12 +343,12 @@ local custom_actions = {
       local snapshot = {
         saved_at = os.date('!%Y-%m-%dT%H:%M:%SZ'),
         active_workspace = window:active_workspace(),
-        windows = {},
+        workspaces = {},
       }
       local total_tabs = 0
       for _, mw in ipairs(all_wins) do
         local w_entry = {
-          workspace = mw:get_workspace() or 'default',
+          name = mw:get_workspace() or 'default',
           tabs = {},
         }
         for _, mtab in ipairs(mw:tabs()) do
@@ -335,12 +368,12 @@ local custom_actions = {
           })
           total_tabs = total_tabs + 1
         end
-        table.insert(snapshot.windows, w_entry)
+        table.insert(snapshot.workspaces, w_entry)
       end
       local encode = (wezterm.serde and wezterm.serde.json_encode_pretty)
         or (wezterm.serde and wezterm.serde.json_encode)
         or wezterm.json_encode
-      local snap_path = dir .. '/session-snapshot.json'
+      local snap_path = dir .. '/wezterm_session.json'
       local fh = io.open(snap_path, 'w')
       if fh then
         fh:write(encode(snapshot) .. '\n')
@@ -348,7 +381,7 @@ local custom_actions = {
         pcall(function()
           window:toast_notification(
             'WezTerm Session Saved',
-            string.format('Saved %d window(s), %d tab(s) to session-snapshot.json', #snapshot.windows, total_tabs),
+            string.format('Saved %d tab(s) across %d workspace(s) to wezterm_session.json', total_tabs, #snapshot.workspaces),
             nil,
             3000
           )
@@ -358,11 +391,11 @@ local custom_actions = {
   end,
   RestoreSession = function()
     return wezterm.action_callback(function(window, pane)
-      local snap_path = dir .. '/session-snapshot.json'
-      local snap = read_json(snap_path)
-      if not snap or type(snap.windows) ~= 'table' or #snap.windows == 0 then
+      local snap = read_json(dir .. '/wezterm_session.json') or read_json(dir .. '/session-snapshot.json')
+      local ws_entries = snap and (snap.workspaces or snap.windows) or nil
+      if not ws_entries or type(ws_entries) ~= 'table' or #ws_entries == 0 then
         pcall(function()
-          window:toast_notification('WezTerm Session', 'No saved session-snapshot.json found.', nil, 3000)
+          window:toast_notification('WezTerm Session', 'No saved wezterm_session.json found.', nil, 3000)
         end)
         return
       end
@@ -376,8 +409,8 @@ local custom_actions = {
         end
       end
       local restored_tabs = 0
-      for _, w_entry in ipairs(snap.windows) do
-        local ws_name = w_entry.workspace or 'default'
+      for _, w_entry in ipairs(ws_entries) do
+        local ws_name = w_entry.name or w_entry.workspace or 'default'
         local tabs = w_entry.tabs or {}
         if #tabs > 0 and not existing_ws[ws_name] then
           existing_ws[ws_name] = true
@@ -414,7 +447,7 @@ local custom_actions = {
       pcall(function()
         window:toast_notification(
           'WezTerm Session Restored',
-          string.format('Restored %d tab(s) from session-snapshot.json', restored_tabs),
+          string.format('Restored %d tab(s) from wezterm_session.json', restored_tabs),
           nil,
           3000
         )
@@ -466,7 +499,15 @@ end
 -- ─── Font ────────────────────────────────────────────────────────────────────
 local f = section('font')
 if f.family then
-  config.font = font(f.family, f.weight)
+  if f.fallback then
+    local primary = { family = f.family }
+    if f.weight then
+      primary.weight = f.weight
+    end
+    config.font = wezterm.font_with_fallback { primary, 'Symbols Nerd Font Mono', 'Noto Color Emoji' }
+  else
+    config.font = font(f.family, f.weight)
+  end
   -- Half-intensity rules keep dim text (status lines) off Victor Mono's
   -- Thin/Light cuts, which render almost invisible.
   if f.rules then
@@ -492,18 +533,37 @@ end
 -- set display.use_x11 = false until the next GNOME login. X11 clients see one
 -- DPI (288) on every monitor, hence dpi_by_screen for the laptop panel.
 local d = section('display')
-config.enable_wayland = not d.use_x11
+if d.enable_wayland ~= nil then
+  config.enable_wayland = d.enable_wayland
+else
+  config.enable_wayland = not d.use_x11
+end
 set('dpi_by_screen', d.dpi_by_screen)
 
 -- ─── Colors & terminal emulation ─────────────────────────────────────────────
 local c = section('colors')
 local dark_ui = is_appearance_dark()
-if not dark_ui and c.scheme_light and c.scheme_light ~= '' then
+local using_light_scheme = (not dark_ui) and c.scheme_light and c.scheme_light ~= ''
+if using_light_scheme then
   config.color_scheme = c.scheme_light
 else
   set('color_scheme', c.scheme)
 end
 set('bold_brightens_ansi_colors', c.bold_brightens_ansi_colors)
+if c.oled_black and not using_light_scheme then
+  config.colors = config.colors or {}
+  config.colors.background = '#000000'
+end
+if c.cursor_color and type(c.cursor_color) == 'string' and c.cursor_color:match('^#%x%x%x%x%x%x$') then
+  config.colors = config.colors or {}
+  config.colors.cursor_bg = c.cursor_color
+  config.colors.cursor_border = c.cursor_color
+  local cr = tonumber(c.cursor_color:sub(2, 3), 16) or 0
+  local cg = tonumber(c.cursor_color:sub(4, 5), 16) or 0
+  local cb = tonumber(c.cursor_color:sub(6, 7), 16) or 0
+  local lum = (0.2126 * cr + 0.7152 * cg + 0.0722 * cb) / 255
+  config.colors.cursor_fg = lum > 0.5 and '#000000' or '#ffffff'
+end
 
 local t = section('terminal')
 set('term', t.term)
@@ -517,6 +577,13 @@ set('exit_behavior', t.exit_behavior)
 -- maximize/tile sizes.
 local w = section('window')
 set('window_background_opacity', w.opacity)
+if w.blur and tonumber(w.blur) and tonumber(w.blur) > 0 then
+  config.macos_window_background_blur = tonumber(w.blur)
+  config.kde_window_background_blur = true
+end
+if w.win32_backdrop and w.win32_backdrop ~= '' then
+  config.win32_system_backdrop = w.win32_backdrop
+end
 config.window_decorations = w.decorations or (d.use_x11 and 'TITLE | RESIZE' or 'INTEGRATED_BUTTONS | RESIZE')
 set('window_padding', w.padding)
 set('initial_cols', w.initial_cols)
@@ -695,7 +762,7 @@ end
 -- Leader/key-table transitions trigger update-status immediately with zero lag.
 local st = section('status')
 if st.enabled then
-  set('status_update_interval', st.interval_ms)
+  set('status_update_interval', st.update_interval or st.interval_ms)
 
   wezterm.GLOBAL.git_branch_cache = wezterm.GLOBAL.git_branch_cache or {}
 
@@ -709,17 +776,57 @@ if st.enabled then
     if entry and (now - entry.ts) < (st.git_recheck_s or 10) then
       return entry.branch
     end
-    local ok, success, stdout = pcall(wezterm.run_child_process, {
-      'git',
-      '-C',
-      cwd,
-      'rev-parse',
-      '--abbrev-ref',
-      'HEAD',
-    })
     local branch = ''
-    if ok and success and stdout then
-      branch = stdout:gsub('%s+$', '')
+    local scan_dir = cwd:gsub('\\', '/')
+    if scan_dir ~= '/' then
+      scan_dir = scan_dir:gsub('/+$', '')
+    end
+    local needs_git_cli = true
+    for _ = 1, 20 do
+      if scan_dir == '' then
+        needs_git_cli = false
+        break
+      end
+      local base = scan_dir == '/' and '' or scan_dir
+      local hf = io.open(base .. '/.git/HEAD', 'r')
+      if hf then
+        local head = hf:read('*l') or ''
+        hf:close()
+        local ref = head:match('^ref:%s*refs/heads/(.+)$')
+        ref = ref and ref:gsub('%s+$', '') or ''
+        if ref ~= '' and ref ~= '.invalid' then
+          branch = ref
+          needs_git_cli = false
+        end
+        break
+      end
+      local gf = io.open(base .. '/.git', 'r')
+      if gf then
+        local line = gf:read('*l') or ''
+        gf:close()
+        if line:match('^gitdir:') then
+          break
+        end
+      end
+      if scan_dir == '/' then
+        needs_git_cli = false
+        break
+      end
+      local parent = scan_dir:match('^(.+)/[^/]+$')
+      scan_dir = parent or '/'
+    end
+    if needs_git_cli then
+      local ok, success, stdout = pcall(wezterm.run_child_process, {
+        'git',
+        '-C',
+        cwd,
+        'rev-parse',
+        '--abbrev-ref',
+        'HEAD',
+      })
+      if ok and success and stdout then
+        branch = stdout:gsub('%s+$', '')
+      end
     end
     local count = 0
     for _ in pairs(cache) do
@@ -829,7 +936,13 @@ if st.enabled then
               local ptitle = (ap.get_title and ap:get_title() or ''):lower()
               local pfg = ((ap.get_foreground_process_name and ap:get_foreground_process_name() or ''):match('([^/\\]+)$') or ''):lower()
               local probe = ucmd .. ' ' .. pfg .. ' ' .. ptitle
-              local ag = probe:match('claude') or probe:match('gemini') or probe:match('antigravity') or probe:match('codex') or probe:match('aider') or probe:match('opencode') or probe:match('goose') or probe:match('cline')
+              local ag = nil
+              for _, name in ipairs { 'claude', 'gemini', 'antigravity', 'agy', 'codex', 'aider', 'opencode', 'goose', 'cline', 'amp' } do
+                if probe:find('%f[%w]' .. name .. '%f[%W]') then
+                  ag = name
+                  break
+                end
+              end
               if ag then
                 wezterm.GLOBAL._wt_agent_notified[pid] = true
                 local ttitle = (mtab.get_title and mtab:get_title()) or ''
@@ -994,6 +1107,20 @@ set('visual_bell', be.visual)
 
 -- ─── Hyperlinks ──────────────────────────────────────────────────────────────
 local h = section('hyperlinks')
+if h.quick_select then
+  config.quick_select_patterns = config.quick_select_patterns or {}
+  for _, pat in ipairs {
+    '\\b[0-9a-f]{7,40}\\b',
+    '\\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\\b',
+    '\\b(?:\\d{1,3}\\.){3}\\d{1,3}(?::\\d{1,5})?\\b',
+    '\\bv?\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]+)?\\b',
+    '#[0-9a-fA-F]{6}\\b',
+    '\\b[a-z][a-z0-9-]{2,62}-[0-9a-f]{8,10}-[a-z0-9]{5}\\b',
+    '(?:[A-Za-z0-9_./-]+\\.[A-Za-z0-9]{1,8}):\\d+(?::\\d+)?',
+  } do
+    table.insert(config.quick_select_patterns, pat)
+  end
+end
 if h.include_defaults ~= false or h.extra then
   config.hyperlink_rules = h.include_defaults ~= false and wezterm.default_hyperlink_rules() or {}
   for _, rule in ipairs(h.extra or {}) do
@@ -1074,31 +1201,12 @@ end
 -- ─── Command Palette (Ctrl+Shift+P) ──────────────────────────────────────────
 if tb.command_palette ~= false then
   wezterm.on('augment-command-palette', function(window, pane)
+    local has_studio_palette = loaded_theme and type(loaded_theme.command_palette_entries) == 'function'
     local entries = {
       {
-        brief = 'Workflow: Switch / Spawn Project Workspace (zoxide + ~/projetos)',
-        icon = 'md_folder_pound',
-        action = custom_actions.ProjectSessionizer(),
-      },
-      {
-        brief = 'Workflow: Broadcast Command to All Split Panes in Tab',
+        brief = 'Workflow: Broadcast Command to Shell Panes in Active Tab',
         icon = 'md_broadcast',
         action = custom_actions.BroadcastToPanes(),
-      },
-      {
-        brief = 'Workflow: Toggle Zen / Presentation Mode (+4pt, distraction-free)',
-        icon = 'md_meditation',
-        action = custom_actions.ToggleZenMode(),
-      },
-      {
-        brief = 'Workflow: Save Workspace & Tab Session Snapshot',
-        icon = 'md_content_save',
-        action = custom_actions.SaveSession(),
-      },
-      {
-        brief = 'Workflow: Restore Workspace & Tab Session Snapshot',
-        icon = 'md_backup_restore',
-        action = custom_actions.RestoreSession(),
       },
       {
         brief = 'Workflow: Rename Active Tab',
@@ -1116,12 +1224,37 @@ if tb.command_palette ~= false then
         action = custom_actions.OpenUrlQuickSelect(),
       },
     }
-    if loaded_theme and type(loaded_theme.command_palette_entries) == 'function' then
+    if has_studio_palette then
       local ok_e, extra = pcall(loaded_theme.command_palette_entries, config, wezterm, window, pane)
       if ok_e and type(extra) == 'table' then
         for _, item in ipairs(extra) do
           table.insert(entries, item)
         end
+      end
+    else
+      for _, fallback_entry in ipairs {
+        {
+          brief = 'Workflow: Switch / Spawn Project Workspace (zoxide + ~/projetos)',
+          icon = 'md_folder_pound',
+          action = custom_actions.ProjectSessionizer(),
+        },
+        {
+          brief = 'Workflow: Toggle Zen / Presentation Mode (+4pt, distraction-free)',
+          icon = 'md_meditation',
+          action = custom_actions.ToggleZenMode(),
+        },
+        {
+          brief = 'Workflow: Save Workspace & Tab Session Snapshot',
+          icon = 'md_content_save',
+          action = custom_actions.SaveSession(),
+        },
+        {
+          brief = 'Workflow: Restore Workspace & Tab Session Snapshot',
+          icon = 'md_backup_restore',
+          action = custom_actions.RestoreSession(),
+        },
+      } do
+        table.insert(entries, fallback_entry)
       end
     end
     return entries
