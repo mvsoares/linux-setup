@@ -867,9 +867,43 @@ if st.enabled then
       end
     end
 
-    if wide and st.battery then
-      for _, b in ipairs(wezterm.battery_info()) do
-        table.insert(segments, string.format('%.0f%%', b.state_of_charge * 100))
+    if st.battery ~= false and st.battery_mode ~= 'off' then
+      local bat_opts = {
+        enabled = st.battery ~= false,
+        mode = st.battery_mode or 'always',
+        style = st.battery_style or 'nerd',
+        time = st.battery_time or 'off',
+        warn = st.battery_warn or 30,
+        crit = st.battery_crit or 15,
+        toast = st.battery_toast == true,
+        color = st.color or '#a6adc8',
+      }
+      local bat_segs = nil
+      if loaded_theme and type(loaded_theme.format_battery_segments) == 'function' then
+        local ok_bs, res_bs = pcall(loaded_theme.format_battery_segments, wezterm, window, bat_opts)
+        if ok_bs and type(res_bs) == 'table' then
+          bat_segs = res_bs
+        end
+      end
+      if not bat_segs then
+        bat_segs = {}
+        local ok_bi, binfo = pcall(wezterm.battery_info)
+        if ok_bi and type(binfo) == 'table' then
+          local nf_steps = { '\u{f008e}', '\u{f007a}', '\u{f007b}', '\u{f007c}', '\u{f007d}', '\u{f007e}', '\u{f007f}', '\u{f0080}', '\u{f0081}', '\u{f0082}', '\u{f0079}' }
+          for _, b in ipairs(binfo) do
+            local pct = math.min(100, math.max(0, math.floor(((b.state_of_charge or 0) * 100) + 0.5)))
+            local step = math.min(10, math.max(0, math.floor((pct + 5) / 10)))
+            local b_state = tostring(b.state or '')
+            local icon = b_state == 'Charging' and '\u{f0084}' or (nf_steps[step + 1] or '\u{f0079}')
+            local fg = (b_state == 'Charging' or b_state == 'Full') and '#34d399' or (pct <= 15 and '#f87171' or (pct <= 30 and '#fbbf24' or (st.color or '#a6adc8')))
+            table.insert(bat_segs, { text = string.format('%s %d%%', icon, pct), fg = fg, bold = pct <= 30 })
+          end
+        end
+      end
+      for _, bseg in ipairs(bat_segs) do
+        if wide or (type(bseg) == 'table' and bseg.bg ~= nil) then
+          table.insert(segments, bseg)
+        end
       end
     end
 
@@ -906,8 +940,32 @@ if st.enabled then
     end
 
     if #segments > 0 then
-      table.insert(elements, { Foreground = { Color = st.color or '#a6adc8' } })
-      table.insert(elements, { Text = '  ' .. table.concat(segments, '   ') .. '  ' })
+      local base_col = st.color or '#a6adc8'
+      table.insert(elements, { Foreground = { Color = base_col } })
+      table.insert(elements, { Text = '  ' })
+      for idx, seg in ipairs(segments) do
+        if idx > 1 then
+          table.insert(elements, { Foreground = { Color = base_col } })
+          table.insert(elements, { Text = '   ' })
+        end
+        if type(seg) == 'table' then
+          if seg.bg then
+            table.insert(elements, { Background = { Color = seg.bg } })
+          end
+          table.insert(elements, { Foreground = { Color = seg.fg or base_col } })
+          if seg.bold then
+            table.insert(elements, { Attribute = { Intensity = 'Bold' } })
+          end
+          table.insert(elements, { Text = seg.text })
+          if seg.bg or seg.bold then
+            table.insert(elements, 'ResetAttributes')
+          end
+        else
+          table.insert(elements, { Foreground = { Color = base_col } })
+          table.insert(elements, { Text = tostring(seg) })
+        end
+      end
+      table.insert(elements, { Text = '  ' })
     end
 
     window:set_right_status(wezterm.format(elements))

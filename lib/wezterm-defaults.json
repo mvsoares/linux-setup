@@ -66,6 +66,12 @@
     "git_branch": true,
     "git_recheck_s": 10,
     "battery": true,
+    "battery_mode": "always",
+    "battery_style": "nerd",
+    "battery_time": "always",
+    "battery_warn": 30,
+    "battery_crit": 15,
+    "battery_toast": true,
     "clock": "%H:%M",
     "color": "#a6adc8"
   },
