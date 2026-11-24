@@ -241,15 +241,23 @@ else
     fi
 fi
 
-# Apply runtime optimizations & theme via standalone `synth-shell-theme` package
-SYNTH_THEME_REPO="$(cd "${SCRIPT_DIR}/.." && pwd)/synth-shell-theme"
+# Install & run standalone `synth-shell-theme` via pipx (PyPI with GitHub fallback)
 SYNTH_THEME_BIN="${USER_HOME}/.local/bin/synth-shell-theme"
+SYNTH_THEME_GIT="git+https://github.com/mvsoares/synth-shell-theme.git"
 
-if [[ -n "$REAL_USER" ]] && [[ ! -x "$SYNTH_THEME_BIN" ]] && command -v pipx &>/dev/null; then
-    if [[ -d "$SYNTH_THEME_REPO" ]]; then
-        as_user "pipx install -e '${SYNTH_THEME_REPO}' --force" >> "$LOG_FILE" 2>&1 || true
-    else
-        as_user "pipx install synth-shell-theme --force" >> "$LOG_FILE" 2>&1 || true
+if [[ -n "$REAL_USER" ]]; then
+    if ! command -v pipx &>/dev/null; then
+        pkg_install pipx
+        as_user "pipx ensurepath" >> "$LOG_FILE" 2>&1 || true
+    fi
+    if command -v pipx &>/dev/null; then
+        if as_user "pipx install --force synth-shell-theme" >> "$LOG_FILE" 2>&1; then
+            ok "synth-shell-theme installed/updated via pipx (PyPI)"
+        elif as_user "pipx install --force '${SYNTH_THEME_GIT}'" >> "$LOG_FILE" 2>&1; then
+            ok "synth-shell-theme installed/updated via pipx (GitHub)"
+        else
+            warn "synth-shell-theme pipx install failed — check ${LOG_FILE}"
+        fi
     fi
 fi
 
@@ -267,13 +275,8 @@ if [[ -f "$SYNTH_PROMPT" ]] && [[ -n "$REAL_USER" ]]; then
             "$SYNTH_THEME_BIN" "${SYNTH_INIT_ARGS[@]}" >> "$LOG_FILE" 2>&1 \
             && ok "synth-shell runtime patches & theme verified (synth-shell-theme)" \
             || warn "synth-shell-theme init reported an issue — check ${LOG_FILE}"
-    elif [[ -d "${SYNTH_THEME_REPO}/src" ]]; then
-        sudo -u "$REAL_USER" HOME="$USER_HOME" PYTHONPATH="${SYNTH_THEME_REPO}/src" \
-            python3 -m synth_shell_theme "${SYNTH_INIT_ARGS[@]}" >> "$LOG_FILE" 2>&1 \
-            && ok "synth-shell runtime patches & theme verified (local synth-shell-theme)" \
-            || warn "synth-shell-theme init reported an issue — check ${LOG_FILE}"
     else
-        info "Install 'synth-shell-theme' via pipx to manage 64 prompt themes & runtime optimizations"
+        warn "synth-shell-theme binary not found at ${SYNTH_THEME_BIN} — run: pipx install synth-shell-theme"
     fi
 fi
 tick "synth-shell (prompt · better-ls · better-alias · better-history)"

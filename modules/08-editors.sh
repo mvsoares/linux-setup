@@ -213,7 +213,25 @@ PROMPT_COMMAND="${PROMPT_COMMAND:-}"'; __wezterm_osc7; __wezterm_set_user_var cm
 WEZTERM_HOOK
     ok "WezTerm bash hook added/updated (process name + cwd in tab titles)"
 fi
-tick "WezTerm + config"
+
+# Install standalone `wezterm-theme` (wezterm-studio) via pipx (PyPI with GitHub fallback)
+WEZTERM_STUDIO_GIT="git+https://github.com/mvsoares/wezterm-studio.git"
+if [[ -n "$REAL_USER" ]]; then
+    if ! command -v pipx &>/dev/null; then
+        pkg_install pipx
+        as_user "pipx ensurepath" >> "$LOG_FILE" 2>&1 || true
+    fi
+    if command -v pipx &>/dev/null; then
+        if as_user "pipx install --force wezterm-theme" >> "$LOG_FILE" 2>&1; then
+            ok "wezterm-theme (wezterm-studio) installed/updated via pipx (PyPI)"
+        elif as_user "pipx install --force '${WEZTERM_STUDIO_GIT}'" >> "$LOG_FILE" 2>&1; then
+            ok "wezterm-theme (wezterm-studio) installed/updated via pipx (GitHub)"
+        else
+            warn "wezterm-theme pipx install failed — check ${LOG_FILE}"
+        fi
+    fi
+fi
+tick "WezTerm + config + wezterm-theme"
 
 # ── AI Code Assist CLIs ───────────────────────────────────────────────────
 

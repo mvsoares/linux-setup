@@ -22,12 +22,12 @@ The setup is split into **10 ordered modules**, each independently skippable and
 |---|--------|------------|
 | 1 | **Repos & NVIDIA** | Universe/multiverse, Brave, GitHub CLI, Flatpak/Flathub, NVIDIA drivers + Vulkan + power rules |
 | 2 | **System & CLI** | build-essential, git, Podman, fzf, ripgrep, fd, bat, eza, zoxide, git-delta, lazygit, lazydocker, dust, procs, btm, hyperfine, glow, and more |
-| 3 | **Shell** | Starship prompt, synth-shell (managed via standalone `synth-shell-theme`), global aliases, fzf integration, zoxide init, history tuning |
+| 3 | **Shell** | Starship prompt, synth-shell + `synth-shell-theme` (pipx/GitHub), global aliases, fzf integration, zoxide init, history tuning |
 | 4 | **Fonts & Themes** | 25+ Nerd Fonts, Inter, Monaspace, Geist; Dracula & Catppuccin GTK themes; Papirus & Tela icons; Bibata cursors |
 | 5 | **GNOME** | Dash to Dock, Blur my Shell, Just Perfection, Caffeine, Clipboard Indicator, Vitals, Space Bar; dark mode, workspace shortcuts, Nautilus tree view |
 | 6 | **Cloud & K8s** | AWS CLI v2, gcloud, azure-cli, kubectl, helm, k9s, stern, kubectx/kubens, kustomize, eksctl |
 | 7 | **Languages** | nvm + Node LTS, pyenv + Python, rustup, Go, SDKMAN (Java), pipx (black, ruff, mypy, poetry, httpie, tldr) |
-| 8 | **Editors** | VSCodium (with ~30 extensions), Neovim + kickstart.nvim, WezTerm (config + process-name tab titles) |
+| 8 | **Editors** | VSCodium (with ~30 extensions), Neovim + kickstart.nvim, WezTerm (config + `wezterm-theme` via pipx/GitHub) |
 | 9 | **Workspace** | Git (delta, libsecret, rerere, rebase), tmux (Ctrl+A, Dracula status), direnv, editorconfig, SSH defaults |
 | 10 | **Tweaks** | swappiness=10, TCP tuning, inotify limits, fstrim, preload, UFW firewall, journal cleanup, helper scripts |
 
@@ -81,11 +81,11 @@ Existing files are saved as `*.pre-restore` before being overwritten.
 The interactive `synth-shell` Prompt Theme Picker (64 themes), Dual Powerline Separator Editor (48 presets + 60+ Nerd Font glyphs), Runtime Speed Optimizer, and Live Web Studio now live in the standalone, zero-dependency Python package **[synth-shell-theme](https://github.com/mvsoares/synth-shell-theme)** ([PyPI](https://pypi.org/project/synth-shell-theme/)):
 
 ```bash
-# Install via pipx (provides `synth-shell-theme` and `synth-shell-separator` in PATH)
+# Install from PyPI via pipx (provides `synth-shell-theme` and `synth-shell-separator` in PATH)
 pipx install synth-shell-theme
-# (or local editable dev install: pipx install -e ~/projetos/synth-shell-theme --force)
+# (or directly from GitHub: pipx install git+https://github.com/mvsoares/synth-shell-theme.git)
 
-# Apply all 4 runtime speed & compatibility patches to ~/.config/synth-shell
+# Apply all runtime speed, telemetry & safety patches to ~/.config/synth-shell
 synth-shell-theme init
 
 # Interactive 2-column 256-color terminal picker
@@ -131,7 +131,7 @@ The interactive WezTerm Tab Bar Theme Picker (60 themes + Symbol Customizer) and
 ```bash
 # Install from PyPI via pipx (provides `wezterm-theme` and `wezterm-tab-theme` in PATH)
 pipx install wezterm-theme
-# (or local editable dev install: pipx install -e ~/projetos/wezterm-studio --force)
+# (or directly from GitHub: pipx install git+https://github.com/mvsoares/wezterm-studio.git)
 
 # Interactive terminal TUI (60 themes, symbol builder, font & scheme pickers)
 wezterm-theme
