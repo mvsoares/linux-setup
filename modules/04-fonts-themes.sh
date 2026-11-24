@@ -93,16 +93,19 @@ NERD_FONTS=(
     "Recursive:Recursive"
 )
 
-_nf_jobs=0
-for entry in "${NERD_FONTS[@]}"; do
-    install_nerd_font "${entry%%:*}" "${entry#*:}" &
-    _nf_jobs=$((_nf_jobs + 1))
-    if [[ $_nf_jobs -ge 4 ]]; then
-        wait -n 2>/dev/null || wait
-        _nf_jobs=$((_nf_jobs - 1))
-    fi
-done
-wait
+# Run in an isolated subshell so `wait` / `wait -n` never waits on setup.sh's SUDO_KEEPER_PID
+(
+    _nf_jobs=0
+    for entry in "${NERD_FONTS[@]}"; do
+        install_nerd_font "${entry%%:*}" "${entry#*:}" &
+        _nf_jobs=$((_nf_jobs + 1))
+        if [[ $_nf_jobs -ge 4 ]]; then
+            wait -n 2>/dev/null || wait
+            _nf_jobs=$((_nf_jobs - 1))
+        fi
+    done
+    wait
+)
 tick "21 Nerd Fonts + Symbols fallback (mono, patched with icons)"
 
 # ── 2. Package manager monospace fallback fonts (non-duplicating) ────────────
@@ -129,16 +132,18 @@ GOOGLE_FONTS=(
     "Outfit"
     "Geist"
 )
-_gf_jobs=0
-for gfont in "${GOOGLE_FONTS[@]}"; do
-    install_google_font "$gfont" &
-    _gf_jobs=$((_gf_jobs + 1))
-    if [[ $_gf_jobs -ge 4 ]]; then
-        wait -n 2>/dev/null || wait
-        _gf_jobs=$((_gf_jobs - 1))
-    fi
-done
-wait
+(
+    _gf_jobs=0
+    for gfont in "${GOOGLE_FONTS[@]}"; do
+        install_google_font "$gfont" &
+        _gf_jobs=$((_gf_jobs + 1))
+        if [[ $_gf_jobs -ge 4 ]]; then
+            wait -n 2>/dev/null || wait
+            _gf_jobs=$((_gf_jobs - 1))
+        fi
+    done
+    wait
+)
 tick "General/display fonts (Google Fonts)"
 
 # ── 4. Package manager general & emoji fonts (no duplicates with Google) ─────

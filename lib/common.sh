@@ -86,23 +86,41 @@ detect_user() {
     [[ -z "$REAL_USER" ]] && REAL_USER="$(id -un 1000 2>/dev/null || echo "")"
     USER_HOME=$(getent passwd "$REAL_USER" | cut -d: -f6 2>/dev/null || echo "/root")
     USER_ID=$(id -u "$REAL_USER" 2>/dev/null || echo "1000")
-    export REAL_USER USER_HOME USER_ID
+    USER_GROUP=$(id -gn "$REAL_USER" 2>/dev/null || echo "$REAL_USER")
+    export REAL_USER USER_HOME USER_ID USER_GROUP
 }
 
 # pipx / rustup / zoxide install to ~/.local/bin — non-interactive subshells need PATH
 ensure_user_local_bin_path() {
     [[ -z "${REAL_USER:-}" || -z "${USER_HOME:-}" ]] && return 0
+    local grp="${USER_GROUP:-$REAL_USER}"
+    # Pre-create standard XDG user dirs owned by the real user so running as root
+    # never leaves ~/.local or ~/.config owned by root:root (breaks pipx, synth-shell, etc.)
+    local d
+    for d in \
+        "${USER_HOME}/.local" \
+        "${USER_HOME}/.local/bin" \
+        "${USER_HOME}/.local/share" \
+        "${USER_HOME}/.local/share/applications" \
+        "${USER_HOME}/.local/state" \
+        "${USER_HOME}/.config" \
+        "${USER_HOME}/.cache" \
+        "${USER_HOME}/.bashrc.d"; do
+        mkdir -p "$d"
+        chown "${REAL_USER}:${grp}" "$d" 2>/dev/null || true
+    done
+
     local marker='# linux-setup: ~/.local/bin (pipx, cargo, user tools)'
     local rc="${USER_HOME}/.bashrc"
     [[ -f "$rc" ]] || touch "$rc"
-    chown "$REAL_USER:$REAL_USER" "$rc" 2>/dev/null || true
+    chown "${REAL_USER}:${grp}" "$rc" 2>/dev/null || true
     if ! grep -qF "$marker" "$rc" 2>/dev/null; then
         cat >> "$rc" << 'EOF'
 
 # linux-setup: ~/.local/bin (pipx, cargo, user tools)
 [[ -d "$HOME/.local/bin" ]] && case ":$PATH:" in *":$HOME/.local/bin:"*) ;; *) export PATH="$HOME/.local/bin:$PATH" ;; esac
 EOF
-        chown "$REAL_USER:$REAL_USER" "$rc"
+        chown "${REAL_USER}:${grp}" "$rc"
         ok "~/.local/bin PATH block added to ${REAL_USER}'s .bashrc"
     fi
     ensure_bashrc_d
@@ -112,9 +130,11 @@ EOF
 # terminals (GNOME Terminal, WezTerm on Ubuntu) load modular shell configs too.
 ensure_bashrc_d() {
     [[ -z "${REAL_USER:-}" || -z "${USER_HOME:-}" ]] && return 0
+    local grp="${USER_GROUP:-$REAL_USER}"
     local rc="${USER_HOME}/.bashrc"
     local d="${USER_HOME}/.bashrc.d"
-    install -d -o "$REAL_USER" -g "$REAL_USER" "$d" 2>/dev/null || mkdir -p "$d"
+    mkdir -p "$d"
+    chown "${REAL_USER}:${grp}" "$d" 2>/dev/null || true
     [[ -f "$rc" ]] || touch "$rc"
     local marker='# linux-setup: load ~/.bashrc.d/*.sh'
     if ! grep -qF "$marker" "$rc" 2>/dev/null; then
@@ -128,7 +148,7 @@ if [[ -d "$HOME/.bashrc.d" ]]; then
     unset _rc_snip
 fi
 EOF
-        chown "$REAL_USER:$REAL_USER" "$rc"
+        chown "${REAL_USER}:${grp}" "$rc"
     fi
 }
 
@@ -137,12 +157,14 @@ EOF
 install_shell_snippet() {
     local filename="$1"
     local src_content="$2"
+    local grp="${USER_GROUP:-${REAL_USER:-root}}"
     printf '%s\n' "$src_content" > "/etc/profile.d/${filename}"
     chmod 644 "/etc/profile.d/${filename}"
     if [[ -n "${REAL_USER:-}" && -n "${USER_HOME:-}" ]]; then
-        install -d -o "$REAL_USER" -g "$REAL_USER" "${USER_HOME}/.bashrc.d" 2>/dev/null || true
+        mkdir -p "${USER_HOME}/.bashrc.d"
+        chown "${REAL_USER}:${grp}" "${USER_HOME}/.bashrc.d" 2>/dev/null || true
         printf '%s\n' "$src_content" > "${USER_HOME}/.bashrc.d/${filename}"
-        chown "$REAL_USER:$REAL_USER" "${USER_HOME}/.bashrc.d/${filename}"
+        chown "${REAL_USER}:${grp}" "${USER_HOME}/.bashrc.d/${filename}"
         chmod 644 "${USER_HOME}/.bashrc.d/${filename}"
     fi
 }

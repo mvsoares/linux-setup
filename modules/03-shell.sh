@@ -160,6 +160,7 @@ tick "Shell profile (/etc/profile.d + ~/.bashrc.d/99-workstation.sh)"
 if [[ -n "$REAL_USER" ]]; then
     STARSHIP_CFG="${USER_HOME}/.config/starship.toml"
     mkdir -p "${USER_HOME}/.config"
+    chown "${REAL_USER}:${USER_GROUP:-$REAL_USER}" "${USER_HOME}/.config" 2>/dev/null || true
     if [[ ! -f "$STARSHIP_CFG" ]]; then
         cat > "$STARSHIP_CFG" << 'TOML'
 "$schema" = 'https://starship.rs/config-schema.json'

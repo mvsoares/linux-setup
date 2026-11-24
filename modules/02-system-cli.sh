@@ -299,7 +299,7 @@ fi
 
 # hadolint (Dockerfile / Containerfile linter)
 if ! command -v hadolint &>/dev/null; then
-    install_github_bin "hadolint/hadolint" "hadolint-Linux-${ARCH_ALT}" "hadolint" "hadolint"
+    install_github_bin "hadolint/hadolint" "hadolint-linux-${ARCH_ALT}" "hadolint" "hadolint"
 else
     skip "hadolint"
 fi
