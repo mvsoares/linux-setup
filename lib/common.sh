@@ -102,6 +102,7 @@ ensure_user_local_bin_path() {
         "${USER_HOME}/.local/bin" \
         "${USER_HOME}/.local/share" \
         "${USER_HOME}/.local/share/applications" \
+        "${USER_HOME}/.local/share/man" \
         "${USER_HOME}/.local/state" \
         "${USER_HOME}/.config" \
         "${USER_HOME}/.cache" \
@@ -311,9 +312,11 @@ add_dnf_repo() {
 }
 
 # ── APT helpers (Debian/Ubuntu) ───────────────────────────────────────────────
+APT_LOCK_OPT=(-o DPkg::Lock::Timeout=120)
+
 apt_quiet() {
     local rc=0
-    DEBIAN_FRONTEND=noninteractive apt-get -y -q "$@" >> "$LOG_FILE" 2>&1 || rc=$?
+    DEBIAN_FRONTEND=noninteractive apt-get "${APT_LOCK_OPT[@]}" -y -q "$@" >> "$LOG_FILE" 2>&1 || rc=$?
     [[ $rc -ne 0 ]] && warn "apt-get $* → exit ${rc} (see log)"
     return $rc
 }
@@ -321,7 +324,7 @@ apt_quiet() {
 apt_each() {
     for pkg in "$@"; do
         local rc=0
-        DEBIAN_FRONTEND=noninteractive apt-get -y -q install "$pkg" >> "$LOG_FILE" 2>&1 || rc=$?
+        DEBIAN_FRONTEND=noninteractive apt-get "${APT_LOCK_OPT[@]}" -y -q install "$pkg" >> "$LOG_FILE" 2>&1 || rc=$?
         if [[ $rc -eq 0 ]]; then ok "${pkg}"; else warn "${pkg} — not found / failed (skipped)"; fi
     done
 }

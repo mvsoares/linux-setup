@@ -135,8 +135,8 @@ tick "SDKMAN (Java/Gradle/Maven/Kotlin)"
 # ── JDK 25 + Maven via SDKMAN ────────────────────────────────────────────────
 if [[ -s "${SDKMAN_DIR}/bin/sdkman-init.sh" ]]; then
     # JDK 25 (Temurin)
-    if as_user "source '${SDKMAN_DIR}/bin/sdkman-init.sh' && sdk list java 2>/dev/null | grep -q '25\..*tem.*installed'" 2>/dev/null; then
-        skip "JDK 25 (Temurin)"
+    if [[ -x "${SDKMAN_DIR}/candidates/java/current/bin/java" ]]; then
+        skip "JDK ($( "${SDKMAN_DIR}/candidates/java/current/bin/java" -version 2>&1 | head -1 ))"
     else
         info "Installing JDK 25 (Temurin)..."
         JDK25_ID=$(as_user "source '${SDKMAN_DIR}/bin/sdkman-init.sh' && sdk list java 2>/dev/null" \
@@ -149,8 +149,8 @@ if [[ -s "${SDKMAN_DIR}/bin/sdkman-init.sh" ]]; then
         fi
     fi
 
-    # Maven
-    if as_user "source '${SDKMAN_DIR}/bin/sdkman-init.sh' && sdk list maven 2>/dev/null | grep -q 'installed'" 2>/dev/null; then
+    # Maven (check actual binary — `sdk list maven` legend always contains the word "installed")
+    if [[ -x "${SDKMAN_DIR}/candidates/maven/current/bin/mvn" ]]; then
         skip "Maven"
     else
         info "Installing Maven..."

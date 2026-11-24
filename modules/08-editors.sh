@@ -168,7 +168,7 @@ else
                 "/etc/apt/sources.list.d/wezterm.list" \
                 "deb [signed-by=/usr/share/keyrings/wezterm-fury.gpg] https://apt.fury.io/wez/ * *"; then
                 apt_quiet update
-                if apt-get install -y -qq wezterm >> "$LOG_FILE" 2>&1; then
+                if DEBIAN_FRONTEND=noninteractive apt-get "${APT_LOCK_OPT[@]}" -y -qq install wezterm >> "$LOG_FILE" 2>&1; then
                     _wez_installed=true && ok "WezTerm (apt)"
                 fi
             fi
