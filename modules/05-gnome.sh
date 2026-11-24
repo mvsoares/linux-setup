@@ -5,10 +5,10 @@ init_sub 9
 
 # ── Dependencies ──────────────────────────────────────────────────────────────
 if is_fedora; then
-    dnf_each gnome-tweaks gnome-extensions-app gnome-shell-extension-appindicator dconf-editor kolourpaint drawing gnome-text-editor
+    dnf_each gnome-tweaks gnome-extensions-app gnome-shell-extension-appindicator dconf-editor gnome-text-editor pinta
 else
     apt_each gnome-tweaks gnome-shell-extensions gnome-shell-extension-manager \
-             gnome-shell-extension-appindicator dconf-editor kolourpaint drawing gnome-text-editor
+             gnome-shell-extension-appindicator dconf-editor gnome-text-editor pinta gnome-screenshot
 fi
 gtk-update-icon-cache -f /usr/share/icons/hicolor 2>/dev/null || true
 tick "GNOME dependencies"
@@ -31,24 +31,26 @@ install_extension() {
     local name="$1" uuid="$2" ext_id="$3"
     local dest="${EXTENSIONS_DIR}/${uuid}"
     if [[ -d "$dest" ]]; then
+        [[ -d "$dest/schemas" && ! -f "$dest/schemas/gschemas.compiled" ]] \
+            && glib-compile-schemas "$dest/schemas" >> "$LOG_FILE" 2>&1 || true
         skip "${name} extension"
         ENABLED_EXTS+=("$uuid")
         return 0
     fi
     info "Fetching ${name} (ext #${ext_id})..."
-    local info_json version_tag
+    local info_json="" version_tag=""
     # Try exact version, then major.0, then unversioned (grab latest available)
     for try_ver in "${SHELL_VER}" "${SHELL_MAJOR}.0" ""; do
         local qp="pk=${ext_id}"
         [[ -n "$try_ver" ]] && qp+="&shell_version=${try_ver}"
-        info_json=$(curl -fsSL -A "${CURL_UA:-Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36}" \
-            "https://extensions.gnome.org/extension-info/?${qp}" 2>/dev/null)
+        info_json=$(curl -fsSL "${CURL_TIMEOUT_OPTS[@]}" -A "${CURL_UA:-Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36}" \
+            "https://extensions.gnome.org/extension-info/?${qp}" 2>/dev/null || echo "")
         [[ -n "$info_json" ]] && echo "$info_json" | python3 -c "import sys,json; json.load(sys.stdin)" &>/dev/null && break
         info_json=""
     done
 
     version_tag=$(echo "$info_json" | python3 -c "
-import sys, json
+import sys, json, re
 try:
     d = json.load(sys.stdin)
     vsm = d.get('shell_version_map', {})
@@ -56,9 +58,14 @@ try:
         if key in vsm:
             print(vsm[key].get('pk', '')); sys.exit(0)
     if vsm:
-        latest = sorted(vsm.keys(), key=lambda v: [int(x) for x in v.split('.')], reverse=True)
+        def ver_key(v):
+            nums = [int(x) for x in re.findall(r'\d+', v)]
+            is_pre = 0 if re.search(r'alpha|beta|rc', v, re.I) else 1
+            return (nums, is_pre)
+        latest = sorted(vsm.keys(), key=ver_key, reverse=True)
         print(vsm[latest[0]].get('pk', ''))
-except: pass
+except Exception:
+    pass
 " 2>/dev/null || echo "")
 
     if [[ -z "$version_tag" ]]; then
@@ -67,12 +74,13 @@ except: pass
     fi
     local zip_url="https://extensions.gnome.org/download-extension/${uuid}.shell-extension.zip?version_tag=${version_tag}"
     local tmp_zip="/tmp/ext-${uuid}-$$.zip"
-    if curl -fsSL -A "${CURL_UA:-Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36}" \
+    if curl -fsSL "${CURL_TIMEOUT_OPTS[@]}" -A "${CURL_UA:-Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36}" \
         "$zip_url" -o "$tmp_zip" >> "$LOG_FILE" 2>&1; then
         mkdir -p "$dest"
         if unzip -qo "$tmp_zip" -d "$dest" >> "$LOG_FILE" 2>&1; then
             find "$dest" -type f -exec chmod 644 {} \;
             find "$dest" -type d -exec chmod 755 {} \;
+            [[ -d "$dest/schemas" ]] && glib-compile-schemas "$dest/schemas" >> "$LOG_FILE" 2>&1 || true
             rm -f "$tmp_zip"
             ok "${name} installed (v${version_tag})"
             ENABLED_EXTS+=("$uuid")
@@ -87,40 +95,44 @@ except: pass
 }
 
 # ── Install extensions ────────────────────────────────────────────────────────
-install_extension "User Themes"        "user-theme@gnome-shell-extensions.gcampax.github.com"  19
-install_extension "Dash to Panel"      "dash-to-panel@jderose9.github.com"                      1160
-install_extension "Blur my Shell"      "blur-my-shell@aunetx"                                  3193
-install_extension "Just Perfection"    "just-perfection-desktop@just-perfection"                3843
-install_extension "Caffeine"           "caffeine@patapon.info"                                  517
+install_extension "User Themes"         "user-theme@gnome-shell-extensions.gcampax.github.com"  19
+install_extension "Dash to Panel"       "dash-to-panel@jderose9.github.com"                      1160
+install_extension "Blur my Shell"       "blur-my-shell@aunetx"                                  3193
+install_extension "Just Perfection"     "just-perfection-desktop@just-perfection"                3843
+install_extension "Caffeine"            "caffeine@patapon.info"                                  517
 install_extension "Clipboard Indicator" "clipboard-indicator@tudmotu.com"                       779
-install_extension "Vitals"             "Vitals@CoreCoding.com"                                  1460
-install_extension "Space Bar"          "space-bar@luchrioh"                                     5090
+install_extension "Vitals"              "Vitals@CoreCoding.com"                                  1460
+install_extension "Space Bar"           "space-bar@luchrioh"                                     5090
 
-# AppIndicator via package manager
-if is_fedora; then
-    if rpm -q gnome-shell-extension-appindicator &>/dev/null 2>&1; then
-        ENABLED_EXTS+=("appindicatorsupport@rgcjonas.gmail.com")
-        ok "AppIndicator (via dnf)"
-    else
-        install_extension "AppIndicator" "appindicatorsupport@rgcjonas.gmail.com" 615
-    fi
+# AppIndicator via package manager (detect actual UUID: Ubuntu ships ubuntu-appindicators@ubuntu.com)
+if [[ -d "${EXTENSIONS_DIR}/ubuntu-appindicators@ubuntu.com" ]]; then
+    ENABLED_EXTS+=("ubuntu-appindicators@ubuntu.com")
+    ok "AppIndicator (ubuntu-appindicators@ubuntu.com)"
+elif [[ -d "${EXTENSIONS_DIR}/appindicatorsupport@rgcjonas.gmail.com" ]]; then
+    ENABLED_EXTS+=("appindicatorsupport@rgcjonas.gmail.com")
+    ok "AppIndicator (appindicatorsupport@rgcjonas.gmail.com)"
 else
-    if dpkg -s gnome-shell-extension-appindicator &>/dev/null 2>&1; then
-        ENABLED_EXTS+=("appindicatorsupport@rgcjonas.gmail.com")
-        ok "AppIndicator (via apt)"
-    else
-        install_extension "AppIndicator" "appindicatorsupport@rgcjonas.gmail.com" 615
-    fi
+    install_extension "AppIndicator" "appindicatorsupport@rgcjonas.gmail.com" 615
 fi
-tick "GNOME Shell extensions (10)"
+tick "GNOME Shell extensions (9)"
 
-# Enable extensions
+# Enable extensions (merge with currently enabled extensions instead of overwriting)
 if [[ ${#ENABLED_EXTS[@]} -gt 0 ]]; then
-    _ext_list="["
-    for u in "${ENABLED_EXTS[@]}"; do _ext_list+="'${u}',"; done
-    _ext_list="${_ext_list%,}]"
-    as_user "gsettings set org.gnome.shell enabled-extensions \"${_ext_list}\"" \
-        && ok "Extensions enabled" || warn "Could not set enabled-extensions"
+    _cur_exts=$(as_user "gsettings get org.gnome.shell enabled-extensions" 2>/dev/null || echo "[]")
+    _merged_exts=$(python3 - "$_cur_exts" "${ENABLED_EXTS[@]}" << 'PYEOF'
+import sys, re
+cur_raw = sys.argv[1]
+new_exts = sys.argv[2:]
+existing = re.findall(r"'([^']+)'", cur_raw)
+merged = list(existing)
+for ext in new_exts:
+    if ext not in merged:
+        merged.append(ext)
+print("[" + ", ".join(f"'{e}'" for e in merged) + "]")
+PYEOF
+)
+    as_user "gsettings set org.gnome.shell enabled-extensions \"${_merged_exts}\"" \
+        && ok "Extensions enabled (merged with existing)" || warn "Could not set enabled-extensions"
 fi
 tick "Extensions enabled"
 
@@ -148,7 +160,7 @@ gset org.gnome.desktop.interface font-hinting         "'slight'"
 gset org.gnome.desktop.interface text-scaling-factor  "1.0"
 tick "Fonts: Inter 11 / JetBrainsMono 12 / rgba"
 
-# ── Dash-to-Panel ─────────────────────────────────────────────────────────────
+# ── Extension Settings (Dash-to-Panel · Blur my Shell · Just Perfection) ─────
 DTP="org.gnome.shell.extensions.dash-to-panel"
 if as_user "gsettings list-keys ${DTP}" &>/dev/null; then
     as_user "gsettings set ${DTP} multi-monitors           'true'"               2>/dev/null || true
@@ -158,19 +170,11 @@ if as_user "gsettings list-keys ${DTP}" &>/dev/null; then
     as_user "gsettings set ${DTP} show-activities-button   'false'"              2>/dev/null || true
     as_user "gsettings set ${DTP} show-window-previews     'true'"               2>/dev/null || true
     as_user "gsettings set ${DTP} click-effect             'MINIMIZE'"           2>/dev/null || true
-    # Ensure Dash to Panel is enabled even if not freshly installed
-    _cur=$(as_user "gsettings get org.gnome.shell enabled-extensions" 2>/dev/null || echo "[]")
-    if ! echo "$_cur" | grep -q "dash-to-panel"; then
-        as_user "gsettings set org.gnome.shell enabled-extensions \
-            \"$(echo "$_cur" | sed "s/]$/, 'dash-to-panel@jderose9.github.com']/")\"" 2>/dev/null || true
-    fi
     ok "Dash-to-Panel configured"
 else
     info "Dash-to-Panel schemas not available yet (apply after GNOME Shell restart)"
 fi
-tick "Dash-to-Panel (bottom, 40px, both monitors)"
 
-# ── Blur my Shell ─────────────────────────────────────────────────────────────
 BMS="org.gnome.shell.extensions.blur-my-shell"
 if as_user "gsettings list-keys ${BMS}.panel" &>/dev/null; then
     as_user "gsettings set ${BMS}.panel blur            'true'"  2>/dev/null || true
@@ -184,7 +188,6 @@ else
     info "Blur my Shell schemas not available yet (apply after GNOME Shell restart)"
 fi
 
-# ── Just Perfection ──────────────────────────────────────────────────────────
 JP="org.gnome.shell.extensions.just-perfection"
 if as_user "gsettings list-keys ${JP}" &>/dev/null; then
     as_user "gsettings set ${JP} animation              '3'"     2>/dev/null || true
@@ -195,6 +198,7 @@ if as_user "gsettings list-keys ${JP}" &>/dev/null; then
 else
     info "Just Perfection schemas not available yet (apply after GNOME Shell restart)"
 fi
+tick "Extension settings (Dash-to-Panel · Blur my Shell · Just Perfection)"
 
 # ── Window & Workspace ───────────────────────────────────────────────────────
 gset org.gnome.desktop.wm.preferences button-layout        "'appmenu:minimize,maximize,close'"
@@ -231,45 +235,42 @@ if [[ -f "${SCRIPT_DIR}/scripts/cap-screen" ]]; then
     ok "cap-screen installed to /usr/local/bin/cap-screen"
 fi
 
-# Area screenshot to clipboard (Cmd+Shift+S / Super+Shift+S)
-# App shortcuts:
-#   Cmd/Super + t -> WezTerm
-#   Cmd/Super + b -> Chrome
-#   Cmd/Super + e -> File Explorer (Nemo)
-#   Cmd/Super + g -> Text Editor (gnome-text-editor)
-#   Cmd/Super + Shift + s -> Area Screenshot to Clipboard
-#   Cmd/Super + Shift + f -> Capture Region to File & Clipboard (cap-screen)
+# Detect installed file manager (nautilus on GNOME, nemo on Cinnamon)
+FILE_MGR="nautilus"
+command -v nemo &>/dev/null && ! command -v nautilus &>/dev/null && FILE_MGR="nemo"
 
-# Cinnamon custom keybindings
-gset org.cinnamon.desktop.keybindings looking-glass-keybinding "@as []"
-gset org.cinnamon.desktop.keybindings.media-keys screensaver "['<Super>l', '<Control><Alt>l', 'XF86ScreenSaver']"
-gset org.cinnamon.desktop.keybindings.media-keys home "['XF86Explorer']"
-gset org.cinnamon.desktop.keybindings.media-keys area-screenshot-clip "['<Control><Shift>Print']"
-gset org.cinnamon.desktop.keybindings custom-list "['custom0', 'custom1', 'custom2', 'custom3', 'custom4', 'custom5']"
+# Cinnamon custom keybindings (only when Cinnamon schemas exist)
+if as_user "gsettings list-schemas | grep -q '^org\.cinnamon\.desktop\.keybindings$'" 2>/dev/null; then
+    gset org.cinnamon.desktop.keybindings looking-glass-keybinding "@as []"
+    gset org.cinnamon.desktop.keybindings.media-keys screensaver "['<Super>l', '<Control><Alt>l', 'XF86ScreenSaver']"
+    gset org.cinnamon.desktop.keybindings.media-keys home "['XF86Explorer']"
+    gset org.cinnamon.desktop.keybindings.media-keys area-screenshot-clip "['<Control><Shift>Print']"
+    gset org.cinnamon.desktop.keybindings custom-list "['custom0', 'custom1', 'custom2', 'custom3', 'custom4', 'custom5']"
 
-gset org.cinnamon.desktop.keybindings.custom-keybinding:/org/cinnamon/desktop/keybindings/custom-keybindings/custom0/ name "'WezTerm'"
-gset org.cinnamon.desktop.keybindings.custom-keybinding:/org/cinnamon/desktop/keybindings/custom-keybindings/custom0/ command "'wezterm'"
-gset org.cinnamon.desktop.keybindings.custom-keybinding:/org/cinnamon/desktop/keybindings/custom-keybindings/custom0/ binding "['<Super>t']"
+    gset org.cinnamon.desktop.keybindings.custom-keybinding:/org/cinnamon/desktop/keybindings/custom-keybindings/custom0/ name "'WezTerm'"
+    gset org.cinnamon.desktop.keybindings.custom-keybinding:/org/cinnamon/desktop/keybindings/custom-keybindings/custom0/ command "'wezterm'"
+    gset org.cinnamon.desktop.keybindings.custom-keybinding:/org/cinnamon/desktop/keybindings/custom-keybindings/custom0/ binding "['<Super>t']"
 
-gset org.cinnamon.desktop.keybindings.custom-keybinding:/org/cinnamon/desktop/keybindings/custom-keybindings/custom1/ name "'Google Chrome'"
-gset org.cinnamon.desktop.keybindings.custom-keybinding:/org/cinnamon/desktop/keybindings/custom-keybindings/custom1/ command "'google-chrome --ozone-platform=x11'"
-gset org.cinnamon.desktop.keybindings.custom-keybinding:/org/cinnamon/desktop/keybindings/custom-keybindings/custom1/ binding "['<Super>b']"
+    gset org.cinnamon.desktop.keybindings.custom-keybinding:/org/cinnamon/desktop/keybindings/custom-keybindings/custom1/ name "'Google Chrome'"
+    gset org.cinnamon.desktop.keybindings.custom-keybinding:/org/cinnamon/desktop/keybindings/custom-keybindings/custom1/ command "'google-chrome --ozone-platform=x11'"
+    gset org.cinnamon.desktop.keybindings.custom-keybinding:/org/cinnamon/desktop/keybindings/custom-keybindings/custom1/ binding "['<Super>b']"
 
-gset org.cinnamon.desktop.keybindings.custom-keybinding:/org/cinnamon/desktop/keybindings/custom-keybindings/custom2/ name "'File Explorer'"
-gset org.cinnamon.desktop.keybindings.custom-keybinding:/org/cinnamon/desktop/keybindings/custom-keybindings/custom2/ command "'nemo'"
-gset org.cinnamon.desktop.keybindings.custom-keybinding:/org/cinnamon/desktop/keybindings/custom-keybindings/custom2/ binding "['<Super>e']"
+    gset org.cinnamon.desktop.keybindings.custom-keybinding:/org/cinnamon/desktop/keybindings/custom-keybindings/custom2/ name "'File Explorer'"
+    gset org.cinnamon.desktop.keybindings.custom-keybinding:/org/cinnamon/desktop/keybindings/custom-keybindings/custom2/ command "'${FILE_MGR}'"
+    gset org.cinnamon.desktop.keybindings.custom-keybinding:/org/cinnamon/desktop/keybindings/custom-keybindings/custom2/ binding "['<Super>e']"
 
-gset org.cinnamon.desktop.keybindings.custom-keybinding:/org/cinnamon/desktop/keybindings/custom-keybindings/custom3/ name "'Text Editor'"
-gset org.cinnamon.desktop.keybindings.custom-keybinding:/org/cinnamon/desktop/keybindings/custom-keybindings/custom3/ command "'gnome-text-editor'"
-gset org.cinnamon.desktop.keybindings.custom-keybinding:/org/cinnamon/desktop/keybindings/custom-keybindings/custom3/ binding "['<Super>g']"
+    gset org.cinnamon.desktop.keybindings.custom-keybinding:/org/cinnamon/desktop/keybindings/custom-keybindings/custom3/ name "'Text Editor'"
+    gset org.cinnamon.desktop.keybindings.custom-keybinding:/org/cinnamon/desktop/keybindings/custom-keybindings/custom3/ command "'gnome-text-editor'"
+    gset org.cinnamon.desktop.keybindings.custom-keybinding:/org/cinnamon/desktop/keybindings/custom-keybindings/custom3/ binding "['<Super>g']"
 
-gset org.cinnamon.desktop.keybindings.custom-keybinding:/org/cinnamon/desktop/keybindings/custom-keybindings/custom4/ name "'Area Screenshot to Clipboard'"
-gset org.cinnamon.desktop.keybindings.custom-keybinding:/org/cinnamon/desktop/keybindings/custom-keybindings/custom4/ command "'gnome-screenshot -a -c'"
-gset org.cinnamon.desktop.keybindings.custom-keybinding:/org/cinnamon/desktop/keybindings/custom-keybindings/custom4/ binding "['<Super><Shift>s', '<Shift><Super>s', '<Super><Shift>S', '<Shift><Super>S']"
+    gset org.cinnamon.desktop.keybindings.custom-keybinding:/org/cinnamon/desktop/keybindings/custom-keybindings/custom4/ name "'Area Screenshot to Clipboard'"
+    gset org.cinnamon.desktop.keybindings.custom-keybinding:/org/cinnamon/desktop/keybindings/custom-keybindings/custom4/ command "'gnome-screenshot -a -c'"
+    gset org.cinnamon.desktop.keybindings.custom-keybinding:/org/cinnamon/desktop/keybindings/custom-keybindings/custom4/ binding "['<Super><Shift>s', '<Shift><Super>s', '<Super><Shift>S', '<Shift><Super>S']"
 
-gset org.cinnamon.desktop.keybindings.custom-keybinding:/org/cinnamon/desktop/keybindings/custom-keybindings/custom5/ name "'Capture Region to File and Clipboard'"
-gset org.cinnamon.desktop.keybindings.custom-keybinding:/org/cinnamon/desktop/keybindings/custom-keybindings/custom5/ command "'/usr/local/bin/cap-screen'"
-gset org.cinnamon.desktop.keybindings.custom-keybinding:/org/cinnamon/desktop/keybindings/custom-keybindings/custom5/ binding "['<Super><Shift>f', '<Shift><Super>f', '<Super><Shift>F', '<Shift><Super>F']"
+    gset org.cinnamon.desktop.keybindings.custom-keybinding:/org/cinnamon/desktop/keybindings/custom-keybindings/custom5/ name "'Capture Region to File and Clipboard'"
+    gset org.cinnamon.desktop.keybindings.custom-keybinding:/org/cinnamon/desktop/keybindings/custom-keybindings/custom5/ command "'/usr/local/bin/cap-screen'"
+    gset org.cinnamon.desktop.keybindings.custom-keybinding:/org/cinnamon/desktop/keybindings/custom-keybindings/custom5/ binding "['<Super><Shift>f', '<Shift><Super>f', '<Super><Shift>F', '<Shift><Super>F']"
+fi
 
 # GNOME custom keybindings
 gset org.gnome.settings-daemon.plugins.media-keys screensaver "['<Super>l']"
@@ -284,7 +285,7 @@ gset org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:/org/gnome/s
 gset org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom1/ binding "'<Super>b'"
 
 gset org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom2/ name "'File Explorer'"
-gset org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom2/ command "'nemo'"
+gset org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom2/ command "'${FILE_MGR}'"
 gset org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom2/ binding "'<Super>e'"
 
 gset org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom3/ name "'Text Editor'"
@@ -295,7 +296,7 @@ gset org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:/org/gnome/s
 gset org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom4/ command "'/usr/local/bin/cap-screen'"
 gset org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom4/ binding "'<Super><Shift>f'"
 
-tick "Windows + workspaces + keybindings"
+tick "Windows + workspaces + keybindings (${FILE_MGR}, cap-screen)"
 
 # ── Nautilus ──────────────────────────────────────────────────────────────────
 gset org.gnome.nautilus.preferences default-folder-viewer   "'list-view'"

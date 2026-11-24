@@ -12,12 +12,15 @@
 # Idempotent, checkpoint-based — safe to re-run at any time.
 #
 # Usage:
-#   sudo bash setup.sh                 — run all modules (resume from checkpoints)
-#   sudo bash setup.sh --reset         — clear all checkpoints, run fresh
-#   sudo bash setup.sh --reset 5       — re-run only step 5
-#   sudo bash setup.sh --only 3,5,7    — run only specific steps
-#   sudo bash setup.sh --list          — list all steps
-#   sudo bash setup.sh --skip 2        — skip NVIDIA (e.g., if no GPU)
+#   sudo bash setup.sh                        — run all modules (resume from checkpoints)
+#   sudo bash setup.sh --profile server       — headless profile (skip GUI/GNOME/fonts)
+#   sudo bash setup.sh --profile minimal      — core CLI, shell, languages & workspace
+#   sudo bash setup.sh --dry-run              — inspect environment & execution plan
+#   sudo bash setup.sh --reset                — clear all checkpoints, run fresh
+#   sudo bash setup.sh --reset 5              — re-run only step 5
+#   sudo bash setup.sh --only 3,5,7           — run only specific steps
+#   sudo bash setup.sh --skip 1               — skip step 1 (Repos & NVIDIA)
+#   sudo bash setup.sh --list                 — list all steps
 # =============================================================================
 set -uo pipefail
 
@@ -29,6 +32,8 @@ mkdir -p "/var/log/linux-setup" 2>/dev/null || true
 export LOG_FILE="/var/log/linux-setup/setup-$(date +%Y%m%d-%H%M%S).log"
 export STATE_DIR="/var/cache/workstation-setup"
 export ERRORS=0
+export SETUP_PROFILE="full"
+DRY_RUN=0
 
 # ── Source shared library ─────────────────────────────────────────────────────
 source "${SCRIPT_DIR}/lib/common.sh"
@@ -65,6 +70,27 @@ while [[ $# -gt 0 ]]; do
                 echo -e "  ${YELLOW}⚠${RESET}  All checkpoints cleared — running full install"
             fi
             ;;
+        --profile)
+            SETUP_PROFILE="${2:-full}"
+            case "$SETUP_PROFILE" in
+                full|dev)
+                    ;;
+                minimal)
+                    ONLY_STEPS=(1 2 3 7 9)
+                    ;;
+                server)
+                    SKIP_STEPS+=(4 5)
+                    ;;
+                *)
+                    echo -e "${RED}Invalid profile:${RESET} ${SETUP_PROFILE} (use: full, dev, minimal, server)"
+                    exit 1
+                    ;;
+            esac
+            shift
+            ;;
+        --dry-run|--check)
+            DRY_RUN=1
+            ;;
         --only)
             _only="${2:-}"
             IFS=',' read -ra ONLY_STEPS <<< "${_only// /}"
@@ -72,7 +98,8 @@ while [[ $# -gt 0 ]]; do
             ;;
         --skip)
             _skip="${2:-}"
-            IFS=',' read -ra SKIP_STEPS <<< "${_skip// /}"
+            IFS=',' read -ra _skip_extra <<< "${_skip// /}"
+            SKIP_STEPS+=("${_skip_extra[@]}")
             shift
             ;;
         --list)
@@ -91,12 +118,18 @@ while [[ $# -gt 0 ]]; do
             echo "Usage: sudo bash setup.sh [OPTIONS]"
             echo ""
             echo "Options:"
+            echo "  --profile NAME  Select preset: full (default), dev, minimal, server"
+            echo "  --dry-run       Show environment info and execution plan without making changes"
             echo "  --reset [N]     Clear checkpoint(s) and re-run (all or step N)"
             echo "  --only 1,3,5    Run only specific steps"
-            echo "  --skip 2        Skip specific steps (e.g., NVIDIA on non-GPU)"
+            echo "  --skip 1        Skip specific steps (e.g., 1 for Repos/NVIDIA)"
             echo "  --list          List all available modules"
             echo "  --help          Show this help"
             exit 0
+            ;;
+        *)
+            echo -e "${RED}Unknown option:${RESET} $1 (see --help)"
+            exit 1
             ;;
     esac
     shift
@@ -113,8 +146,39 @@ should_run_step() {
     return 0
 }
 
+# ── Dry-run / preflight check ─────────────────────────────────────────────────
+if [[ "$DRY_RUN" -eq 1 ]]; then
+    detect_user
+    echo ""
+    echo -e "${BOLD}${CYAN}Linux Workstation Setup — Dry-Run / Preflight Check${RESET}"
+    echo -e "${DIM}─────────────────────────────────────────────────────────────${RESET}"
+    echo -e "  Distro    : ${YELLOW}${DISTRO_NAME} ${DISTRO_VERSION}${RESET} (${DISTRO_ID})"
+    echo -e "  Arch      : ${YELLOW}$(uname -m)${RESET} (pkg: $(get_pkg_arch), go/k8s: $(get_arch))"
+    echo -e "  Kernel    : ${YELLOW}$(uname -r)${RESET}"
+    echo -e "  Session   : ${YELLOW}${XDG_SESSION_TYPE:-headless}${RESET} (${XDG_CURRENT_DESKTOP:-none})"
+    echo -e "  GPU       : ${YELLOW}$(lspci 2>/dev/null | grep -iE 'vga|3d|display' | head -1 | sed 's/.*: //' || echo 'unknown')${RESET}"
+    echo -e "  User      : ${YELLOW}${REAL_USER:-$(whoami)}${RESET} (${USER_HOME:-$HOME})"
+    echo -e "  Profile   : ${YELLOW}${SETUP_PROFILE}${RESET}"
+    echo ""
+    echo -e "${BOLD}Execution plan:${RESET}"
+    for i in "${!MODULES[@]}"; do
+        step_num=$((i + 1))
+        module_file="${MODULES[$i]%%:*}"
+        module_desc="${MODULES[$i]#*:}"
+        if ! should_run_step "$step_num"; then
+            echo -e "  ${DIM}[skip]${RESET}  Step ${step_num}/${TOTAL_STEPS} — ${module_desc} (${module_file})"
+        elif step_done "$step_num"; then
+            echo -e "  ${YELLOW}[done]${RESET}  Step ${step_num}/${TOTAL_STEPS} — ${module_desc} [checkpoint exists]"
+        else
+            echo -e "  ${GREEN}[run] ${RESET}  Step ${step_num}/${TOTAL_STEPS} — ${module_desc} (${module_file})"
+        fi
+    done
+    echo ""
+    exit 0
+fi
+
 # ── Banner ────────────────────────────────────────────────────────────────────
-clear
+[[ -t 1 ]] && clear
 echo -e "${BOLD}${CYAN}"
 cat << 'BANNER'
 
@@ -129,6 +193,8 @@ cat << 'BANNER'
 BANNER
 echo -e "${RESET}"
 echo -e "  Distro    : ${YELLOW}${DISTRO_NAME} ${DISTRO_VERSION}${RESET}"
+echo -e "  Arch      : ${YELLOW}$(uname -m)${RESET}"
+echo -e "  Profile   : ${YELLOW}${SETUP_PROFILE}${RESET}"
 echo -e "  Log       : ${YELLOW}${LOG_FILE}${RESET}"
 echo -e "  State     : ${YELLOW}${STATE_DIR}${RESET}"
 echo -e "  Modules   : ${YELLOW}${#MODULES[@]}${RESET}"
@@ -183,17 +249,17 @@ echo ""
 echo -e "${BOLD}${GREEN}╔══════════════════════════════════════════════════════════════════╗${RESET}"
 echo -e "${BOLD}${GREEN}║           WORKSTATION SETUP COMPLETE                             ║${RESET}"
 echo -e "${BOLD}${GREEN}╠══════════════════════════════════════════════════════════════════╣${RESET}"
-printf "${BOLD}${GREEN}║${RESET}  %-64s${BOLD}${GREEN}║${RESET}\n" "✔ Repos    : GitHub CLI · Brave · Flathub"
+printf "${BOLD}${GREEN}║${RESET}  %-64s${BOLD}${GREEN}║${RESET}\n" "✔ Repos    : GitHub CLI · Google Chrome · Flathub"
 printf "${BOLD}${GREEN}║${RESET}  %-64s${BOLD}${GREEN}║${RESET}\n" "✔ NVIDIA   : drivers · Vulkan · power rules"
-printf "${BOLD}${GREEN}║${RESET}  %-64s${BOLD}${GREEN}║${RESET}\n" "✔ CLI      : bat · eza · delta · fd · rg · fzf · zoxide · dust"
-printf "${BOLD}${GREEN}║${RESET}  %-64s${BOLD}${GREEN}║${RESET}\n" "✔ Shell    : Starship · synth-shell · aliases · completions"
+printf "${BOLD}${GREEN}║${RESET}  %-64s${BOLD}${GREEN}║${RESET}\n" "✔ CLI      : bat · eza · delta · fd · rg · fzf · atuin · yazi · xh"
+printf "${BOLD}${GREEN}║${RESET}  %-64s${BOLD}${GREEN}║${RESET}\n" "✔ Shell    : Starship · synth-shell · ~/.bashrc.d · completions"
 printf "${BOLD}${GREEN}║${RESET}  %-64s${BOLD}${GREEN}║${RESET}\n" "✔ Fonts    : 20+ Nerd Fonts · Inter · Geist (GTK themes: optional)"
 printf "${BOLD}${GREEN}║${RESET}  %-64s${BOLD}${GREEN}║${RESET}\n" "✔ GNOME    : Dash-to-Panel · Blur · shortcuts · cap-screen"
-printf "${BOLD}${GREEN}║${RESET}  %-64s${BOLD}${GREEN}║${RESET}\n" "✔ Cloud    : AWS · GCP · Azure · kubectl · helm · k9s"
-printf "${BOLD}${GREEN}║${RESET}  %-64s${BOLD}${GREEN}║${RESET}\n" "✔ Langs    : nvm · pyenv · rustup · Go · SDKMAN"
-printf "${BOLD}${GREEN}║${RESET}  %-64s${BOLD}${GREEN}║${RESET}\n" "✔ Editors  : VSCodium · Neovim · WezTerm"
-printf "${BOLD}${GREEN}║${RESET}  %-64s${BOLD}${GREEN}║${RESET}\n" "✔ Workspace: git-delta · tmux · direnv · editorconfig"
-printf "${BOLD}${GREEN}║${RESET}  %-64s${BOLD}${GREEN}║${RESET}\n" "✔ Tweaks   : ZRAM · noatime · ASUS battery 80% · boot speed"
+printf "${BOLD}${GREEN}║${RESET}  %-64s${BOLD}${GREEN}║${RESET}\n" "✔ Cloud    : AWS · GCP · Azure · kubectl · k9s · tofu · trivy"
+printf "${BOLD}${GREEN}║${RESET}  %-64s${BOLD}${GREEN}║${RESET}\n" "✔ Langs    : nvm · uv · pyenv · rustup · Go · SDKMAN (JDK 25)"
+printf "${BOLD}${GREEN}║${RESET}  %-64s${BOLD}${GREEN}║${RESET}\n" "✔ Editors  : VSCodium · Neovim · WezTerm · AI CLIs"
+printf "${BOLD}${GREEN}║${RESET}  %-64s${BOLD}${GREEN}║${RESET}\n" "✔ Workspace: git-delta · tmux+TPM · direnv · editorconfig"
+printf "${BOLD}${GREEN}║${RESET}  %-64s${BOLD}${GREEN}║${RESET}\n" "✔ Tweaks   : ZRAM (zstd, swappiness=100) · BBR · firewall · cleanup"
 [[ $ERRORS -gt 0 ]] && \
 printf "${BOLD}${GREEN}║${RESET}  ${YELLOW}%-64s${RESET}${BOLD}${GREEN}║${RESET}\n" "⚠  ${ERRORS} non-fatal warning(s) — see ${LOG_FILE}"
 echo -e "${BOLD}${GREEN}╠══════════════════════════════════════════════════════════════════╣${RESET}"
@@ -208,7 +274,7 @@ echo ""
 
 # ── Optional: GTK themes, icons & cursors ────────────────────────────────────
 THEMES_SCRIPT="${SCRIPT_DIR}/scripts/install-themes.sh"
-if [[ -f "$THEMES_SCRIPT" ]]; then
+if [[ -f "$THEMES_SCRIPT" && -t 0 ]] && ! is_server_profile; then
     echo -e "${BOLD}${CYAN}┌─ Optional: GTK Themes · Icons · Cursors ───────────────────────┐${RESET}"
     echo -e "${BOLD}${CYAN}│${RESET}  Dracula · Catppuccin · Arc · Materia · Numix · Greybird        ${BOLD}${CYAN}│${RESET}"
     echo -e "${BOLD}${CYAN}│${RESET}  Papirus · Tela icons   ·   Bibata Modern cursor                ${BOLD}${CYAN}│${RESET}"

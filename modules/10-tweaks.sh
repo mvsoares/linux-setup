@@ -1,15 +1,15 @@
 # =============================================================================
 # Module 10 — System Tweaks · Performance Tuning · Cleanup
 # =============================================================================
-init_sub 11
+init_sub 9
 
-# ── Kernel parameters ────────────────────────────────────────────────────────
-info "Applying kernel parameters..."
-# Remove older config that may contain duplicate values
+# ── Kernel parameters (ZRAM-optimized) ───────────────────────────────────────
+info "Applying kernel parameters (ZRAM-optimized)..."
 rm -f /etc/sysctl.d/99-desktop-tweaks.conf 2>/dev/null || true
 cat > /etc/sysctl.d/99-workstation.conf << 'SYSCTL'
-# Desktop responsiveness
-vm.swappiness = 10
+# Memory & ZRAM tuning (compressed RAM swap benefits from higher swappiness & zero readahead)
+vm.swappiness = 100
+vm.page-cluster = 0
 vm.vfs_cache_pressure = 50
 vm.dirty_ratio = 15
 vm.dirty_background_ratio = 5
@@ -26,12 +26,11 @@ fs.inotify.max_user_instances = 512
 fs.file-max = 2097152
 SYSCTL
 sysctl --system >> "$LOG_FILE" 2>&1 || warn "sysctl errors"
-tick "Kernel parameters (swappiness=10, inotify, network)"
+tick "Kernel parameters (ZRAM swappiness=100, inotify, network)"
 
 # ── Services ──────────────────────────────────────────────────────────────────
-systemctl enable preload     >> "$LOG_FILE" 2>&1 && ok "preload enabled"     || true
 systemctl enable fstrim.timer >> "$LOG_FILE" 2>&1 && ok "fstrim.timer enabled" || true
-tick "Services: preload + fstrim"
+tick "Services: fstrim.timer"
 
 # ── Boot speed: Disable slow & unnecessary services ──────────────────────────
 info "Optimizing boot services..."
@@ -42,11 +41,10 @@ fi
 systemctl disable NetworkManager-wait-online.service >> "$LOG_FILE" 2>&1 || true
 tick "Boot optimization (disabled apport & NM-wait-online)"
 
-# ── Storage & Memory: noatime + ZRAM ──────────────────────────────────────────
-info "Optimizing filesystem mount options (noatime)..."
-if grep -q " / ext4 " /etc/fstab && ! grep -q " / ext4 [^ ]*noatime" /etc/fstab; then
+# ── Storage & Memory: ZRAM + fstab ────────────────────────────────────────────
+if grep -qE '[[:space:]]/[[:space:]]+ext4[[:space:]]' /etc/fstab && ! grep -qE '[[:space:]]/[[:space:]]+ext4[[:space:]][^[:space:]]*noatime' /etc/fstab; then
     cp /etc/fstab "/etc/fstab.bak.$(date +%Y%m%d%H%M%S)" 2>/dev/null || true
-    sed -i 's|\(/ ext4 *defaults\)|\1,noatime|' /etc/fstab 2>/dev/null || true
+    sed -i -E 's|([[:space:]]/[[:space:]]+ext4[[:space:]]+[^[:space:]]+)|\1,noatime|' /etc/fstab 2>/dev/null || true
     mount -o remount,noatime / >> "$LOG_FILE" 2>&1 || true
     systemctl daemon-reload >> "$LOG_FILE" 2>&1 || true
     ok "Added noatime to / in /etc/fstab"
@@ -64,15 +62,16 @@ else
         systemctl restart zramswap.service >> "$LOG_FILE" 2>&1 || true
     fi
 fi
-tick "Storage & RAM: noatime + zram (zstd, prio 100)"
+tick "Storage & RAM: ZRAM (zstd, prio 100)"
 
-# ── Battery Health: ASUS charge threshold (80%) ──────────────────────────────
+# ── Hardware-specific & peripheral tuning ────────────────────────────────────
+# Battery Health: ASUS/laptop charge threshold (80%)
 if [[ -f /sys/class/power_supply/BAT0/charge_control_end_threshold ]]; then
-    info "Configuring ASUS battery charge threshold (80%)..."
+    info "Configuring battery charge threshold (80%)..."
     echo 80 > /sys/class/power_supply/BAT0/charge_control_end_threshold 2>/dev/null || true
     cat > /etc/systemd/system/battery-charge-threshold.service << 'BAT_EOF'
 [Unit]
-Description=Set ASUS battery charge threshold to 80%
+Description=Set battery charge threshold to 80%
 After=multi-user.target suspend.target hibernate.target
 
 [Service]
@@ -88,34 +87,17 @@ SUBSYSTEM=="power_supply", KERNEL=="BAT0", ATTR{charge_control_end_threshold}="8
 UDEV_EOF
     systemctl daemon-reload >> "$LOG_FILE" 2>&1 || true
     systemctl enable --now battery-charge-threshold.service >> "$LOG_FILE" 2>&1 || true
-    ok "ASUS battery threshold set to 80%"
-    tick "Battery protection (80% charge threshold)"
+    ok "Battery charge threshold set to 80%"
 fi
 
-# ── Network: Wi-Fi power saving disable (low latency) ────────────────────────
+# Wi-Fi power saving disable (lower latency)
 if [[ -f /etc/NetworkManager/conf.d/default-wifi-powersave-on.conf ]]; then
     sed -i 's/wifi.powersave = 3/wifi.powersave = 2/' /etc/NetworkManager/conf.d/default-wifi-powersave-on.conf 2>/dev/null || true
     systemctl reload NetworkManager >> "$LOG_FILE" 2>&1 || true
     ok "Wi-Fi powersave disabled (wifi.powersave = 2)"
-    tick "Wi-Fi power saving disabled for lower latency"
 fi
 
-# ── Network: TCP BBR + fq, no slow-start after idle ──────────────────────────
-if grep -qw bbr /proc/sys/net/ipv4/tcp_available_congestion_control 2>/dev/null \
-    || modprobe tcp_bbr >> "$LOG_FILE" 2>&1; then
-    echo tcp_bbr > /etc/modules-load.d/tcp_bbr.conf
-    cat > /etc/sysctl.d/99-network-tuning.conf << 'NET_EOF'
-net.core.default_qdisc = fq
-net.ipv4.tcp_congestion_control = bbr
-net.ipv4.tcp_slow_start_after_idle = 0
-NET_EOF
-    sysctl -p /etc/sysctl.d/99-network-tuning.conf >> "$LOG_FILE" 2>&1 || true
-    ok "TCP BBR + fq enabled"
-    tick "Network: TCP BBR + fq, slow-start after idle off"
-fi
-
-# ── USB-C dock: keep Thunderbolt xHCI always on (no runtime PM) ──────────────
-# Wavlink/DisplayLink dock hangs off the Tiger Lake TB4 xHCI (00:0d.0).
+# USB-C dock: keep Tiger Lake TB4 xHCI always on (no runtime PM)
 if lspci -s 00:0d.0 2>/dev/null | grep -qi 'Thunderbolt.*USB Controller'; then
     if [[ -d /etc/tlp.d ]]; then
         cat > /etc/tlp.d/02-usbc-dock.conf << 'TLPDOCK_EOF'
@@ -129,26 +111,38 @@ ACTION=="add", SUBSYSTEM=="pci", KERNEL=="0000:00:0d.0", ATTR{power/control}="on
 UDEVDOCK_EOF
     fi
     echo on > /sys/bus/pci/devices/0000:00:0d.0/power/control 2>/dev/null || true
-    tick "USB-C dock controller: runtime PM disabled"
+    ok "USB-C TB4 dock controller: runtime PM disabled"
 fi
 
-# ── NuPhy & QMK/VIA Keyboards: WebHID udev rules ──────────────────────────────
+# NuPhy & QMK/VIA Keyboards: WebHID udev rules (0660 + uaccess for active desktop seat)
 cat > /etc/udev/rules.d/50-nuphy.rules << 'NUPHY_EOF'
 # NuPhy keyboards & dongles (QMK/VIA / WebHID)
-KERNEL=="hidraw*", ATTRS{idVendor}=="19f5", MODE="0666", TAG+="uaccess"
-SUBSYSTEM=="usb", ATTRS{idVendor}=="19f5", MODE="0666", TAG+="uaccess"
+KERNEL=="hidraw*", ATTRS{idVendor}=="19f5", MODE="0660", TAG+="uaccess"
+SUBSYSTEM=="usb", ATTRS{idVendor}=="19f5", MODE="0660", TAG+="uaccess"
 NUPHY_EOF
 udevadm control --reload-rules >> "$LOG_FILE" 2>&1 || true
 udevadm trigger >> "$LOG_FILE" 2>&1 || true
-tick "NuPhy / QMK WebHID udev rules"
 
-# ── Hardware sensors ─────────────────────────────────────────────────────────
-sensors-detect --auto >> "$LOG_FILE" 2>&1 || true
-tick "Hardware sensors detected"
+# Hardware sensors
+command -v sensors-detect &>/dev/null && sensors-detect --auto >> "$LOG_FILE" 2>&1 || true
+tick "Hardware tuning (battery · Wi-Fi · dock · NuPhy udev · sensors)"
+
+# ── Network: TCP BBR + fq, no slow-start after idle ──────────────────────────
+if grep -qw bbr /proc/sys/net/ipv4/tcp_available_congestion_control 2>/dev/null \
+    || modprobe tcp_bbr >> "$LOG_FILE" 2>&1; then
+    echo tcp_bbr > /etc/modules-load.d/tcp_bbr.conf
+    cat > /etc/sysctl.d/99-network-tuning.conf << 'NET_EOF'
+net.core.default_qdisc = fq
+net.ipv4.tcp_congestion_control = bbr
+net.ipv4.tcp_slow_start_after_idle = 0
+NET_EOF
+    sysctl -p /etc/sysctl.d/99-network-tuning.conf >> "$LOG_FILE" 2>&1 || true
+    ok "TCP BBR + fq enabled"
+fi
+tick "Network: TCP BBR + fq"
 
 # ── Firewall ──────────────────────────────────────────────────────────────────
 if is_fedora; then
-    # Fedora uses firewalld
     if systemctl is-active --quiet firewalld; then
         ok "firewalld already active"
     else
@@ -158,7 +152,9 @@ if is_fedora; then
     firewall-cmd --reload >> "$LOG_FILE" 2>&1 || true
     tick "firewalld (SSH allowed)"
 else
-    # Ubuntu uses UFW
+    if ! command -v ufw &>/dev/null; then
+        apt_each ufw
+    fi
     if command -v ufw &>/dev/null; then
         if ! ufw status | grep -q "Status: active"; then
             info "Configuring UFW firewall..."
@@ -170,14 +166,6 @@ else
                 || warn "UFW enable failed"
         else
             ok "UFW already active"
-        fi
-    else
-        apt_each ufw
-        if command -v ufw &>/dev/null; then
-            ufw default deny incoming >> "$LOG_FILE" 2>&1
-            ufw default allow outgoing >> "$LOG_FILE" 2>&1
-            ufw allow ssh >> "$LOG_FILE" 2>&1
-            ufw --force enable >> "$LOG_FILE" 2>&1 || true
         fi
     fi
 
@@ -213,7 +201,7 @@ case "${1:-info}" in
                 --object-path /org/gnome/SettingsDaemon/Power \
                 --method org.freedesktop.DBus.Properties.Set \
                 org.gnome.SettingsDaemon.Power.Screen Brightness \
-                "<int32 $(awk "BEGIN{printf \"%d\", ${2:-100} * 100}")>" 2>/dev/null \
+                "<int32 $(awk "BEGIN{v=${2:-1.0}*100; if(v>100)v=100; if(v<0)v=0; printf \"%d\", v}")>" 2>/dev/null \
                 || echo "Could not set brightness via GNOME. Try: xdg-open gnome-control-center://power"
         else
             xrandr --output "$(xrandr | grep ' connected' | awk '{print $1}' | head -1)" --brightness "${2:-1.0}"
@@ -238,7 +226,7 @@ case "${1:-info}" in
         echo "GPU:"
         nvidia-smi -L 2>/dev/null || lspci | grep -i 'vga\|3d' 2>/dev/null || echo "N/A"
         ;;
-    *)  echo "Usage: display-setup [gamma <val>] [brightness <0-1>] [reset] [info]" ;;
+    *)  echo "Usage: display-setup [gamma <val>] [brightness <0.0-1.0>] [reset] [info]" ;;
 esac
 DISP
 chmod +x /usr/local/bin/display-setup
@@ -250,7 +238,7 @@ BOLD='\033[1m'; CYAN='\033[0;36m'; GREEN='\033[0;32m'; RESET='\033[0m'
 echo -e "${BOLD}${CYAN}System Report${RESET}"
 echo -e "${BOLD}─────────────────────────────────────────${RESET}"
 echo -e "${GREEN}OS:${RESET}       $(lsb_release -ds 2>/dev/null || grep '^PRETTY_NAME' /etc/os-release | cut -d= -f2 | tr -d '\"')"
-echo -e "${GREEN}Kernel:${RESET}   $(uname -r)"
+echo -e "${GREEN}Kernel:${RESET}   $(uname -r) ($(uname -m))"
 echo -e "${GREEN}Shell:${RESET}    $SHELL"
 echo -e "${GREEN}User:${RESET}     $(whoami)@$(hostname)"
 echo -e "${GREEN}Uptime:${RESET}   $(uptime -p)"
@@ -260,8 +248,11 @@ command -v nvidia-smi &>/dev/null && echo -e "${GREEN}GPU:${RESET}      $(nvidia
 echo -e "${GREEN}Podman:${RESET}   $(podman --version 2>/dev/null || echo 'not installed')"
 echo -e "${GREEN}Node:${RESET}     $(node --version 2>/dev/null || echo 'not installed')"
 echo -e "${GREEN}Python:${RESET}   $(python3 --version 2>/dev/null || echo 'not installed')"
+echo -e "${GREEN}uv:${RESET}       $(uv --version 2>/dev/null || echo 'not installed')"
 echo -e "${GREEN}Go:${RESET}       $(go version 2>/dev/null | awk '{print $3}' || echo 'not installed')"
 echo -e "${GREEN}Rust:${RESET}     $(rustc --version 2>/dev/null || echo 'not installed')"
+echo -e "${GREEN}Java:${RESET}     $(java -version 2>&1 | head -1 || echo 'not installed')"
+echo -e "${GREEN}kubectl:${RESET}  $(kubectl version --client --short 2>/dev/null || kubectl version --client 2>/dev/null | head -1 || echo 'not installed')"
 echo -e "${GREEN}Fonts:${RESET}    $(fc-list 2>/dev/null | wc -l) installed"
 SYSREPORT
 chmod +x /usr/local/bin/sysreport
@@ -276,11 +267,12 @@ else
     apt_quiet autoremove
     apt_quiet autoclean
     apt_quiet clean
-    snap set system refresh.retain=2 >> "$LOG_FILE" 2>&1 || true
-    # Remove orphan snaps
-    snap list --all 2>/dev/null | awk '/disabled/{print $1, $3}' | while read snapname revision; do
-        snap remove "$snapname" --revision="$revision" >> "$LOG_FILE" 2>&1 || true
-    done
+    if command -v snap &>/dev/null; then
+        snap set system refresh.retain=2 >> "$LOG_FILE" 2>&1 || true
+        snap list --all 2>/dev/null | awk '/disabled/{print $1, $3}' | while read -r snapname revision; do
+            snap remove "$snapname" --revision="$revision" >> "$LOG_FILE" 2>&1 || true
+        done
+    fi
 fi
 # Clean old journal logs (keep 7 days)
 journalctl --vacuum-time=7d >> "$LOG_FILE" 2>&1 || true

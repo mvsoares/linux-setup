@@ -6,40 +6,41 @@ init_sub 6
 # ── Git config ────────────────────────────────────────────────────────────────
 info "Applying git config improvements..."
 
-if is_fedora; then
-    if command -v git-credential-libsecret &>/dev/null; then
-        as_user "git config --global credential.helper /usr/libexec/git-core/git-credential-libsecret"
-        ok "Git credential helper → libsecret (GNOME keyring)"
-    else
-        info "git-credential-libsecret not available — keeping current helper"
+_git_cred_helper=""
+for _cand in \
+    /usr/libexec/git-core/git-credential-libsecret \
+    /usr/lib/git-core/git-credential-libsecret \
+    /usr/share/doc/git/contrib/credential/libsecret/git-credential-libsecret; do
+    if [[ -x "$_cand" ]]; then
+        _git_cred_helper="$_cand"
+        break
     fi
+done
+
+if [[ -n "$_git_cred_helper" ]]; then
+    as_user "git config --global credential.helper '${_git_cred_helper}'"
+    ok "Git credential helper → libsecret (${_git_cred_helper})"
 else
-    GIT_CRED_DIR="/usr/share/doc/git/contrib/credential/libsecret"
-    if [[ -f "$GIT_CRED_DIR/git-credential-libsecret" ]]; then
-        as_user "git config --global credential.helper '${GIT_CRED_DIR}/git-credential-libsecret'"
-        ok "Git credential helper → libsecret (GNOME keyring)"
-    else
-        info "git-credential-libsecret not available — keeping current helper"
-    fi
+    info "git-credential-libsecret not available — keeping current helper (tip: run 'gh auth setup-git')"
 fi
 
 as_user "git config --global init.defaultBranch main"
-if command -v codium &>/dev/null; then
+if ! is_server_profile && command -v codium &>/dev/null; then
     as_user "git config --global core.editor 'codium --wait'"
-elif command -v code &>/dev/null; then
-    as_user "git config --global core.editor 'code --wait'"
+elif command -v nvim &>/dev/null; then
+    as_user "git config --global core.editor 'nvim'"
+elif command -v vim &>/dev/null; then
+    as_user "git config --global core.editor 'vim'"
 fi
 if command -v delta &>/dev/null; then
     as_user "git config --global core.pager delta"
-fi
-as_user "git config --global core.autocrlf input"
-if command -v delta &>/dev/null; then
     as_user "git config --global interactive.diffFilter 'delta --color-only'"
     as_user "git config --global delta.navigate true"
     as_user "git config --global delta.side-by-side true"
     as_user "git config --global delta.line-numbers true"
     as_user "git config --global delta.syntax-theme Dracula"
 fi
+as_user "git config --global core.autocrlf input"
 as_user "git config --global merge.conflictstyle zdiff3"
 as_user "git config --global diff.algorithm histogram"
 as_user "git config --global diff.colorMoved default"
@@ -54,6 +55,7 @@ as_user "git config --global column.ui auto"
 tick "Git config (delta, libsecret, histogram, zdiff3)"
 
 # ── Global gitignore ─────────────────────────────────────────────────────────
+# Kept focused on OS, editor, and local env files (never ignore dist/build/target globally)
 GLOBAL_GITIGNORE="${USER_HOME}/.gitignore_global"
 if [[ ! -f "$GLOBAL_GITIGNORE" ]]; then
     cat > "$GLOBAL_GITIGNORE" << 'GITIGNORE'
@@ -63,38 +65,25 @@ Thumbs.db
 Desktop.ini
 *~
 
-# Editors
+# Editors & IDEs
 .vscode/
 .idea/
 *.swp
 *.swo
-*~
 .project
 .settings/
 
-# Environment
-.env
+# Local Environment
 .env.local
 .env.*.local
 .direnv/
 
-# Runtime
+# Local Tool Caches
 __pycache__/
 *.pyc
 .mypy_cache/
 .ruff_cache/
-node_modules/
-.npm/
-.yarn/
-.pnpm-store/
-dist/
-build/
-target/
-
-# Logs
-*.log
-npm-debug.log*
-yarn-debug.log*
+.pytest_cache/
 GITIGNORE
     chown "$REAL_USER:$REAL_USER" "$GLOBAL_GITIGNORE"
     ok "Global gitignore deployed"
@@ -104,7 +93,7 @@ fi
 as_user "git config --global core.excludesFile '${GLOBAL_GITIGNORE}'"
 tick "Global gitignore"
 
-# ── Tmux config ──────────────────────────────────────────────────────────────
+# ── Tmux config + TPM ────────────────────────────────────────────────────────
 TMUX_CONF="${USER_HOME}/.tmux.conf"
 if [[ -f "$TMUX_CONF" ]]; then
     skip "tmux config (already exists)"
@@ -116,9 +105,11 @@ unbind C-b
 set -g prefix C-a
 bind C-a send-prefix
 
-# Modern terminal settings
+# Modern terminal settings (truecolor + WezTerm OSC passthrough)
 set -g default-terminal "tmux-256color"
+set -as terminal-features ",*:RGB"
 set -ag terminal-overrides ",xterm-256color:RGB"
+set -g allow-passthrough on
 set -g mouse on
 set -g history-limit 50000
 set -g base-index 1
@@ -148,7 +139,7 @@ bind -r L resize-pane -R 5
 # Reload config
 bind r source-file ~/.tmux.conf \; display "Config reloaded"
 
-# Status bar — clean and minimal
+# Status bar — clean and minimal (Dracula)
 set -g status-style 'bg=#282a36 fg=#f8f8f2'
 set -g status-left '#[fg=#50fa7b,bold] #S '
 set -g status-right '#[fg=#8be9fd] %H:%M  #[fg=#bd93f9]%d-%b '
@@ -163,9 +154,20 @@ set -g pane-active-border-style 'fg=#ff79c6'
 
 # New window in current path
 bind c new-window -c "#{pane_current_path}"
+
+# ── TPM Plugins (press prefix + I to install) ────────────────────────────────
+set -g @plugin 'tmux-plugins/tpm'
+set -g @plugin 'tmux-plugins/tmux-sensible'
+set -g @plugin 'tmux-plugins/tmux-resurrect'
+set -g @plugin 'tmux-plugins/tmux-continuum'
+set -g @continuum-restore 'on'
+
+if "test ! -d ~/.tmux/plugins/tpm" \
+   "run 'git clone https://github.com/tmux-plugins/tpm ~/.tmux/plugins/tpm'"
+run '~/.tmux/plugins/tpm/tpm'
 TMUX
     chown "$REAL_USER:$REAL_USER" "$TMUX_CONF"
-    ok "tmux config (Dracula-themed, Ctrl-a prefix)"
+    ok "tmux config (Dracula-themed, Ctrl-a, RGB/WezTerm passthrough, TPM)"
 fi
 
 # TPM (tmux plugin manager)
@@ -185,21 +187,25 @@ else
     pkg_install direnv
 fi
 
-# direnv default .envrc template
+# direnv helpers (idiomatic direnv without shadowing built-in layout_python)
 DIRENV_DIR="${USER_HOME}/.config/direnv"
 mkdir -p "$DIRENV_DIR"
 if [[ ! -f "${DIRENV_DIR}/direnvrc" ]]; then
     cat > "${DIRENV_DIR}/direnvrc" << 'DIRENVRC'
-# Auto-detect and use Python venv
-layout_python() {
-    local python=${1:-python3}
-    if [[ ! -d .venv ]]; then
-        $python -m venv .venv
+# Idiomatic uv / .venv layout for direnv (use `layout uv` in .envrc)
+layout_uv() {
+    if [[ -d ".venv" ]]; then
+        VIRTUAL_ENV="$(pwd)/.venv"
+    else
+        uv venv .venv
+        VIRTUAL_ENV="$(pwd)/.venv"
     fi
-    source .venv/bin/activate
+    PATH_add "$VIRTUAL_ENV/bin"
+    export UV_ACTIVE=1
+    export VIRTUAL_ENV
 }
 
-# Auto-detect and use Node version from .nvmrc
+# Auto-detect and use Node version from .nvmrc (use `use nvm` in .envrc)
 use_nvm() {
     local NVM_DIR="$HOME/.nvm"
     if [[ -f .nvmrc ]] && [[ -s "$NVM_DIR/nvm.sh" ]]; then
@@ -209,7 +215,7 @@ use_nvm() {
 }
 DIRENVRC
     chown -R "$REAL_USER:$REAL_USER" "$DIRENV_DIR"
-    ok "direnv config with Python/Node helpers"
+    ok "direnv config with uv/nvm helpers"
 fi
 tick "direnv + helpers"
 

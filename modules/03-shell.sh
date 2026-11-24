@@ -8,25 +8,40 @@ if command -v starship &>/dev/null; then
     skip "Starship"
 else
     info "Installing Starship prompt..."
-    curl -fsSL https://starship.rs/install.sh -o /tmp/starship_install.sh && sh /tmp/starship_install.sh --yes >> "$LOG_FILE" 2>&1 && rm -f /tmp/starship_install.sh \
+    curl -fsSL "${CURL_TIMEOUT_OPTS[@]}" https://starship.rs/install.sh -o /tmp/starship_install.sh \
+        && sh /tmp/starship_install.sh --yes >> "$LOG_FILE" 2>&1 \
+        && rm -f /tmp/starship_install.sh \
         && ok "Starship installed" || warn "Starship install failed"
 fi
 tick "Starship prompt"
 
-# ── Global shell profile ─────────────────────────────────────────────────────
-cat > /etc/profile.d/99-workstation.sh << 'PROFILE'
+# ── Global & User shell profile (/etc/profile.d + ~/.bashrc.d) ───────────────
+# Deployed to both /etc/profile.d (login shells) and ~/.bashrc.d (interactive
+# non-login terminals like WezTerm & GNOME Terminal on Ubuntu).
+read -r -d '' WORKSTATION_PROFILE << 'PROFILE' || true
 #!/usr/bin/env bash
 # Only apply to interactive shells for real users (not root/service accounts)
 [[ $- != *i* ]] && return
 [[ $EUID -eq 0 ]] && return
+# Avoid double-sourcing when both /etc/profile.d and ~/.bashrc.d load
+[[ -n "${__LINUX_SETUP_WORKSTATION_LOADED:-}" ]] && return
+__LINUX_SETUP_WORKSTATION_LOADED=1
 
 # ── Workstation Shell Enhancements ────────────────────────────────────────────
 export HISTSIZE=50000; export HISTFILESIZE=100000
 export HISTCONTROL=ignoreboth:erasedups
 export HISTTIMEFORMAT="%F %T  "
 shopt -s histappend cmdhist autocd cdspell dirspell globstar 2>/dev/null || true
-export EDITOR=vim; export VISUAL=vim
-[[ -d "$HOME/.local/bin" ]] && export PATH="$HOME/.local/bin:$PATH"
+
+if command -v nvim &>/dev/null; then
+    export EDITOR=nvim; export VISUAL=nvim
+elif command -v vim &>/dev/null; then
+    export EDITOR=vim; export VISUAL=vim
+else
+    export EDITOR=nano; export VISUAL=nano
+fi
+
+[[ -d "$HOME/.local/bin" ]] && case ":$PATH:" in *":$HOME/.local/bin:"*) ;; *) export PATH="$HOME/.local/bin:$PATH" ;; esac
 
 # NVIDIA on-demand GPU wrapper
 if command -v nvidia-smi &>/dev/null; then
@@ -38,10 +53,13 @@ if command -v nvidia-smi &>/dev/null; then
 fi
 
 # Modern tool overrides (only activate if present)
-command -v wezterm &>/dev/null && alias wezterm='wezterm 2>/dev/null'
 command -v bat &>/dev/null && alias cat='bat --paging=never --style=plain' && alias catp='bat'
 command -v eza &>/dev/null && alias ls='eza --icons' && alias ll='eza -lah --icons --git' && alias lt='eza --tree --icons -L 3'
-command -v fzf &>/dev/null && export FZF_DEFAULT_OPTS='--height=40% --layout=reverse --border --info=inline --color=header:italic:underline,prompt:bold'
+# Preserve theme-synced FZF_DEFAULT_OPTS if synth-shell-theme already set it
+if command -v fzf &>/dev/null; then
+    : "${FZF_DEFAULT_OPTS:=--height=40% --layout=reverse --border --info=inline --color=header:italic:underline,prompt:bold}"
+    export FZF_DEFAULT_OPTS
+fi
 command -v direnv &>/dev/null && eval "$(direnv hook bash)" 2>/dev/null || true
 command -v dust &>/dev/null && alias du='dust'
 command -v procs &>/dev/null && alias pss='procs'
@@ -49,11 +67,30 @@ if command -v duf &>/dev/null; then
     df() { if [[ $# -eq 0 ]]; then duf; else command df "$@"; fi; }
 fi
 command -v btm &>/dev/null && alias top='btm'
+command -v xh &>/dev/null && alias http='xh'
+
+# Yazi wrapper that changes cwd on exit
+if command -v yazi &>/dev/null; then
+    yy() {
+        local tmp cwd
+        tmp="$(mktemp -t "yazi-cwd.XXXXXX")"
+        yazi "$@" --cwd-file="$tmp"
+        if cwd="$(command cat -- "$tmp")" && [[ -n "$cwd" && "$cwd" != "$PWD" ]]; then
+            builtin cd -- "$cwd" || return
+        fi
+        rm -f -- "$tmp"
+    }
+fi
 
 # fzf keybindings (paths differ between distros)
 [[ -f /usr/share/doc/fzf/examples/key-bindings.bash ]] && source /usr/share/doc/fzf/examples/key-bindings.bash
 [[ -f /usr/share/fzf/shell/key-bindings.bash ]] && source /usr/share/fzf/shell/key-bindings.bash
 [[ -f /usr/share/bash-completion/completions/fzf ]] && source /usr/share/bash-completion/completions/fzf
+
+# Atuin searchable shell history (Ctrl+R only, keeps Up-arrow normal)
+if command -v atuin &>/dev/null; then
+    eval "$(atuin init bash --disable-up-arrow)" 2>/dev/null || true
+fi
 
 # Navigation
 alias ..='cd ..'; alias ...='cd ../..'; alias ....='cd ../../..'
@@ -69,14 +106,14 @@ alias lg='lazygit'; alias lzd='lazydocker'
 # Podman & system
 alias dk='podman'; alias dkc='podman compose'; alias py='python3'
 alias please='sudo'; alias ports='ss -tulpn'
-alias myip='curl -s ifconfig.me'
-alias sysinfo='fastfetch 2>/dev/null || neofetch 2>/dev/null || inxi -Fxz 2>/dev/null'
-alias weather='curl -s wttr.in/?format=3'
-# Distro-specific update alias
+alias myip='curl -s --max-time 5 ifconfig.me'
+alias sysinfo='fastfetch 2>/dev/null || inxi -Fxz 2>/dev/null'
+alias weather='curl -s --max-time 5 wttr.in/?format=3'
+# Distro-specific update alias (includes pipx & flatpak)
 if [[ -f /etc/fedora-release ]]; then
-    alias update='sudo dnf upgrade -y && flatpak update -y 2>/dev/null'
+    alias update='sudo dnf upgrade -y && (command -v flatpak &>/dev/null && flatpak update -y || true) && (command -v pipx &>/dev/null && pipx upgrade-all || true)'
 else
-    alias update='sudo apt update && sudo apt upgrade -y && sudo snap refresh && flatpak update -y 2>/dev/null'
+    alias update='sudo apt update && sudo apt upgrade -y && (command -v snap &>/dev/null && sudo snap refresh || true) && (command -v flatpak &>/dev/null && flatpak update -y || true) && (command -v pipx &>/dev/null && pipx upgrade-all || true)'
 fi
 alias fonts-list='fc-list | sort'; alias fonts-mono='fc-list :spacing=mono | sort'
 if [[ -n "${WAYLAND_DISPLAY:-}" ]] && command -v wl-copy &>/dev/null; then
@@ -115,8 +152,9 @@ elif command -v starship &>/dev/null; then
     eval "$(starship init bash)"
 fi
 PROFILE
-chmod +x /etc/profile.d/99-workstation.sh
-tick "Global shell profile (/etc/profile.d/99-workstation.sh)"
+
+install_shell_snippet "99-workstation.sh" "$WORKSTATION_PROFILE"
+tick "Shell profile (/etc/profile.d + ~/.bashrc.d/99-workstation.sh)"
 
 # ── Starship config ──────────────────────────────────────────────────────────
 if [[ -n "$REAL_USER" ]]; then
@@ -167,27 +205,27 @@ style = "bold yellow"
 
 [python]
 format = ' [${symbol}${pyenv_prefix}(${version})(\($virtualenv\))]($style)'
-symbol = " "
+symbol = " "
 
 [nodejs]
 format = ' [$symbol($version)]($style)'
-symbol = " "
+symbol = " "
 
 [rust]
 format = ' [$symbol($version)]($style)'
-symbol = " "
+symbol = " "
 
 [golang]
 format = ' [$symbol($version)]($style)'
-symbol = " "
+symbol = " "
 
 [java]
 format = ' [$symbol($version)]($style)'
-symbol = " "
+symbol = " "
 
 [docker_context]
 format = ' [$symbol$context]($style)'
-symbol = " "
+symbol = " "
 
 [kubernetes]
 disabled = false
@@ -197,11 +235,11 @@ detect_folders = ["k8s", "kube", "kubernetes"]
 
 [aws]
 format = ' [$symbol($profile)(\($region\))]($style)'
-symbol = "  "
+symbol = "󰸏 "
 
 [gcloud]
 format = ' [$symbol($project)]($style)'
-symbol = " "
+symbol = "󱇶 "
 TOML
         chown "$REAL_USER:$REAL_USER" "$STARSHIP_CFG"
         ok "Starship config created"
@@ -279,7 +317,7 @@ if [[ -f "$SYNTH_PROMPT" ]] && [[ -n "$REAL_USER" ]]; then
         warn "synth-shell-theme binary not found at ${SYNTH_THEME_BIN} — run: pipx install synth-shell-theme"
     fi
 fi
-tick "synth-shell (prompt · better-ls · better-alias · better-history)"
+tick "synth-shell + synth-shell-theme"
 
 # ── Bashrc tune-ups ──────────────────────────────────────────────────────────
 BASHRC="${USER_HOME}/.bashrc"
@@ -291,38 +329,14 @@ if [[ -f "$BASHRC" ]]; then
     sed -i 's/^HISTFILESIZE=2000$/HISTFILESIZE=100000/' "$BASHRC"
     sed -i 's/^#shopt -s globstar$/shopt -s globstar/' "$BASHRC"
 
-    # Shorten GKE context in Synth-Shell prompt (pure bash, avoids spawning kubectl)
-    if ! grep -q 'getKube()' "$BASHRC" 2>/dev/null; then
-        cat >> "$BASHRC" << 'KUBEBLOCK'
-
-# Shorten GKE context in Synth-Shell prompt (pure bash, avoids spawning kubectl)
-getKube() {
-    local cfg="${KUBECONFIG%%:*}"
-    cfg="${cfg:-$HOME/.kube/config}"
-    [[ -r "$cfg" ]] || return
-    local line ctx=""
-    while IFS= read -r line; do
-        if [[ "$line" =~ ^current-context:[[:space:]]*(.*)$ ]]; then
-            ctx="${BASH_REMATCH[1]}"
-            ctx="${ctx%"${ctx##*[![:space:]]}"}"
-            ctx="${ctx%\"}" ; ctx="${ctx#\"}"
-            ctx="${ctx%\'}" ; ctx="${ctx#\'}"
-            break
-        fi
-    done < "$cfg"
-    [[ -z "$ctx" ]] && return
-    # gke_<project>_<region>_<cluster> -> <cluster> (strip redundant gke- prefix)
-    if [[ "$ctx" =~ ^gke_[^_]+_[^_]+_(.+)$ ]]; then
-        ctx="${BASH_REMATCH[1]#gke-}"
-    fi
-    (( ${#ctx} > 28 )) && ctx="${ctx:0:25}…"
-    printf '☸ %s' "$ctx"
-}
-KUBEBLOCK
-        ok "getKube() short cluster name helper added to .bashrc"
+    # Remove legacy getKube() override from older linux-setup versions so it does not
+    # shadow synth-shell-theme's enhanced getKube() (namespace + production alert).
+    if [[ -x "$SYNTH_THEME_BIN" ]] && grep -q '# Shorten GKE context in Synth-Shell prompt' "$BASHRC" 2>/dev/null; then
+        sed -i '/^# Shorten GKE context in Synth-Shell prompt/,/^}$/d' "$BASHRC"
+        ok "Removed legacy getKube() from .bashrc (now managed by synth-shell-theme)"
     fi
 
-    # Shpool Session Prompt Indicator (dynamic theme matching)
+    # Shpool Session Prompt Indicator (dynamic theme matching; Bash 5.1+ array-safe)
     if ! grep -q '__shpool_ps1_prefix' "$BASHRC" 2>/dev/null; then
         cat >> "$BASHRC" << 'SHPOOLBLOCK'
 
@@ -377,19 +391,28 @@ __shpool_ps1_prefix() {
     return $ret
 }
 
-if [[ "$PROMPT_COMMAND" != *"__shpool_ps1_prefix"* ]]; then
-    PROMPT_COMMAND="${PROMPT_COMMAND:+$PROMPT_COMMAND; }__shpool_ps1_prefix"
+if [[ "$(declare -p PROMPT_COMMAND 2>/dev/null)" == "declare -a"* ]]; then
+    [[ " ${PROMPT_COMMAND[*]} " != *" __shpool_ps1_prefix "* ]] && PROMPT_COMMAND+=(__shpool_ps1_prefix)
+elif [[ "${PROMPT_COMMAND:-}" != *"__shpool_ps1_prefix"* ]]; then
+    PROMPT_COMMAND="${PROMPT_COMMAND:+${PROMPT_COMMAND}; }__shpool_ps1_prefix"
 fi
 SHPOOLBLOCK
         ok "Shpool session prompt indicator added to .bashrc"
     fi
-    
-    # Ensure zoxide is initialized at the very end of .bashrc
-    if ! grep -q 'zoxide init bash' "$BASHRC"; then
-        echo -e '\n# Initialize zoxide (must be at the end)' >> "$BASHRC"
-        echo 'command -v zoxide &>/dev/null && eval "$(zoxide init bash)" && alias cd='\''z'\''' >> "$BASHRC"
+
+    # Ensure zoxide is initialized cleanly at the end of .bashrc (--cmd cd preserves cd -)
+    if grep -q "zoxide init bash)\" && alias cd='z'" "$BASHRC" 2>/dev/null; then
+        sed -i "s|eval \"\$(zoxide init bash)\" && alias cd='z'|eval \"\$(zoxide init bash --cmd cd)\"|" "$BASHRC"
+        ok "Upgraded zoxide init to --cmd cd"
+    elif ! grep -q 'zoxide init bash' "$BASHRC" 2>/dev/null; then
+        cat >> "$BASHRC" << 'ZOXIDEBLOCK'
+
+# Initialize zoxide (must be at the end)
+command -v zoxide &>/dev/null && eval "$(zoxide init bash --cmd cd)"
+ZOXIDEBLOCK
     fi
 
+    chown "$REAL_USER:$REAL_USER" "$BASHRC"
     ok "Bashrc tuned (backup: ${BACKUP})"
 fi
 tick "Bashrc improvements"

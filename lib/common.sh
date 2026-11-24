@@ -47,6 +47,7 @@ init_sub() { _ST_TOTAL=${1:-1}; _ST_CUR=0; }
 tick() {
     _ST_CUR=$(( _ST_CUR + 1 ))
     local pct=$(( _ST_CUR * 100 / _ST_TOTAL ))
+    (( pct > 100 )) && pct=100
     local filled=$(( pct * 22 / 100 ))
     local bar=""
     for ((i=0; i<filled; i++));  do bar+="█"; done
@@ -57,6 +58,7 @@ tick() {
 step() {
     CURRENT_STEP=$((CURRENT_STEP + 1))
     local pct=$(( CURRENT_STEP * 100 / TOTAL_STEPS ))
+    (( pct > 100 )) && pct=100
     local filled=$(( pct * 40 / 100 ))
     local bar=""
     for ((i=0; i<filled; i++));  do bar+="█"; done
@@ -94,17 +96,59 @@ ensure_user_local_bin_path() {
     local rc="${USER_HOME}/.bashrc"
     [[ -f "$rc" ]] || touch "$rc"
     chown "$REAL_USER:$REAL_USER" "$rc" 2>/dev/null || true
-    if grep -qF "$marker" "$rc" 2>/dev/null; then
-        return 0
-    fi
-    cat >> "$rc" << 'EOF'
+    if ! grep -qF "$marker" "$rc" 2>/dev/null; then
+        cat >> "$rc" << 'EOF'
 
 # linux-setup: ~/.local/bin (pipx, cargo, user tools)
 [[ -d "$HOME/.local/bin" ]] && case ":$PATH:" in *":$HOME/.local/bin:"*) ;; *) export PATH="$HOME/.local/bin:$PATH" ;; esac
 EOF
-    chown "$REAL_USER:$REAL_USER" "$rc"
-    ok "~/.local/bin PATH block added to ${REAL_USER}'s .bashrc"
+        chown "$REAL_USER:$REAL_USER" "$rc"
+        ok "~/.local/bin PATH block added to ${REAL_USER}'s .bashrc"
+    fi
+    ensure_bashrc_d
 }
+
+# Ensure ~/.bashrc.d/ exists and is sourced by ~/.bashrc so non-login interactive
+# terminals (GNOME Terminal, WezTerm on Ubuntu) load modular shell configs too.
+ensure_bashrc_d() {
+    [[ -z "${REAL_USER:-}" || -z "${USER_HOME:-}" ]] && return 0
+    local rc="${USER_HOME}/.bashrc"
+    local d="${USER_HOME}/.bashrc.d"
+    install -d -o "$REAL_USER" -g "$REAL_USER" "$d" 2>/dev/null || mkdir -p "$d"
+    [[ -f "$rc" ]] || touch "$rc"
+    local marker='# linux-setup: load ~/.bashrc.d/*.sh'
+    if ! grep -qF "$marker" "$rc" 2>/dev/null; then
+        cat >> "$rc" << 'EOF'
+
+# linux-setup: load ~/.bashrc.d/*.sh
+if [[ -d "$HOME/.bashrc.d" ]]; then
+    for _rc_snip in "$HOME/.bashrc.d"/*.sh; do
+        [[ -r "$_rc_snip" ]] && source "$_rc_snip"
+    done
+    unset _rc_snip
+fi
+EOF
+        chown "$REAL_USER:$REAL_USER" "$rc"
+    fi
+}
+
+# Install a drop-in shell snippet to both /etc/profile.d (login shells) and
+# ~/.bashrc.d (interactive non-login shells).
+install_shell_snippet() {
+    local filename="$1"
+    local src_content="$2"
+    printf '%s\n' "$src_content" > "/etc/profile.d/${filename}"
+    chmod 644 "/etc/profile.d/${filename}"
+    if [[ -n "${REAL_USER:-}" && -n "${USER_HOME:-}" ]]; then
+        install -d -o "$REAL_USER" -g "$REAL_USER" "${USER_HOME}/.bashrc.d" 2>/dev/null || true
+        printf '%s\n' "$src_content" > "${USER_HOME}/.bashrc.d/${filename}"
+        chown "$REAL_USER:$REAL_USER" "${USER_HOME}/.bashrc.d/${filename}"
+        chmod 644 "${USER_HOME}/.bashrc.d/${filename}"
+    fi
+}
+
+# Profile helper (full | dev | minimal | server)
+is_server_profile() { [[ "${SETUP_PROFILE:-full}" == "server" ]]; }
 
 # Fedora: avoid "can't create transaction lock" when PackageKit/another dnf holds RPM
 wait_for_rpm_lock() {
@@ -183,6 +227,9 @@ gset() {
 }
 
 # ── Repository Helpers ────────────────────────────────────────────────────────
+# Curl timeouts to avoid indefinite hangs on flaky networks
+CURL_TIMEOUT_OPTS=(--connect-timeout 15 --max-time 300)
+
 add_apt_repo() {
     local name="$1" key_url="$2" key_file="$3" repo_list_file="$4" repo_content="$5"
     if [[ -f "$repo_list_file" && -s "$key_file" ]]; then
@@ -191,24 +238,34 @@ add_apt_repo() {
     fi
     info "Adding ${name} repo..."
     if [[ -n "$key_url" && -n "$key_file" ]]; then
-        if [[ "$key_url" == *".asc" || "$key_url" == *".pub" || "$key_url" == *".gpg" ]]; then
-            if ! curl -fsSL "$key_url" | gpg --batch --yes --dearmor -o "$key_file" >> "$LOG_FILE" 2>&1; then
-                warn "${name} key failed"
+        mkdir -p "$(dirname "$key_file")"
+        local tmp_key
+        tmp_key=$(mktemp)
+        if ! curl -fsSL "${CURL_TIMEOUT_OPTS[@]}" "$key_url" -o "$tmp_key" >> "$LOG_FILE" 2>&1; then
+            rm -f "$tmp_key"
+            warn "${name} key failed"
+            return 1
+        fi
+        # Only dearmor ASCII-armored PGP keys; binary keyrings (.gpg) must not be
+        # passed to gpg --dearmor (GnuPG 2.4+ fails or corrupts binary keyrings).
+        if grep -q "BEGIN PGP PUBLIC KEY BLOCK" "$tmp_key" 2>/dev/null; then
+            if ! gpg --batch --yes --dearmor -o "$key_file" < "$tmp_key" >> "$LOG_FILE" 2>&1; then
+                rm -f "$tmp_key"
+                warn "${name} key dearmor failed"
                 return 1
             fi
         else
-            if ! curl -fsSLo "$key_file" "$key_url" >> "$LOG_FILE" 2>&1; then
-                warn "${name} key failed"
-                return 1
-            fi
+            cp "$tmp_key" "$key_file"
         fi
+        chmod 644 "$key_file"
+        rm -f "$tmp_key"
     fi
     echo "$repo_content" > "$repo_list_file"
     tick "${name} repo added"
 }
 
 add_dnf_repo() {
-    local name="$1" repo_url_or_content="$2" repo_file="$3" key_url="$4"
+    local name="$1" repo_url_or_content="$2" repo_file="$3" key_url="${4:-}"
     if [[ -f "$repo_file" ]]; then
         tick "${name} repo — already present"
         return 0
@@ -306,7 +363,7 @@ pkg_update() {
     fi
 }
 
-# Get system architecture in a portable way
+# Get system architecture in a portable way (amd64 / arm64)
 get_arch() {
     local arch
     arch=$(uname -m)
@@ -315,6 +372,22 @@ get_arch() {
         aarch64) echo "arm64" ;;
         *)       echo "$arch" ;;
     esac
+}
+
+# Get system architecture in x86_64 / arm64 form (used by Neovim, etc.)
+get_arch_x86_arm64() {
+    local arch
+    arch=$(uname -m)
+    case "$arch" in
+        x86_64)  echo "x86_64" ;;
+        aarch64) echo "arm64" ;;
+        *)       echo "$arch" ;;
+    esac
+}
+
+# Get system architecture in Rust target form (x86_64 / aarch64)
+get_arch_rust() {
+    uname -m
 }
 
 # Get architecture for dpkg/rpm compatibility
@@ -370,13 +443,13 @@ CURL_UA='Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) 
 _gh_api_curl() {
     local auth_header=()
     [[ -n "${GITHUB_TOKEN:-}" ]] && auth_header=(-H "Authorization: Bearer ${GITHUB_TOKEN}")
-    curl -sSf -A "$CURL_UA" "${auth_header[@]}" -H 'Accept: application/vnd.github+json' "$@"
+    curl -sSf "${CURL_TIMEOUT_OPTS[@]}" -A "$CURL_UA" "${auth_header[@]}" -H 'Accept: application/vnd.github+json' "$@"
 }
 
 # Get latest release tag via redirect header (no API quota used)
 _github_latest_tag() {
     local loc tag
-    loc=$(curl -sSIL -A "$CURL_UA" "https://github.com/$1/releases/latest" 2>/dev/null \
+    loc=$(curl -sSIL "${CURL_TIMEOUT_OPTS[@]}" -A "$CURL_UA" "https://github.com/$1/releases/latest" 2>/dev/null \
         | grep -i '^location:' | tail -1)
     tag=$(echo "$loc" | sed 's|.*/tag/||; s/\r//; s/[[:space:]]//g')
     if [[ -z "$tag" ]]; then
@@ -389,8 +462,8 @@ _github_latest_tag() {
 # Find asset download URL from release HTML page (no API quota used)
 _github_asset_url() {
     local repo="$1" tag="$2" pattern="$3"
-    local html url line
-    html=$(curl -fsSL -A "$CURL_UA" -L "https://github.com/${repo}/releases/expanded_assets/${tag}" 2>/dev/null) || html=""
+    local html url
+    html=$(curl -fsSL "${CURL_TIMEOUT_OPTS[@]}" -A "$CURL_UA" -L "https://github.com/${repo}/releases/expanded_assets/${tag}" 2>/dev/null) || html=""
     # Prefer Perl \K (fast); fall back to grep -E (no PCRE / uutils grep)
     url=$(echo "$html" | grep -oP 'href="\K[^"]*'"$pattern"'[^"]*' 2>/dev/null | head -1)
     [[ -z "$url" ]] && url=$(echo "$html" | grep -oE 'href="[^"]+"' | sed 's/^href="//;s/"$//' | grep -F "$pattern" | head -1)
@@ -421,13 +494,14 @@ github_latest_version() {
 
 install_github_deb() {
     local repo="$1" pattern="$2" name="$3"
-    local url tag
+    local url="" tag
     tag=$(_github_latest_tag "$repo")
     [[ -n "$tag" ]] && url=$(_github_asset_url "$repo" "$tag" "$pattern")
     [[ -z "$url" ]] && url=$(_github_api_asset_url "$repo" "$pattern")
     if [[ -n "$url" ]]; then
-        local tmp=$(mktemp -d)
-        if curl -sSfL -A "$CURL_UA" "$url" -o "$tmp/pkg.deb" >> "$LOG_FILE" 2>&1; then
+        local tmp
+        tmp=$(mktemp -d)
+        if curl -sSfL "${CURL_TIMEOUT_OPTS[@]}" -A "$CURL_UA" "$url" -o "$tmp/pkg.deb" >> "$LOG_FILE" 2>&1; then
             dpkg -i "$tmp/pkg.deb" >> "$LOG_FILE" 2>&1 \
                 && ok "$name installed" \
                 || { apt-get install -f -y >> "$LOG_FILE" 2>&1; warn "$name install had issues"; }
@@ -442,13 +516,14 @@ install_github_deb() {
 
 install_github_rpm() {
     local repo="$1" pattern="$2" name="$3"
-    local url tag
+    local url="" tag
     tag=$(_github_latest_tag "$repo")
     [[ -n "$tag" ]] && url=$(_github_asset_url "$repo" "$tag" "$pattern")
     [[ -z "$url" ]] && url=$(_github_api_asset_url "$repo" "$pattern")
     if [[ -n "$url" ]]; then
-        local tmp=$(mktemp -d)
-        if curl -sSfL -A "$CURL_UA" "$url" -o "$tmp/pkg.rpm" >> "$LOG_FILE" 2>&1; then
+        local tmp
+        tmp=$(mktemp -d)
+        if curl -sSfL "${CURL_TIMEOUT_OPTS[@]}" -A "$CURL_UA" "$url" -o "$tmp/pkg.rpm" >> "$LOG_FILE" 2>&1; then
             dnf install -y "$tmp/pkg.rpm" >> "$LOG_FILE" 2>&1 \
                 && ok "$name installed" \
                 || warn "$name install had issues"
@@ -472,7 +547,7 @@ install_github_pkg() {
 
 install_github_tar() {
     local repo="$1" pattern="$2" binary="$3" name="$4"
-    local url tag altpat
+    local url="" tag altpat
     # Try redirect + HTML scrape (no API quota)
     tag=$(_github_latest_tag "$repo")
     [[ -n "$tag" ]] && url=$(_github_asset_url "$repo" "$tag" "$pattern")
@@ -486,21 +561,23 @@ install_github_tar() {
         done
     fi
     if [[ -z "$url" && "$pattern" == *'musl'* ]]; then
-        for altpat in 'x86_64-unknown-linux-gnu' 'linux-x86_64'; do
+        local rarch; rarch=$(get_arch_rust)
+        for altpat in "${rarch}-unknown-linux-gnu" "linux-${rarch}"; do
             url=$(_github_asset_url "$repo" "$tag" "$altpat")
             [[ -z "$url" ]] && url=$(_github_api_asset_url "$repo" "$altpat")
             [[ -n "$url" ]] && break
         done
     fi
     if [[ -n "$url" ]]; then
-        local tmp=$(mktemp -d)
+        local tmp
+        tmp=$(mktemp -d)
         # Download to file first — tar can auto-detect compression from file but not from stdin pipe
-        if curl -sSfL -A "$CURL_UA" "$url" -o "$tmp/archive" >> "$LOG_FILE" 2>&1; then
+        if curl -sSfL "${CURL_TIMEOUT_OPTS[@]}" -A "$CURL_UA" "$url" -o "$tmp/archive" >> "$LOG_FILE" 2>&1; then
             if tar -xf "$tmp/archive" -C "$tmp" >> "$LOG_FILE" 2>&1; then
                 local bin_path
                 bin_path=$(find "$tmp" -name "$binary" -type f 2>/dev/null | head -1)
                 if [[ -n "$bin_path" ]]; then
-                    install "$bin_path" /usr/local/bin/"$binary"
+                    install -m 755 "$bin_path" /usr/local/bin/"$binary"
                     ok "$name installed"
                 else
                     warn "$name — binary not found in archive"
@@ -512,6 +589,58 @@ install_github_tar() {
             warn "$name — download failed"
         fi
         rm -rf "$tmp"
+    else
+        warn "$name — could not find release"
+    fi
+}
+
+install_github_zip() {
+    local repo="$1" pattern="$2" binary="$3" name="$4"
+    local url="" tag
+    tag=$(_github_latest_tag "$repo")
+    [[ -n "$tag" ]] && url=$(_github_asset_url "$repo" "$tag" "$pattern")
+    [[ -z "$url" ]] && url=$(_github_api_asset_url "$repo" "$pattern")
+    if [[ -n "$url" ]]; then
+        local tmp
+        tmp=$(mktemp -d)
+        if curl -sSfL "${CURL_TIMEOUT_OPTS[@]}" -A "$CURL_UA" "$url" -o "$tmp/archive.zip" >> "$LOG_FILE" 2>&1; then
+            if unzip -qo "$tmp/archive.zip" -d "$tmp" >> "$LOG_FILE" 2>&1; then
+                local bin_path
+                bin_path=$(find "$tmp" -name "$binary" -type f 2>/dev/null | head -1)
+                if [[ -n "$bin_path" ]]; then
+                    install -m 755 "$bin_path" /usr/local/bin/"$binary"
+                    ok "$name installed"
+                else
+                    warn "$name — binary not found in zip"
+                fi
+            else
+                warn "$name — zip extraction failed"
+            fi
+        else
+            warn "$name — download failed"
+        fi
+        rm -rf "$tmp"
+    else
+        warn "$name — could not find release"
+    fi
+}
+
+install_github_bin() {
+    local repo="$1" pattern="$2" binary="$3" name="$4"
+    local url="" tag
+    tag=$(_github_latest_tag "$repo")
+    [[ -n "$tag" ]] && url=$(_github_asset_url "$repo" "$tag" "$pattern")
+    [[ -z "$url" ]] && url=$(_github_api_asset_url "$repo" "$pattern")
+    if [[ -n "$url" ]]; then
+        local tmp
+        tmp=$(mktemp)
+        if curl -sSfL "${CURL_TIMEOUT_OPTS[@]}" -A "$CURL_UA" "$url" -o "$tmp" >> "$LOG_FILE" 2>&1; then
+            install -m 755 "$tmp" /usr/local/bin/"$binary"
+            ok "$name installed"
+        else
+            warn "$name — download failed"
+        fi
+        rm -f "$tmp"
     else
         warn "$name — could not find release"
     fi

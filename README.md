@@ -1,13 +1,13 @@
 # Linux Workstation Setup
 
-Opinionated, idempotent setup scripts for a full Ubuntu development workstation. One command gets you from a fresh install to a production-ready dev environment with modern CLI tools, cloud SDKs, language runtimes, GPU drivers, a polished GNOME desktop, and sane defaults everywhere.
+Opinionated, idempotent setup scripts for a full **Ubuntu 24+/26+** and **Fedora 43+** development workstation (x86_64 & ARM64). One command gets you from a fresh install to a production-ready dev environment with modern CLI tools, cloud SDKs, language runtimes, GPU drivers, a polished GNOME desktop, and sane defaults everywhere.
 
 Safe to re-run at any time — a checkpoint system skips already-completed steps.
 
 ## Quick Start
 
 ```bash
-git clone https://github.com/<you>/linux-setup.git
+git clone https://github.com/mvsoares/linux-setup.git
 cd linux-setup
 sudo bash setup.sh
 ```
@@ -20,32 +20,39 @@ The setup is split into **10 ordered modules**, each independently skippable and
 
 | # | Module | Highlights |
 |---|--------|------------|
-| 1 | **Repos & NVIDIA** | Universe/multiverse, Brave, GitHub CLI, Flatpak/Flathub, NVIDIA drivers + Vulkan + power rules |
-| 2 | **System & CLI** | build-essential, git, Podman, fzf, ripgrep, fd, bat, eza, zoxide, git-delta, lazygit, lazydocker, dust, procs, btm, hyperfine, glow, and more |
-| 3 | **Shell** | Starship prompt, synth-shell + `synth-shell-theme` (pipx/GitHub), global aliases, fzf integration, zoxide init, history tuning |
-| 4 | **Fonts & Themes** | 25+ Nerd Fonts, Inter, Monaspace, Geist; Dracula & Catppuccin GTK themes; Papirus & Tela icons; Bibata cursors |
-| 5 | **GNOME** | Dash to Dock, Blur my Shell, Just Perfection, Caffeine, Clipboard Indicator, Vitals, Space Bar; dark mode, workspace shortcuts, Nautilus tree view |
-| 6 | **Cloud & K8s** | AWS CLI v2, gcloud, azure-cli, kubectl, helm, k9s, stern, kubectx/kubens, kustomize, eksctl |
-| 7 | **Languages** | nvm + Node LTS, pyenv + Python, rustup, Go, SDKMAN (Java), pipx (black, ruff, mypy, poetry, httpie, tldr) |
-| 8 | **Editors** | VSCodium (with ~30 extensions), Neovim + kickstart.nvim, WezTerm (config + `wezterm-theme` via pipx/GitHub) |
-| 9 | **Workspace** | Git (delta, libsecret, rerere, rebase), tmux (Ctrl+A, Dracula status), direnv, editorconfig, SSH defaults |
-| 10 | **Tweaks** | swappiness=10, TCP tuning, inotify limits, fstrim, preload, UFW firewall, journal cleanup, helper scripts |
+| 1 | **Repos & NVIDIA** | RPM Fusion / Universe, GitHub CLI, Google Chrome, Flatpak/Flathub, NVIDIA drivers (`ubuntu-drivers`/`akmod-nvidia`) + Vulkan + power rules |
+| 2 | **System & CLI** | build-essential, git, Podman, fzf, ripgrep, fd, bat, eza, zoxide, git-delta, lazygit, lazydocker, yazi, atuin, xh, sd, tealdeer, dust, procs, btm, hyperfine, glow, yq (Go v4), shellcheck, shfmt, gitleaks, hadolint, Mission Center, Flatseal, LocalSend |
+| 3 | **Shell** | Starship prompt, synth-shell + `synth-shell-theme` (pipx/GitHub), `~/.bashrc.d/` + `/etc/profile.d/`, aliases, atuin, fzf, zoxide (`--cmd cd`), history tuning |
+| 4 | **Fonts & Themes** | 21 Nerd Fonts (parallel download) + Symbols fallback, Inter, Geist, Google Fonts, emoji fonts (GTK themes/icons via `scripts/install-themes.sh`) |
+| 5 | **GNOME** | Dash-to-Panel, Blur my Shell, Just Perfection, Caffeine, Clipboard Indicator, Vitals, Space Bar, AppIndicator; dark mode, workspace shortcuts, Nautilus tree view, `cap-screen` |
+| 6 | **Cloud & K8s** | AWS CLI v2, eksctl, Session Manager, gcloud + GKE auth, Azure CLI, kubectl, helm, k9s, stern, kubectx/kubens, kustomize, kubecolor, kind, OpenTofu (`tofu`), trivy, dive, sops, age, act + bash completions |
+| 7 | **Languages** | nvm + Node LTS + pnpm, **uv** (Astral), pyenv + pipx (`ruff`, `mypy`, `poetry`, `httpie`, `cookiecutter`), rustup, Go, SDKMAN (JDK 25 Temurin + Maven) |
+| 8 | **Editors** | VSCodium (26 Open VSX extensions), Neovim + kickstart.nvim, WezTerm (JSON config + `wezterm-theme` via pipx/GitHub), Gemini CLI, Claude Code, Codex CLI |
+| 9 | **Workspace** | Git (delta, libsecret, rerere, rebase, zdiff3, histogram), tmux (Ctrl+A, Dracula, RGB/WezTerm passthrough, TPM), direnv (`uv`/`nvm` helpers), `.editorconfig`, SSH defaults |
+| 10 | **Tweaks** | ZRAM (`zstd`, `swappiness=100`, `page-cluster=0`), TCP BBR + fq, inotify limits, fstrim, battery 80% threshold, NuPhy udev rules, UFW/firewalld, journal cleanup, `display-setup`, `sysreport` |
 
 ## Usage
 
-**Tip (CI / many VMs):** GitHub’s API rate-limits unauthenticated requests. Export `GITHUB_TOKEN` (classic PAT, no scope needed for public repos) before `setup.sh` so GitHub release downloads stay reliable.
+**Tip (CI / many VMs):** GitHub's API rate-limits unauthenticated requests. Export `GITHUB_TOKEN` (classic PAT, no scope needed for public repos) before `setup.sh` so GitHub release downloads stay reliable.
 
 ```bash
 # Run everything (resumes from last checkpoint)
 sudo bash setup.sh
 
+# Preview environment & execution plan without changing anything
+bash setup.sh --dry-run
+
+# Profiles: full (default), dev, minimal, server (headless: skips GNOME, fonts, GUI apps)
+sudo bash setup.sh --profile server
+sudo bash setup.sh --profile minimal
+
 # List available modules
-sudo bash setup.sh --list
+bash setup.sh --list
 
 # Run only specific steps
 sudo bash setup.sh --only 2,3,8
 
-# Skip NVIDIA (no GPU)
+# Skip step 1 (Repos & NVIDIA)
 sudo bash setup.sh --skip 1
 
 # Re-run a single step from scratch
@@ -78,7 +85,7 @@ Existing files are saved as `*.pre-restore` before being overwritten.
 
 ## Synth-Shell Theme Studio (`synth-shell-theme`)
 
-The interactive `synth-shell` Prompt Theme Picker (64 themes), Dual Powerline Separator Editor (48 presets + 60+ Nerd Font glyphs), Runtime Speed Optimizer, and Live Web Studio now live in the standalone, zero-dependency Python package **[synth-shell-theme](https://github.com/mvsoares/synth-shell-theme)** ([PyPI](https://pypi.org/project/synth-shell-theme/)):
+The interactive `synth-shell` Prompt Theme Picker (64 themes), Dual Powerline Separator Editor (48 presets + 60+ Nerd Font glyphs), Runtime Speed Optimizer, and Live Web Studio live in the standalone, zero-dependency Python package **[synth-shell-theme](https://github.com/mvsoares/synth-shell-theme)** ([PyPI](https://pypi.org/project/synth-shell-theme/)):
 
 ```bash
 # Install from PyPI via pipx (provides `synth-shell-theme` and `synth-shell-separator` in PATH)
@@ -126,7 +133,7 @@ Example `settings.json` for a laptop running WezTerm on X11 with a smaller panel
 
 ## WezTerm Studio (`wezterm-theme`)
 
-The interactive WezTerm Tab Bar Theme Picker (60 themes + Symbol Customizer) and Live Font & Appearance Studio now live in the standalone, cross-platform package **[wezterm-studio](https://github.com/mvsoares/wezterm-studio)** ([PyPI](https://pypi.org/project/wezterm-theme/)):
+The interactive WezTerm Tab Bar Theme Picker (60 themes + Symbol Customizer) and Live Font & Appearance Studio live in the standalone, cross-platform package **[wezterm-studio](https://github.com/mvsoares/wezterm-studio)** ([PyPI](https://pypi.org/project/wezterm-theme/)):
 
 ```bash
 # Install from PyPI via pipx (provides `wezterm-theme` and `wezterm-tab-theme` in PATH)
@@ -150,11 +157,12 @@ wezterm-theme doctor
 ## Project Structure
 
 ```
-├── setup.sh                        # Main entry point — orchestrates all modules
+├── .github/workflows/ci.yml        # CI: bash -n, ShellCheck, Ubuntu & Fedora dry-run smoke tests
+├── setup.sh                        # Main entry point — orchestrates all modules & profiles
 ├── backup.sh                       # Backup current workstation configs
 ├── restore.sh                      # Restore configs from backup archive
 ├── lib/
-│   ├── common.sh                   # Shared functions (logging, progress, apt helpers)
+│   ├── common.sh                   # Shared functions (logging, progress, apt/dnf/GitHub helpers)
 │   ├── wezterm.lua                 # WezTerm loader: reads defaults.json + settings.json
 │   ├── wezterm-defaults.json       # WezTerm default settings (fonts, tabs, keys, mouse…)
 │   └── wezterm-deploy.sh           # Installs loader + defaults, keeps user settings
@@ -175,13 +183,14 @@ wezterm-theme doctor
 
 1. **Checkpoint system** — Each module writes a marker to `/var/cache/workstation-setup/` on success. Re-running skips completed steps automatically.
 2. **Modular design** — Modules are sourced in order by `setup.sh`. Each is a self-contained bash script that uses shared helpers from `lib/common.sh`.
-3. **Progress tracking** — A visual progress bar shows overall and per-module progress in the terminal.
-4. **Error resilience** — Non-fatal failures are counted and logged to `/tmp/workstation-setup-*.log` without halting execution.
-5. **User detection** — Runs as root via `sudo` but detects the real user for per-user configs (dotfiles, GNOME settings, language managers).
+3. **Profiles & Dry-Run** — Use `--profile server|minimal|dev|full` and `--dry-run` to preview the exact plan before making changes.
+4. **Non-login shell parity** — Shell snippets (`97-cloud-aliases.sh`, `98-golang.sh`, `99-workstation.sh`) deploy to both `/etc/profile.d/` and `~/.bashrc.d/` so aliases, PATHs, and completions work in every terminal.
+5. **Error resilience** — Non-fatal failures are counted and logged to `/var/log/linux-setup/setup-*.log` without halting execution.
+6. **User detection** — Runs as root via `sudo` but detects the real user for per-user configs (dotfiles, GNOME settings, language managers).
 
 ## Requirements
 
-- Ubuntu 22.04+ (tested on 24.04)
+- Ubuntu 24.04+ / 26.04 or Fedora 43+ (x86_64 or ARM64)
 - `sudo` access
 - Internet connection
 

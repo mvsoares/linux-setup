@@ -1,24 +1,34 @@
 # =============================================================================
 # Module 02 — System Utilities & Modern CLI Tools
 # =============================================================================
-init_sub 8
+init_sub 7
+
+ARCH_GO=$(get_arch)           # amd64 | arm64
+ARCH_RUST=$(get_arch_rust)    # x86_64 | aarch64
+ARCH_ALT=$(get_arch_x86_arm64) # x86_64 | arm64
 
 info "Installing system essentials..."
 if is_fedora; then
     dnf_quiet install \
         @development-tools cmake ninja-build pkgconf-pkg-config \
-        git git-lfs curl wget aria2 \
+        git git-lfs git-credential-libsecret curl wget aria2 \
         gnupg2 ca-certificates \
-        unzip p7zip p7zip-plugins xclip wl-clipboard flameshot xdotool dconf-editor bc
-    dnf_each gparted libsecret libsecret-devel
+        unzip p7zip p7zip-plugins bc
+    dnf_each libsecret libsecret-devel
+    if ! is_server_profile; then
+        dnf_each xclip wl-clipboard flameshot xdotool dconf-editor gparted
+    fi
 else
     apt_quiet install \
         build-essential cmake ninja-build pkg-config \
         git git-lfs git-extras curl wget aria2 \
-        gnupg2 ca-certificates software-properties-common apt-transport-https \
-        unzip p7zip-full unrar-free xclip wl-clipboard flameshot xdotool dconf-editor preload bc
-    apt_each gparted stacer libsecret-1-0 libsecret-1-dev
-    [[ "$DISTRO_MAJOR" -lt 26 ]] && apt_each p7zip-rar
+        gnupg2 ca-certificates apt-transport-https \
+        unzip p7zip-full unrar-free bc
+    [[ "$DISTRO_MAJOR" -lt 26 ]] && apt_each software-properties-common p7zip-rar
+    apt_each libsecret-1-0 libsecret-1-dev
+    if ! is_server_profile; then
+        apt_each xclip wl-clipboard flameshot xdotool dconf-editor gparted
+    fi
 fi
 tick "System essentials"
 
@@ -29,84 +39,101 @@ if is_fedora; then
 else
     apt_quiet install btop htop iotop iftop ncdu
     apt_each nvtop nethogs lm-sensors fancontrol smartmontools inxi sysstat upower powertop
-    [[ "$DISTRO_MAJOR" -lt 26 ]] && apt_each neofetch
     if ! command -v fastfetch &>/dev/null; then
         if apt-cache show fastfetch &>/dev/null; then
             apt_quiet install fastfetch && ok "fastfetch"
-        else
+        elif command -v add-apt-repository &>/dev/null; then
             add-apt-repository -y ppa:zhangsongcui3371/fastfetch >> "$LOG_FILE" 2>&1 \
                 && apt-get update -q >> "$LOG_FILE" 2>&1 \
                 && apt_quiet install fastfetch \
                 && ok "fastfetch (via PPA)" \
                 || warn "fastfetch — not available (install manually from GitHub)"
+        else
+            install_github_deb "fastfetch-cli/fastfetch" "linux-${ARCH_GO}.deb" "fastfetch"
         fi
     fi
 fi
 tick "System monitors & diagnostics"
 
-info "Installing developer tools..."
+info "Installing developer & code quality tools..."
+# Note: Node.js is installed cleanly via nvm in Module 07 (avoiding apt/dnf conflicts)
 if is_fedora; then
-    dnf_quiet install gh python3 python3-pip python3-devel nodejs jq
+    dnf_quiet install gh python3 python3-pip python3-devel jq ShellCheck
     dnf_each podman podman-compose buildah skopeo \
-             yq direnv mkcert pipx
+             direnv mkcert pipx yamllint shfmt
 else
-    apt_quiet install gh python3 python3-pip python3-venv python3-dev nodejs jq
+    apt_quiet install gh python3 python3-pip python3-venv python3-dev jq shellcheck
     apt_each podman podman-compose buildah skopeo \
-             yq direnv mkcert pipx redis-tools
+             direnv mkcert pipx redis-tools yamllint shfmt
 fi
-tick "Developer tools (podman, gh, python, node)"
+
+# mikefarah/yq v4 (Go) — avoids Ubuntu's incompatible Python kislyuk/yq package
+if ! command -v yq &>/dev/null || ! yq --version 2>&1 | grep -qi 'mikefarah'; then
+    install_github_bin "mikefarah/yq" "yq_linux_${ARCH_GO}" "yq" "yq (Go v4)"
+else
+    skip "yq ($(yq --version 2>/dev/null | head -1))"
+fi
+tick "Developer & code quality tools (podman, gh, python, yq, shellcheck)"
 
 info "Installing network & file tools..."
 if is_fedora; then
-    dnf_quiet install nmap nmap-ncat bind-utils rsync tree ranger fzf ripgrep fd-find bat tmux mosh \
+    dnf_quiet install nmap nmap-ncat bind-utils rsync tree fzf ripgrep fd-find bat tmux mosh \
         strace tcpdump
-    dnf_each whois rclone mc eza screen openssh-askpass chafa remmina
+    dnf_each whois rclone mc eza screen openssh-askpass chafa
+    ! is_server_profile && dnf_each remmina
 else
-    apt_quiet install nmap netcat-openbsd dnsutils rsync tree ranger fzf ripgrep fd-find bat tmux mosh \
+    apt_quiet install nmap netcat-openbsd dnsutils rsync tree fzf ripgrep fd-find bat tmux mosh \
         strace tcpdump
-    apt_each whois rclone mc eza screen ssh-askpass chafa remmina
+    apt_each whois rclone mc eza screen ssh-askpass chafa
+    ! is_server_profile && apt_each remmina
 fi
 tick "Network & file tools"
 
-info "Installing browsers..."
-if is_fedora; then
-    dnf_each google-chrome-stable
+# ── Desktop apps, browser & codecs (skipped in server profile) ───────────────
+if is_server_profile; then
+    tick "Desktop apps & codecs — skipped (server profile)"
 else
-    apt_each google-chrome-stable google-chrome-beta
+    info "Installing browser, codecs & desktop utilities..."
+    if [[ "$ARCH_GO" == "amd64" ]]; then
+        if is_fedora; then
+            dnf_each google-chrome-stable
+        else
+            apt_each google-chrome-stable
+        fi
+    fi
+
+    if is_fedora; then
+        dnf_quiet install ffmpeg mpv celluloid colord yt-dlp
+        dnf_each vlc \
+            gstreamer1-plugins-base gstreamer1-plugins-good \
+            gstreamer1-plugins-bad-free gstreamer1-plugins-ugly-free \
+            gstreamer1-plugin-libav gstreamer1-vaapi
+    else
+        apt_quiet install ffmpeg mpv celluloid colord yt-dlp
+        apt_each vlc \
+            gstreamer1.0-plugins-base gstreamer1.0-plugins-good \
+            gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly \
+            gstreamer1.0-libav gstreamer1.0-vaapi libavcodec-extra
+    fi
+
+    # Modern Flatpak GUI utilities (replace deprecated Stacer + add Flatseal & LocalSend)
+    if command -v flatpak &>/dev/null; then
+        for fp_app in io.missioncenter.MissionCenter com.github.tchx84.Flatseal org.localsend.localsend_app; do
+            if flatpak list --app 2>/dev/null | grep -q "$fp_app"; then
+                skip "Flatpak: ${fp_app}"
+            else
+                flatpak install -y --noninteractive flathub "$fp_app" >> "$LOG_FILE" 2>&1 \
+                    && ok "Flatpak: ${fp_app}" || warn "Flatpak: ${fp_app} skipped"
+            fi
+        done
+    fi
+    tick "Desktop apps (Chrome, VLC, codecs, Mission Center, Flatseal, LocalSend)"
 fi
-tick "Browsers (Google Chrome)"
 
-info "Installing video & codecs..."
-if is_fedora; then
-    dnf_quiet install ffmpeg mpv celluloid colord yt-dlp
-    dnf_each vlc \
-        gstreamer1-plugins-base gstreamer1-plugins-good \
-        gstreamer1-plugins-bad-free gstreamer1-plugins-ugly-free \
-        gstreamer1-plugin-libav gstreamer1-vaapi
-else
-    apt_quiet install ffmpeg mpv celluloid colord yt-dlp
-    apt_each vlc \
-        gstreamer1.0-plugins-base gstreamer1.0-plugins-good \
-        gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly \
-        gstreamer1.0-libav gstreamer1.0-vaapi libavcodec-extra
-fi
-tick "Video players & codecs"
+# ── Modern CLI tools (native repos first, GitHub releases fallback) ──────────
+info "Installing modern CLI tools..."
 
-if ! is_fedora; then
-    info "Installing snap apps..."
-    snap_install "code" --classic
-    snap_install "onefetch"
-    tick "Snap apps"
-else
-    info "Installing Fedora packages (VSCode, onefetch)..."
-    dnf_each code onefetch
-    tick "Fedora packages"
-fi
-
-# ── Modern CLI tools from GitHub ──────────────────────────────────────────────
-info "Installing modern CLI tools from GitHub releases..."
-
-# bat symlink (Ubuntu names it batcat, Fedora uses bat directly)
+# bat & fd symlinks (Ubuntu names them batcat/fdfind; Fedora uses bat/fd directly)
 if ! is_fedora; then
     if command -v batcat &>/dev/null && ! command -v bat &>/dev/null; then
         install -d -o "$REAL_USER" -g "$REAL_USER" "${USER_HOME}/.local/bin"
@@ -114,8 +141,6 @@ if ! is_fedora; then
         chown "$REAL_USER:$REAL_USER" "${USER_HOME}/.local/bin/bat"
         ok "bat → batcat symlink"
     fi
-
-    # fd symlink (Ubuntu names it fdfind, Fedora uses fd directly)
     if command -v fdfind &>/dev/null && ! command -v fd &>/dev/null; then
         install -d -o "$REAL_USER" -g "$REAL_USER" "${USER_HOME}/.local/bin"
         ln -sf "$(command -v fdfind)" "${USER_HOME}/.local/bin/fd"
@@ -124,9 +149,14 @@ if ! is_fedora; then
     fi
 fi
 
-# zoxide (install as user so it goes to ~/.local/bin)
+# Prefer native Fedora packages where upstream does not ship RPMs
+if is_fedora; then
+    dnf_each git-delta hyperfine duf zoxide tealdeer fd-find 2>/dev/null || true
+fi
+
+# zoxide
 if ! command -v zoxide &>/dev/null; then
-    as_user "curl -sSfL https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh -o /tmp/zoxide_install.sh && sh /tmp/zoxide_install.sh && rm -f /tmp/zoxide_install.sh" \
+    as_user "curl -sSfL --connect-timeout 15 --max-time 120 https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh -o /tmp/zoxide_install.sh && sh /tmp/zoxide_install.sh && rm -f /tmp/zoxide_install.sh" \
         >> "$LOG_FILE" 2>&1 && ok "zoxide installed" || warn "zoxide install failed"
 else
     skip "zoxide $(zoxide --version 2>/dev/null)"
@@ -135,9 +165,9 @@ fi
 # git-delta
 if ! command -v delta &>/dev/null; then
     if is_fedora; then
-        install_github_rpm "dandavison/delta" "x86_64.rpm" "git-delta"
+        install_github_tar "dandavison/delta" "${ARCH_RUST}-unknown-linux-gnu.tar.gz" "delta" "git-delta"
     else
-        install_github_deb "dandavison/delta" "$(dpkg --print-architecture).deb" "git-delta"
+        install_github_deb "dandavison/delta" "${ARCH_GO}.deb" "git-delta"
     fi
 else
     skip "delta $(delta --version 2>/dev/null | head -1)"
@@ -145,55 +175,38 @@ fi
 
 # lazygit
 if ! command -v lazygit &>/dev/null; then
-    install_github_tar "jesseduffield/lazygit" "Linux_x86_64.tar.gz" "lazygit" "lazygit"
+    install_github_tar "jesseduffield/lazygit" "Linux_${ARCH_ALT}.tar.gz" "lazygit" "lazygit"
 else
     skip "lazygit"
 fi
 
 # lazydocker
 if ! command -v lazydocker &>/dev/null; then
-    install_github_tar "jesseduffield/lazydocker" "Linux_x86_64.tar.gz" "lazydocker" "lazydocker"
+    install_github_tar "jesseduffield/lazydocker" "Linux_${ARCH_ALT}.tar.gz" "lazydocker" "lazydocker"
 else
     skip "lazydocker"
 fi
 
 # dust (better du)
 if ! command -v dust &>/dev/null; then
-    install_github_tar "bootandy/dust" "x86_64-unknown-linux-musl.tar.gz" "dust" "dust"
+    install_github_tar "bootandy/dust" "${ARCH_RUST}-unknown-linux-musl.tar.gz" "dust" "dust"
 else
     skip "dust $(dust --version 2>/dev/null)"
 fi
 
 # procs (better ps)
 if ! command -v procs &>/dev/null; then
-    _procs_tag=$(_github_latest_tag "dalance/procs")
-    _procs_url=""
-    [[ -n "$_procs_tag" ]] && _procs_url=$(_github_asset_url "dalance/procs" "$_procs_tag" "x86_64-linux.zip")
-    [[ -z "$_procs_url" ]] && _procs_url=$(_gh_api_curl "https://api.github.com/repos/dalance/procs/releases/latest" 2>/dev/null \
-        | grep browser_download_url | grep "x86_64-linux.zip" | head -1 | cut -d'"' -f4)
-    if [[ -n "$_procs_url" ]]; then
-        _procs_tmp=$(mktemp -d)
-        if curl -sSfL "$_procs_url" -o "$_procs_tmp/procs.zip" >> "$LOG_FILE" 2>&1; then
-            unzip -q "$_procs_tmp/procs.zip" -d "$_procs_tmp" >> "$LOG_FILE" 2>&1
-            install "$_procs_tmp/procs" /usr/local/bin/procs && ok "procs installed" || warn "procs install failed"
-        else
-            warn "procs — download failed"
-        fi
-        rm -rf "$_procs_tmp"
-    else
-        warn "procs — could not find release"
-    fi
+    install_github_zip "dalance/procs" "${ARCH_RUST}-linux.zip" "procs" "procs"
 else
     skip "procs $(procs --version 2>/dev/null)"
 fi
 
-
 # duf (better df)
 if ! command -v duf &>/dev/null; then
     if is_fedora; then
-        install_github_rpm "muesli/duf" "x86_64.rpm" "duf"
+        install_github_rpm "muesli/duf" "linux_${ARCH_GO}.rpm" "duf"
     else
-        install_github_deb "muesli/duf" "$(dpkg --print-architecture).deb" "duf"
+        install_github_deb "muesli/duf" "linux_${ARCH_GO}.deb" "duf"
     fi
 else
     skip "duf"
@@ -201,29 +214,21 @@ fi
 
 # glow (terminal markdown renderer)
 if ! command -v glow &>/dev/null; then
-    if is_fedora; then
-        install_github_rpm "charmbracelet/glow" "x86_64.rpm" "glow"
-    else
-        install_github_deb "charmbracelet/glow" "$(dpkg --print-architecture).deb" "glow"
-    fi
+    install_github_tar "charmbracelet/glow" "Linux_${ARCH_ALT}.tar.gz" "glow" "glow"
 else
     skip "glow"
 fi
 
 # bottom (btm — better top)
 if ! command -v btm &>/dev/null; then
-    if is_fedora; then
-        install_github_rpm "ClementTsang/bottom" "x86_64.rpm" "bottom"
-    else
-        install_github_deb "ClementTsang/bottom" "$(dpkg --print-architecture).deb" "bottom"
-    fi
+    install_github_tar "ClementTsang/bottom" "${ARCH_RUST}-unknown-linux-musl.tar.gz" "btm" "bottom (btm)"
 else
     skip "bottom (btm)"
 fi
 
 # just (command runner)
 if ! command -v just &>/dev/null; then
-    install_github_tar "casey/just" "x86_64-unknown-linux-musl.tar.gz" "just" "just"
+    install_github_tar "casey/just" "${ARCH_RUST}-unknown-linux-musl.tar.gz" "just" "just"
 else
     skip "just"
 fi
@@ -231,15 +236,80 @@ fi
 # hyperfine (benchmarking)
 if ! command -v hyperfine &>/dev/null; then
     if is_fedora; then
-        install_github_rpm "sharkdp/hyperfine" "x86_64.rpm" "hyperfine"
+        install_github_tar "sharkdp/hyperfine" "${ARCH_RUST}-unknown-linux-gnu.tar.gz" "hyperfine" "hyperfine"
     else
-        install_github_deb "sharkdp/hyperfine" "$(dpkg --print-architecture).deb" "hyperfine"
+        install_github_deb "sharkdp/hyperfine" "${ARCH_GO}.deb" "hyperfine"
     fi
 else
     skip "hyperfine"
 fi
 
-tick "Modern CLI tools from GitHub"
+# onefetch (git repository summary — works on both Ubuntu & Fedora)
+if ! command -v onefetch &>/dev/null; then
+    install_github_tar "o2sh/onefetch" "onefetch-linux.tar.gz" "onefetch" "onefetch"
+else
+    skip "onefetch"
+fi
+
+# tealdeer (fast Rust tldr client)
+if ! command -v tldr &>/dev/null; then
+    install_github_bin "tealdeer-rs/tealdeer" "tealdeer-linux-${ARCH_RUST}-musl" "tldr" "tealdeer (tldr)"
+    command -v tldr &>/dev/null && as_user "tldr --update" >> "$LOG_FILE" 2>&1 || true
+else
+    skip "tldr ($(tldr --version 2>/dev/null | head -1))"
+fi
+
+# xh (fast Rust HTTP client — friendly drop-in for httpie/curl)
+if ! command -v xh &>/dev/null; then
+    install_github_tar "ducaale/xh" "${ARCH_RUST}-unknown-linux-musl.tar.gz" "xh" "xh"
+else
+    skip "xh"
+fi
+
+# sd (modern intuitive sed)
+if ! command -v sd &>/dev/null; then
+    install_github_tar "chmln/sd" "${ARCH_RUST}-unknown-linux-musl.tar.gz" "sd" "sd"
+else
+    skip "sd"
+fi
+
+# yazi (modern terminal file manager with WezTerm image preview)
+if ! command -v yazi &>/dev/null; then
+    install_github_zip "sxyazi/yazi" "yazi-${ARCH_RUST}-unknown-linux-musl.zip" "yazi" "yazi"
+else
+    skip "yazi"
+fi
+
+# atuin (searchable SQLite shell history)
+if ! command -v atuin &>/dev/null && [[ ! -x "${USER_HOME}/.atuin/bin/atuin" ]]; then
+    install_github_tar "atuinsh/atuin" "atuin-${ARCH_RUST}-unknown-linux-musl.tar.gz" "atuin" "atuin"
+else
+    skip "atuin"
+fi
+
+tick "Modern CLI tools (zoxide · delta · lazygit · yazi · atuin · xh · sd · tealdeer)"
+
+# ── Security / Lint CLIs & pre-commit ────────────────────────────────────────
+# gitleaks (secret scanner)
+if ! command -v gitleaks &>/dev/null; then
+    install_github_tar "gitleaks/gitleaks" "linux_${ARCH_ALT/x86_64/x64}.tar.gz" "gitleaks" "gitleaks"
+else
+    skip "gitleaks"
+fi
+
+# hadolint (Dockerfile / Containerfile linter)
+if ! command -v hadolint &>/dev/null; then
+    install_github_bin "hadolint/hadolint" "hadolint-Linux-${ARCH_ALT}" "hadolint" "hadolint"
+else
+    skip "hadolint"
+fi
+
+# shfmt fallback if not in distro repo
+if ! command -v shfmt &>/dev/null; then
+    install_github_bin "mvdan/sh" "linux_${ARCH_GO}" "shfmt" "shfmt"
+else
+    skip "shfmt"
+fi
 
 # pre-commit
 if ! command -v pre-commit &>/dev/null; then
@@ -252,14 +322,14 @@ if ! command -v pre-commit &>/dev/null; then
 else
     skip "pre-commit $(pre-commit --version 2>/dev/null)"
 fi
-tick "pre-commit"
 
 # Build git-credential-libsecret if not already built (Ubuntu only)
 if ! is_fedora; then
     GIT_CRED_DIR="/usr/share/doc/git/contrib/credential/libsecret"
     if [[ -d "$GIT_CRED_DIR" ]] && [[ ! -f "$GIT_CRED_DIR/git-credential-libsecret" ]]; then
-        make -C "$GIT_CRED_DIR" 2>/dev/null >> "$LOG_FILE" 2>&1 || warn "Could not build git-credential-libsecret"
+        make -C "$GIT_CRED_DIR" >> "$LOG_FILE" 2>&1 || warn "Could not build git-credential-libsecret"
     fi
 fi
+tick "Security & lint CLIs (gitleaks · hadolint · shfmt · pre-commit)"
 
 ok "System utilities & modern CLI tools complete"

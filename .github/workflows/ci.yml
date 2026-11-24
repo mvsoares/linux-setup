@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint:
+    name: Syntax & ShellCheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Bash syntax check (bash -n)
+        run: |
+          bash -n setup.sh backup.sh restore.sh lib/common.sh lib/wezterm-deploy.sh scripts/cap-screen modules/*.sh
+
+      - name: ShellCheck (error & warning)
+        run: |
+          shellcheck -S error -x setup.sh lib/common.sh scripts/cap-screen
+          shellcheck -S error -s bash -e SC2034,SC2154 modules/*.sh
+
+  smoke-test:
+    name: Dry-run smoke test (${{ matrix.name }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - name: Ubuntu 24.04
+            image: ubuntu:24.04
+          - name: Fedora 43
+            image: fedora:43
+    container:
+      image: ${{ matrix.image }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run --list, --help, --dry-run, and --profile server --dry-run
+        run: |
+          bash setup.sh --help
+          bash setup.sh --list
+          bash setup.sh --dry-run
+          bash setup.sh --profile server --dry-run
+          bash setup.sh --profile minimal --dry-run

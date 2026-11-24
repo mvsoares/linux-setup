@@ -1,14 +1,17 @@
 # =============================================================================
-# Module 08 — Editor Setup (VSCodium · Neovim · WezTerm)
+# Module 08 — Editor Setup (VSCodium · Neovim · WezTerm · AI CLIs)
 # =============================================================================
-init_sub 8
+init_sub 6
 
-# ── VSCodium ──────────────────────────────────────────────────────────────
-if command -v codium &>/dev/null; then
-    skip "VSCodium"
+# ── VSCodium (desktop profiles only) ─────────────────────────────────────────
+if is_server_profile; then
+    tick "VSCodium — skipped (server profile)"
 else
-    if is_fedora; then
-        add_dnf_repo "VSCodium" \
+    if command -v codium &>/dev/null; then
+        skip "VSCodium"
+    else
+        if is_fedora; then
+            add_dnf_repo "VSCodium" \
 "[gitlab.com_paulcarroty_vscodium_repo]
 name=download.vscodium.com
 baseurl=https://download.vscodium.com/rpms/
@@ -17,96 +20,113 @@ gpgcheck=1
 repo_gpgcheck=1
 gpgkey=https://gitlab.com/paulcarroty/vscodium-deb-rpm-repo/-/raw/master/pub.gpg
 metadata_expire=1h" \
-            "/etc/yum.repos.d/vscodium.repo" "https://gitlab.com/paulcarroty/vscodium-deb-rpm-repo/-/raw/master/pub.gpg"
-        dnf_each codium
-    else
-        add_apt_repo "VSCodium" "https://gitlab.com/paulcarroty/vscodium-deb-rpm-repo/raw/master/pub.gpg" \
-            "/usr/share/keyrings/vscodium-archive-keyring.gpg" \
-            "/etc/apt/sources.list.d/vscodium.list" \
-            "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/vscodium-archive-keyring.gpg] https://download.vscodium.com/debs vscodium main"
-        apt_quiet update
-        apt_each codium
+                "/etc/yum.repos.d/vscodium.repo" "https://gitlab.com/paulcarroty/vscodium-deb-rpm-repo/-/raw/master/pub.gpg"
+            dnf_each codium
+        else
+            add_apt_repo "VSCodium" "https://gitlab.com/paulcarroty/vscodium-deb-rpm-repo/raw/master/pub.gpg" \
+                "/usr/share/keyrings/vscodium-archive-keyring.gpg" \
+                "/etc/apt/sources.list.d/vscodium.list" \
+                "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/vscodium-archive-keyring.gpg] https://download.vscodium.com/debs vscodium main"
+            apt_quiet update
+            apt_each codium
+        fi
     fi
-fi
 
-# Ensure Codium launchers use --ozone-platform=x11 to prevent Wayland fractional scaling trembling
-for d in /usr/share/applications/codium*.desktop; do
-    if [[ -f "$d" ]]; then
-        bn="$(basename "$d")"
-        mkdir -p "${USER_HOME}/.local/share/applications"
-        sed 's|Exec=\(/usr/share/codium[^ ]*\)|Exec=\1 --ozone-platform=x11|g' "$d" > "${USER_HOME}/.local/share/applications/${bn}"
-        chown "$REAL_USER:$REAL_USER" "${USER_HOME}/.local/share/applications/${bn}"
+    # Ensure Codium launchers use --ozone-platform=x11 to prevent Wayland fractional scaling trembling
+    for d in /usr/share/applications/codium*.desktop; do
+        if [[ -f "$d" ]]; then
+            bn="$(basename "$d")"
+            mkdir -p "${USER_HOME}/.local/share/applications"
+            sed 's|Exec=\(/usr/share/codium[^ ]*\)|Exec=\1 --ozone-platform=x11|g' "$d" > "${USER_HOME}/.local/share/applications/${bn}"
+            chown "$REAL_USER:$REAL_USER" "${USER_HOME}/.local/share/applications/${bn}"
+        fi
+    done
+
+    # Copy VSCode settings to VSCodium if VSCode exists and VSCodium has no settings yet
+    VSCODE_SETTINGS="${USER_HOME}/.config/Code/User/settings.json"
+    CODIUM_USER_DIR="${USER_HOME}/.config/VSCodium/User"
+    if [[ -f "$VSCODE_SETTINGS" ]] && [[ ! -f "${CODIUM_USER_DIR}/settings.json" ]]; then
+        install -d -o "$REAL_USER" -g "$REAL_USER" "$CODIUM_USER_DIR"
+        for f in settings.json keybindings.json; do
+            src="${USER_HOME}/.config/Code/User/${f}"
+            [[ -f "$src" ]] && cp "$src" "${CODIUM_USER_DIR}/${f}" 2>/dev/null
+        done
+        [[ -d "${USER_HOME}/.config/Code/User/snippets" ]] && \
+            cp -r "${USER_HOME}/.config/Code/User/snippets/." "${CODIUM_USER_DIR}/snippets/" 2>/dev/null
+        chown -R "$REAL_USER:$REAL_USER" "$CODIUM_USER_DIR"
+        ok "VSCode settings mirrored to VSCodium"
     fi
-done
 
-# Copy VSCode settings to VSCodium if VSCode exists and VSCodium has no settings yet
-VSCODE_SETTINGS="${USER_HOME}/.config/Code/User/settings.json"
-CODIUM_USER_DIR="${USER_HOME}/.config/VSCodium/User"
-if [[ -f "$VSCODE_SETTINGS" ]] && [[ ! -f "${CODIUM_USER_DIR}/settings.json" ]]; then
-    install -d -o "$REAL_USER" -g "$REAL_USER" "$CODIUM_USER_DIR"
-    for f in settings.json keybindings.json; do
-        src="${USER_HOME}/.config/Code/User/${f}"
-        [[ -f "$src" ]] && cp "$src" "${CODIUM_USER_DIR}/${f}" 2>/dev/null
-    done
-    [[ -d "${USER_HOME}/.config/Code/User/snippets" ]] && \
-        cp -r "${USER_HOME}/.config/Code/User/snippets/." "${CODIUM_USER_DIR}/snippets/" 2>/dev/null
-    chown -R "$REAL_USER:$REAL_USER" "$CODIUM_USER_DIR"
-    ok "VSCode settings mirrored to VSCodium"
+    # Install common VSCodium extensions (Open VSX compatible; skip already installed)
+    VSCODIUM_EXTS=(
+        bradlc.vscode-tailwindcss
+        catppuccin.catppuccin-vsc
+        charliermarsh.ruff
+        christian-kohler.path-intellisense
+        dbaeumer.vscode-eslint
+        donjayamanne.githistory
+        dracula-theme.theme-dracula
+        dsznajder.es7-react-js-snippets
+        eamodio.gitlens
+        editorconfig.editorconfig
+        esbenp.prettier-vscode
+        formulahendry.auto-rename-tag
+        golang.go
+        gruntfuggly.todo-tree
+        humao.rest-client
+        ms-python.python
+        pkief.material-icon-theme
+        redhat.java
+        redhat.vscode-yaml
+        rust-lang.rust-analyzer
+        streetsidesoftware.code-spell-checker
+        tamasfe.even-better-toml
+        timonwong.shellcheck
+        usernamehw.errorlens
+        vscodevim.vim
+        wayou.vscode-todo-highlight
+    )
+
+    if command -v codium &>/dev/null; then
+        info "Checking VSCodium extensions..."
+        _installed_exts=$(as_user "codium --list-extensions 2>/dev/null" | tr '[:upper:]' '[:lower:]' || echo "")
+        for ext in "${VSCODIUM_EXTS[@]}"; do
+            if echo "$_installed_exts" | grep -qx "${ext,,}"; then
+                continue
+            fi
+            as_user "codium --install-extension '${ext}'" >> "$LOG_FILE" 2>&1 \
+                && ok "  ${ext}" || warn "  ${ext} — skipped"
+        done
+        ok "VSCodium extensions up to date"
+    fi
+    tick "VSCodium + extensions"
 fi
-
-# Install common VSCodium extensions
-VSCODIUM_EXTS=(
-    bradlc.vscode-tailwindcss
-    catppuccin.catppuccin-vsc
-    christian-kohler.path-intellisense
-    dbaeumer.vscode-eslint
-    dracula-theme.theme-dracula
-    dsznajder.es7-react-js-snippets
-    eamodio.gitlens
-    esbenp.prettier-vscode
-    formulahendry.auto-rename-tag
-    golang.go
-    gruntfuggly.todo-tree
-    humao.rest-client
-    mhutchie.git-graph
-    pkief.material-icon-theme
-    rangav.vscode-thunder-client
-    redhat.vscode-yaml
-    streetsidesoftware.code-spell-checker
-    usernamehw.errorlens
-    vscodevim.vim
-    wayou.vscode-todo-highlight
-    rust-lang.rust-analyzer
-    tamasfe.even-better-toml
-)
-
-if command -v codium &>/dev/null; then
-    info "Installing VSCodium extensions..."
-    for ext in "${VSCODIUM_EXTS[@]}"; do
-        as_user "codium --install-extension '${ext}' --force" >> "$LOG_FILE" 2>&1 \
-            && ok "  ${ext}" || true
-    done
-fi
-tick "VSCodium + extensions"
 
 # ── Neovim ────────────────────────────────────────────────────────────────
 if command -v nvim &>/dev/null; then
     skip "Neovim"
 else
     info "Installing Neovim (latest stable)..."
-    NVIM_URL=$(_gh_api_curl "https://api.github.com/repos/neovim/neovim/releases/latest" 2>/dev/null \
-        | grep browser_download_url | grep "nvim-linux-$(uname -m).tar.gz" | head -1 | cut -d'"' -f4 || echo "")
+    NVIM_ARCH=$(get_arch_x86_arm64) # x86_64 | arm64
+    NVIM_TAG=$(_github_latest_tag "neovim/neovim")
+    NVIM_URL=""
+    [[ -n "$NVIM_TAG" ]] && NVIM_URL=$(_github_asset_url "neovim/neovim" "$NVIM_TAG" "nvim-linux-${NVIM_ARCH}.tar.gz")
+    [[ -z "$NVIM_URL" ]] && NVIM_URL=$(_github_api_asset_url "neovim/neovim" "nvim-linux-${NVIM_ARCH}.tar.gz")
     if [[ -n "$NVIM_URL" ]]; then
         local_tmp=$(mktemp -d)
-        curl -fsSL "$NVIM_URL" | tar xz -C "$local_tmp" >> "$LOG_FILE" 2>&1
-        NVIM_DIR=$(ls -d "$local_tmp"/nvim-linux* 2>/dev/null | head -1)
-        if [[ -d "$NVIM_DIR" ]]; then
-            rm -rf /opt/nvim
-            mv "$NVIM_DIR" /opt/nvim
-            ln -sf /opt/nvim/bin/nvim /usr/local/bin/nvim
-            ok "Neovim installed to /opt/nvim"
+        if curl -fsSL "${CURL_TIMEOUT_OPTS[@]}" "$NVIM_URL" | tar xz -C "$local_tmp" >> "$LOG_FILE" 2>&1; then
+            NVIM_DIR=$(find "$local_tmp" -maxdepth 1 -type d -name 'nvim-linux*' | head -1)
+            if [[ -d "$NVIM_DIR" ]]; then
+                rm -rf /opt/nvim
+                mv "$NVIM_DIR" /opt/nvim
+                ln -sf /opt/nvim/bin/nvim /usr/local/bin/nvim
+                ok "Neovim installed to /opt/nvim"
+            else
+                warn "Neovim — extracted dir not found"
+            fi
         else
-            warn "Neovim — extracted dir not found"
+            warn "Neovim download failed — falling back to distro package"
+            pkg_install neovim
         fi
         rm -rf "$local_tmp"
     else
@@ -125,154 +145,178 @@ else
 fi
 tick "Neovim + kickstart.nvim"
 
-# ── WezTerm ──────────────────────────────────────────────────────────────
-if command -v wezterm &>/dev/null || flatpak list 2>/dev/null | grep -q org.wezfurlong.wezterm; then
-    skip "WezTerm"
+# ── WezTerm (desktop profiles only) ──────────────────────────────────────────
+if is_server_profile; then
+    tick "WezTerm — skipped (server profile)"
 else
-    info "Installing WezTerm..."
-    _wez_installed=false
-
-    if is_fedora; then
-        # Try COPR repo first (native), fall back to Flatpak
-        if dnf copr enable -y wezfurlong/wezterm-nightly >> "$LOG_FILE" 2>&1 \
-                && dnf install -y wezterm >> "$LOG_FILE" 2>&1; then
-            _wez_installed=true && ok "WezTerm (COPR)"
-        fi
+    if command -v wezterm &>/dev/null || flatpak list 2>/dev/null | grep -q org.wezfurlong.wezterm; then
+        skip "WezTerm"
     else
-        # Try apt repo first (native), fall back to Flatpak
-        if add_apt_repo "WezTerm" "https://apt.fury.io/wez/gpg.key" \
-            "/usr/share/keyrings/wezterm-fury.gpg" \
-            "/etc/apt/sources.list.d/wezterm.list" \
-            "deb [signed-by=/usr/share/keyrings/wezterm-fury.gpg] https://apt.fury.io/wez/ * *"; then
-            apt_quiet update
-            if apt-get install -y -qq wezterm >> "$LOG_FILE" 2>&1; then
-                _wez_installed=true && ok "WezTerm (apt)"
+        info "Installing WezTerm..."
+        _wez_installed=false
+
+        if is_fedora; then
+            # Try COPR repo first (native), fall back to Flatpak
+            if dnf copr enable -y wezfurlong/wezterm-nightly >> "$LOG_FILE" 2>&1 \
+                    && dnf install -y wezterm >> "$LOG_FILE" 2>&1; then
+                _wez_installed=true && ok "WezTerm (COPR)"
+            fi
+        else
+            # Try apt repo first (native), fall back to Flatpak
+            if add_apt_repo "WezTerm" "https://apt.fury.io/wez/gpg.key" \
+                "/usr/share/keyrings/wezterm-fury.gpg" \
+                "/etc/apt/sources.list.d/wezterm.list" \
+                "deb [signed-by=/usr/share/keyrings/wezterm-fury.gpg] https://apt.fury.io/wez/ * *"; then
+                apt_quiet update
+                if apt-get install -y -qq wezterm >> "$LOG_FILE" 2>&1; then
+                    _wez_installed=true && ok "WezTerm (apt)"
+                fi
             fi
         fi
-    fi
 
-    if ! $_wez_installed && command -v flatpak &>/dev/null; then
-        info "Trying WezTerm via Flatpak..."
-        if flatpak install -y flathub org.wezfurlong.wezterm >> "$LOG_FILE" 2>&1; then
-            # Create wrapper so 'command -v wezterm' works
-            cat > /usr/local/bin/wezterm << 'WEZWRAP'
+        if ! $_wez_installed && command -v flatpak &>/dev/null; then
+            info "Trying WezTerm via Flatpak..."
+            if flatpak install -y --noninteractive flathub org.wezfurlong.wezterm >> "$LOG_FILE" 2>&1; then
+                cat > /usr/local/bin/wezterm << 'WEZWRAP'
 #!/bin/sh
 exec flatpak run org.wezfurlong.wezterm "$@"
 WEZWRAP
-            chmod +x /usr/local/bin/wezterm
-            ok "WezTerm (Flatpak)"
-            _wez_installed=true
+                chmod +x /usr/local/bin/wezterm
+                ok "WezTerm (Flatpak)"
+                _wez_installed=true
+            fi
         fi
+
+        $_wez_installed || warn "WezTerm install failed"
     fi
 
-    $_wez_installed || warn "WezTerm install failed"
-fi
+    # Loader + defaults are repo-owned; settings.json/user.lua stay untouched.
+    if bash "${SCRIPT_DIR}/lib/wezterm-deploy.sh" "$USER_HOME" "$REAL_USER:$(id -gn "$REAL_USER")" >> "$LOG_FILE" 2>&1; then
+        ok "WezTerm config deployed (preferences in ~/.config/wezterm/settings.json)"
+    else
+        warn "WezTerm config deploy failed"
+    fi
 
-# Loader + defaults are repo-owned; settings.json/user.lua stay untouched.
-if bash "${SCRIPT_DIR}/lib/wezterm-deploy.sh" "$USER_HOME" "$REAL_USER:$(id -gn "$REAL_USER")" >> "$LOG_FILE" 2>&1; then
-    ok "WezTerm config deployed (preferences in ~/.config/wezterm/settings.json)"
-else
-    warn "WezTerm config deploy failed"
-fi
+    # Append/upgrade bash hook for running command + cwd in WezTerm tab titles
+    BASHRC="${USER_HOME}/.bashrc"
+    touch "$BASHRC"
+    chown "$REAL_USER:$REAL_USER" "$BASHRC"
 
-# Append/upgrade bash hook for running command + cwd in WezTerm tab titles
-BASHRC="${USER_HOME}/.bashrc"
-touch "$BASHRC"
-chown "$REAL_USER:$REAL_USER" "$BASHRC"
+    if grep -q '# END linux-setup: wezterm-hook v2' "$BASHRC" 2>/dev/null; then
+        skip "WezTerm bash hook (v2 already up to date)"
+    else
+        # Remove previous managed hook blocks (v1 or v2) before appending updated one.
+        sed -i "/^# ── WezTerm tab title: show running command /,/^PROMPT_COMMAND=.*__wezterm_preexec_fired=0'$/d" "$BASHRC"
+        sed -i "/^# BEGIN linux-setup: wezterm-hook/,/^# END linux-setup: wezterm-hook/d" "$BASHRC"
 
-if grep -q '__wezterm_set_user_var' "$BASHRC" && grep -q '__wezterm_osc7' "$BASHRC"; then
-    skip "WezTerm bash hook (already up to date)"
-else
-    # Remove previous managed hook block before appending updated one.
-    sed -i "/^# ── WezTerm tab title: show running command /,/^PROMPT_COMMAND=.*__wezterm_preexec_fired=0'$/d" "$BASHRC"
+        cat >> "$BASHRC" << 'WEZTERM_HOOK'
 
-    cat >> "$BASHRC" << 'WEZTERM_HOOK'
+# BEGIN linux-setup: wezterm-hook
+if [[ "${TERM_PROGRAM:-}" == "WezTerm" ]]; then
+    __wezterm_set_user_var() {
+        printf "\033]1337;SetUserVar=%s=%s\007" "$1" "$(printf '%s' "$2" | base64 -w0)"
+    }
 
-# ── WezTerm tab title: show running command ──────────────────────────────────
-__wezterm_set_user_var() {
-    printf "\033]1337;SetUserVar=%s=%s\007" "$1" "$(printf '%s' "$2" | base64)"
-}
-
-__wezterm_preexec_fired=1
-__wezterm_debug() {
-    [[ "$__wezterm_preexec_fired" == "1" ]] && return
-    [[ -n "${COMP_LINE:-}" ]] && return
-    local cmd="${BASH_COMMAND%% *}"
-    [[ "$cmd" == __* ]] && return   # skip internal shell functions (e.g. __fzf_history)
     __wezterm_preexec_fired=1
-    cmd="${cmd##*/}"
-    __wezterm_set_user_var cmd "$cmd"
-}
-trap '__wezterm_debug' DEBUG
+    __wezterm_debug() {
+        [[ "$__wezterm_preexec_fired" == "1" ]] && return
+        [[ -n "${COMP_LINE:-}" ]] && return
+        local cmd="${BASH_COMMAND%% *}"
+        [[ "$cmd" == __* ]] && return   # skip internal shell functions (e.g. __fzf_history)
+        __wezterm_preexec_fired=1
+        cmd="${cmd##*/}"
+        __wezterm_set_user_var cmd "$cmd"
+    }
+    trap '__wezterm_debug' DEBUG
 
-__wezterm_osc7() {
-    printf "\033]7;file://%s%s\033\\" "${HOSTNAME}" "${PWD}"
-}
+    __wezterm_osc7() {
+        local encoded_pwd="${PWD// /%20}"
+        printf "\033]7;file://%s%s\033\\" "${HOSTNAME}" "${encoded_pwd}"
+    }
 
-PROMPT_COMMAND="${PROMPT_COMMAND:-}"'; __wezterm_osc7; __wezterm_set_user_var cmd ""; __wezterm_preexec_fired=0'
-WEZTERM_HOOK
-    ok "WezTerm bash hook added/updated (process name + cwd in tab titles)"
-fi
+    __wezterm_prompt_cmd() {
+        __wezterm_osc7
+        __wezterm_set_user_var cmd ""
+        __wezterm_preexec_fired=0
+    }
 
-# Install standalone `wezterm-theme` (wezterm-studio) via pipx (PyPI with GitHub fallback)
-WEZTERM_STUDIO_GIT="git+https://github.com/mvsoares/wezterm-studio.git"
-if [[ -n "$REAL_USER" ]]; then
-    if ! command -v pipx &>/dev/null; then
-        pkg_install pipx
-        as_user "pipx ensurepath" >> "$LOG_FILE" 2>&1 || true
+    if [[ "$(declare -p PROMPT_COMMAND 2>/dev/null)" == "declare -a"* ]]; then
+        [[ " ${PROMPT_COMMAND[*]} " != *" __wezterm_prompt_cmd "* ]] && PROMPT_COMMAND+=(__wezterm_prompt_cmd)
+    elif [[ "${PROMPT_COMMAND:-}" != *"__wezterm_prompt_cmd"* ]]; then
+        PROMPT_COMMAND="${PROMPT_COMMAND:+${PROMPT_COMMAND}; }__wezterm_prompt_cmd"
     fi
-    if command -v pipx &>/dev/null; then
-        if as_user "pipx install --force wezterm-theme" >> "$LOG_FILE" 2>&1; then
-            ok "wezterm-theme (wezterm-studio) installed/updated via pipx (PyPI)"
-        elif as_user "pipx install --force '${WEZTERM_STUDIO_GIT}'" >> "$LOG_FILE" 2>&1; then
-            ok "wezterm-theme (wezterm-studio) installed/updated via pipx (GitHub)"
-        else
-            warn "wezterm-theme pipx install failed — check ${LOG_FILE}"
+fi
+# END linux-setup: wezterm-hook v2
+WEZTERM_HOOK
+        chown "$REAL_USER:$REAL_USER" "$BASHRC"
+        ok "WezTerm bash hook added/upgraded to v2 (guarded, base64 -w0, array-safe)"
+    fi
+
+    # Install standalone `wezterm-theme` (wezterm-studio) via pipx (PyPI with GitHub fallback)
+    WEZTERM_STUDIO_GIT="git+https://github.com/mvsoares/wezterm-studio.git"
+    if [[ -n "$REAL_USER" ]]; then
+        if ! command -v pipx &>/dev/null; then
+            pkg_install pipx
+            as_user "pipx ensurepath" >> "$LOG_FILE" 2>&1 || true
+        fi
+        if command -v pipx &>/dev/null; then
+            if as_user "pipx install --force wezterm-theme" >> "$LOG_FILE" 2>&1; then
+                ok "wezterm-theme (wezterm-studio) installed/updated via pipx (PyPI)"
+            elif as_user "pipx install --force '${WEZTERM_STUDIO_GIT}'" >> "$LOG_FILE" 2>&1; then
+                ok "wezterm-theme (wezterm-studio) installed/updated via pipx (GitHub)"
+            else
+                warn "wezterm-theme pipx install failed — check ${LOG_FILE}"
+            fi
         fi
     fi
+    tick "WezTerm + config + wezterm-theme"
 fi
-tick "WezTerm + config + wezterm-theme"
 
 # ── AI Code Assist CLIs ───────────────────────────────────────────────────
-
-# Source nvm so npm is available (installed by module 07 as the real user)
+# Helper: run npm as real user using nvm when present, or system npm otherwise
 NVM_DIR="${USER_HOME}/.nvm"
+_npm_prefix=""
 if [[ -s "${NVM_DIR}/nvm.sh" ]]; then
     export NVM_DIR
     # shellcheck source=/dev/null
     source "${NVM_DIR}/nvm.sh"
+    _npm_prefix="export NVM_DIR='${NVM_DIR}' && source '${NVM_DIR}/nvm.sh' && "
 fi
 
 # Gemini CLI (Google)
-if command -v gemini &>/dev/null; then
-    skip "Gemini CLI $(gemini --version 2>/dev/null | head -1 || true)"
+if as_user "${_npm_prefix}command -v gemini" &>/dev/null; then
+    skip "Gemini CLI"
 elif command -v npm &>/dev/null; then
     info "Installing Gemini CLI..."
-    as_user "source '${NVM_DIR}/nvm.sh' && npm install -g @google/gemini-cli" >> "$LOG_FILE" 2>&1 \
+    as_user "${_npm_prefix}npm install -g @google/gemini-cli" >> "$LOG_FILE" 2>&1 \
         && ok "Gemini CLI installed" || warn "Gemini CLI install failed — run: npm install -g @google/gemini-cli"
 else
     warn "Gemini CLI skipped — npm not available (install nvm/node first)"
 fi
 tick "Gemini CLI"
 
-# Claude Code (Anthropic)
-if command -v claude &>/dev/null; then
-    skip "Claude Code $(claude --version 2>/dev/null | head -1 || true)"
-elif command -v npm &>/dev/null; then
-    info "Installing Claude Code CLI..."
-    as_user "source '${NVM_DIR}/nvm.sh' && npm install -g @anthropic-ai/claude-code" >> "$LOG_FILE" 2>&1 \
-        && ok "Claude Code installed" || warn "Claude Code install failed — run: npm install -g @anthropic-ai/claude-code"
+# Claude Code (Anthropic — prefer official native installer, fallback to npm)
+if as_user "${_npm_prefix}command -v claude" &>/dev/null; then
+    skip "Claude Code"
 else
-    warn "Claude Code skipped — npm not available (install nvm/node first)"
+    info "Installing Claude Code CLI..."
+    if as_user "curl -fsSL --connect-timeout 15 --max-time 180 https://claude.ai/install.sh | bash" >> "$LOG_FILE" 2>&1; then
+        ok "Claude Code installed (native)"
+    elif command -v npm &>/dev/null; then
+        as_user "${_npm_prefix}npm install -g @anthropic-ai/claude-code" >> "$LOG_FILE" 2>&1 \
+            && ok "Claude Code installed (npm)" || warn "Claude Code install failed"
+    else
+        warn "Claude Code install failed — see ${LOG_FILE}"
+    fi
 fi
 tick "Claude Code CLI"
 
 # Codex CLI (OpenAI)
-if command -v codex &>/dev/null; then
-    skip "Codex CLI $(codex --version 2>/dev/null | head -1 || true)"
+if as_user "${_npm_prefix}command -v codex" &>/dev/null; then
+    skip "Codex CLI"
 elif command -v npm &>/dev/null; then
     info "Installing OpenAI Codex CLI..."
-    as_user "source '${NVM_DIR}/nvm.sh' && npm install -g @openai/codex" >> "$LOG_FILE" 2>&1 \
+    as_user "${_npm_prefix}npm install -g @openai/codex" >> "$LOG_FILE" 2>&1 \
         && ok "Codex CLI installed" || warn "Codex CLI install failed — run: npm install -g @openai/codex"
 else
     warn "Codex CLI skipped — npm not available (install nvm/node first)"
