@@ -222,21 +222,16 @@ as_user() {
     # Prepend ~/.local/bin so pipx/rustup installs work in same run as setup (non-login shell)
     local _path="${USER_HOME}/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
     local _schema_dir; _schema_dir="$(ext_schema_dirs)"
+    local _runner=(sudo -u "$REAL_USER" HOME="$USER_HOME" PATH="$_path" GSETTINGS_SCHEMA_DIR="$_schema_dir")
     if [[ -n "$bus_addr" ]]; then
-        sudo -u "$REAL_USER" \
-            DBUS_SESSION_BUS_ADDRESS="$bus_addr" \
-            XDG_RUNTIME_DIR="/run/user/${USER_ID}" \
-            HOME="$USER_HOME" \
-            PATH="$_path" \
-            GSETTINGS_SCHEMA_DIR="$_schema_dir" \
-            bash -c "$cmd" 2>> "$LOG_FILE"
+        _runner+=(DBUS_SESSION_BUS_ADDRESS="$bus_addr" XDG_RUNTIME_DIR="/run/user/${USER_ID}")
+        "${_runner[@]}" bash -c "$cmd" 2>> "$LOG_FILE"
+    elif command -v dbus-run-session &>/dev/null; then
+        _runner+=(XDG_RUNTIME_DIR="/run/user/${USER_ID}")
+        "${_runner[@]}" dbus-run-session -- bash -c "$cmd" 2>> "$LOG_FILE"
     else
-        sudo -u "$REAL_USER" \
-            XDG_RUNTIME_DIR="/run/user/${USER_ID}" \
-            HOME="$USER_HOME" \
-            PATH="$_path" \
-            GSETTINGS_SCHEMA_DIR="$_schema_dir" \
-            bash -c "$cmd" 2>> "$LOG_FILE"
+        _runner+=(XDG_RUNTIME_DIR="/run/user/${USER_ID}")
+        "${_runner[@]}" bash -c "$cmd" 2>> "$LOG_FILE"
     fi
 }
 
@@ -244,6 +239,10 @@ gset() {
     local schema="$1"; shift
     local key="$1"; shift
     local val="$*"
+    # Check if schema is installed in the schema catalog before attempting to write
+    if ! as_user "gsettings list-schemas 2>/dev/null" | grep -qx "$schema"; then
+        return 0
+    fi
     as_user "gsettings set ${schema} ${key} \"${val}\"" \
         && ok "  ${schema} ${key} = ${val}" \
         || warn "gsettings failed: ${schema} ${key}"
@@ -444,10 +443,10 @@ final_repo_upgrade() {
         [[ $_ok -eq 1 ]] || warn "dnf upgrade — see ${LOG_FILE}"
         dnf -y autoremove >> "$LOG_FILE" 2>&1 || true
     else
-        apt-get update -q >> "$LOG_FILE" 2>&1 || warn "apt-get update — see ${LOG_FILE}"
-        DEBIAN_FRONTEND=noninteractive apt-get -y -q upgrade >> "$LOG_FILE" 2>&1 \
+        apt-get "${APT_LOCK_OPT[@]}" update -q >> "$LOG_FILE" 2>&1 || warn "apt-get update — see ${LOG_FILE}"
+        DEBIAN_FRONTEND=noninteractive apt-get "${APT_LOCK_OPT[@]}" -y -q upgrade >> "$LOG_FILE" 2>&1 \
             || warn "apt-get upgrade — see ${LOG_FILE}"
-        DEBIAN_FRONTEND=noninteractive apt-get -y -q autoremove >> "$LOG_FILE" 2>&1 || true
+        DEBIAN_FRONTEND=noninteractive apt-get "${APT_LOCK_OPT[@]}" -y -q autoremove >> "$LOG_FILE" 2>&1 || true
     fi
     if command -v flatpak &>/dev/null; then
         flatpak update -y >> "$LOG_FILE" 2>&1 || true

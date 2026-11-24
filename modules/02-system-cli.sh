@@ -13,7 +13,7 @@ if is_fedora; then
         @development-tools cmake ninja-build pkgconf-pkg-config \
         git git-lfs git-credential-libsecret curl wget aria2 \
         gnupg2 ca-certificates \
-        unzip p7zip p7zip-plugins bc
+        zip unzip p7zip p7zip-plugins bc
     dnf_each libsecret libsecret-devel
     if ! is_server_profile; then
         dnf_each xclip wl-clipboard flameshot xdotool dconf-editor gparted
@@ -23,7 +23,7 @@ else
         build-essential cmake ninja-build pkg-config \
         git git-lfs git-extras curl wget aria2 \
         gnupg2 ca-certificates apt-transport-https \
-        unzip p7zip-full unrar-free bc
+        zip unzip p7zip-full unrar-free bc
     [[ "$DISTRO_MAJOR" -lt 26 ]] && apt_each software-properties-common p7zip-rar
     apt_each libsecret-1-0 libsecret-1-dev
     if ! is_server_profile; then
@@ -42,7 +42,7 @@ else
     if ! command -v fastfetch &>/dev/null; then
         if apt-cache show fastfetch &>/dev/null; then
             apt_quiet install fastfetch && ok "fastfetch"
-        elif command -v add-apt-repository &>/dev/null; then
+        elif is_ubuntu && command -v add-apt-repository &>/dev/null; then
             add-apt-repository -y ppa:zhangsongcui3371/fastfetch >> "$LOG_FILE" 2>&1 \
                 && apt-get update -q >> "$LOG_FILE" 2>&1 \
                 && apt_quiet install fastfetch \
@@ -249,6 +249,11 @@ if ! command -v onefetch &>/dev/null; then
     install_github_tar "o2sh/onefetch" "onefetch-linux.tar.gz" "onefetch" "onefetch"
 else
     skip "onefetch"
+fi
+
+# eza (modern ls replacement — fallback for Debian 12 where apt has no eza)
+if ! command -v eza &>/dev/null; then
+    install_github_tar "eza-community/eza" "eza_${ARCH_RUST}-unknown-linux-musl.tar.gz" "eza" "eza"
 fi
 
 # tealdeer (fast Rust tldr client)

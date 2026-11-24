@@ -59,16 +59,27 @@ gpgkey=https://dl.google.com/linux/linux_signing_key.pub" \
     tick "Package index refreshed"
 
 else
-    # ── Ubuntu Repositories ───────────────────────────────────────────────────
-    info "Enabling universe / multiverse / restricted..."
-    if command -v add-apt-repository &>/dev/null; then
-        for comp in universe multiverse restricted; do
-            add-apt-repository -y -n "$comp" >> "$LOG_FILE" 2>&1 || true
-        done
+    # ── Debian & Ubuntu Repositories ──────────────────────────────────────────
+    if is_ubuntu; then
+        info "Enabling universe / multiverse / restricted..."
+        if command -v add-apt-repository &>/dev/null; then
+            for comp in universe multiverse restricted; do
+                add-apt-repository -y -n "$comp" >> "$LOG_FILE" 2>&1 || true
+            done
+        else
+            info "add-apt-repository not present (Ubuntu 26+ DEB822 default) — skipping legacy enable"
+        fi
+        tick "Core Ubuntu repositories enabled"
     else
-        info "add-apt-repository not present (Ubuntu 26+ DEB822 default) — skipping legacy enable"
+        info "Enabling Debian contrib, non-free, and non-free-firmware..."
+        if [[ -f /etc/apt/sources.list.d/debian.sources ]]; then
+            sed -i -E 's/^(Components:.*)\bmain\b(.*)/\1main contrib non-free non-free-firmware\2/' /etc/apt/sources.list.d/debian.sources
+        fi
+        if [[ -f /etc/apt/sources.list ]]; then
+            sed -i -E 's/^(deb .*)\bmain\b(.*)/\1main contrib non-free non-free-firmware\2/' /etc/apt/sources.list
+        fi
+        tick "Core Debian repositories (contrib/non-free) enabled"
     fi
-    tick "Core repositories enabled"
 
     # GitHub CLI
     add_apt_repo "GitHub CLI" "https://cli.github.com/packages/githubcli-archive-keyring.gpg" \
