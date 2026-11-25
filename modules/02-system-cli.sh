@@ -24,7 +24,8 @@ else
         git git-lfs git-extras curl wget aria2 \
         gnupg2 ca-certificates apt-transport-https \
         zip unzip p7zip-full unrar-free bc
-    [[ "$DISTRO_MAJOR" -lt 26 ]] && apt_each software-properties-common p7zip-rar
+    is_ubuntu && [[ "$DISTRO_MAJOR" -lt 26 ]] && apt_each software-properties-common
+    apt-cache show p7zip-rar &>/dev/null && apt_each p7zip-rar
     apt_each libsecret-1-0 libsecret-1-dev
     if ! is_server_profile; then
         apt_each xclip wl-clipboard flameshot xdotool dconf-editor gparted
@@ -60,7 +61,8 @@ info "Installing developer & code quality tools..."
 if is_fedora; then
     dnf_quiet install gh python3 python3-pip python3-devel jq ShellCheck
     dnf_each podman podman-compose buildah skopeo \
-             direnv mkcert pipx yamllint shfmt
+             direnv mkcert pipx yamllint
+    dnf -q info shfmt &>/dev/null && dnf_each shfmt || true
 else
     apt_quiet install gh python3 python3-pip python3-venv python3-dev jq shellcheck
     apt_each podman podman-compose buildah skopeo \
@@ -103,7 +105,11 @@ else
     fi
 
     if is_fedora; then
-        dnf_quiet install ffmpeg mpv celluloid colord yt-dlp
+        wait_for_rpm_lock
+        # --allowerasing lets RPM Fusion ffmpeg cleanly replace Fedora's preinstalled ffmpeg-free/libswresample-free
+        dnf -y -q install --allowerasing ffmpeg mpv celluloid colord yt-dlp >> "$LOG_FILE" 2>&1 \
+            && ok "ffmpeg · mpv · celluloid · colord · yt-dlp" \
+            || warn "dnf install ffmpeg mpv celluloid colord yt-dlp → exit $? (see log)"
         dnf_each vlc \
             gstreamer1-plugins-base gstreamer1-plugins-good \
             gstreamer1-plugins-bad-free gstreamer1-plugins-ugly-free \
@@ -136,22 +142,24 @@ info "Installing modern CLI tools..."
 # bat & fd symlinks (Ubuntu names them batcat/fdfind; Fedora uses bat/fd directly)
 if ! is_fedora; then
     if command -v batcat &>/dev/null && ! command -v bat &>/dev/null; then
-        install -d -o "$REAL_USER" -g "$REAL_USER" "${USER_HOME}/.local/bin"
+        install -d -o "$REAL_USER" -g "${USER_GROUP:-$REAL_USER}" "${USER_HOME}/.local/bin"
         ln -sf "$(command -v batcat)" "${USER_HOME}/.local/bin/bat"
-        chown "$REAL_USER:$REAL_USER" "${USER_HOME}/.local/bin/bat"
+        chown "${REAL_USER}:${USER_GROUP:-$REAL_USER}" "${USER_HOME}/.local/bin/bat"
         ok "bat → batcat symlink"
     fi
     if command -v fdfind &>/dev/null && ! command -v fd &>/dev/null; then
-        install -d -o "$REAL_USER" -g "$REAL_USER" "${USER_HOME}/.local/bin"
+        install -d -o "$REAL_USER" -g "${USER_GROUP:-$REAL_USER}" "${USER_HOME}/.local/bin"
         ln -sf "$(command -v fdfind)" "${USER_HOME}/.local/bin/fd"
-        chown "$REAL_USER:$REAL_USER" "${USER_HOME}/.local/bin/fd"
+        chown "${REAL_USER}:${USER_GROUP:-$REAL_USER}" "${USER_HOME}/.local/bin/fd"
         ok "fd → fdfind symlink"
     fi
 fi
 
 # Prefer native Fedora packages where upstream does not ship RPMs
 if is_fedora; then
-    dnf_each git-delta hyperfine duf zoxide tealdeer fd-find 2>/dev/null || true
+    for _fpkg in git-delta hyperfine duf zoxide tealdeer fd-find; do
+        dnf -q info "$_fpkg" &>/dev/null && dnf_each "$_fpkg" || true
+    done
 fi
 
 # zoxide

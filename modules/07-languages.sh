@@ -70,7 +70,7 @@ export PYENV_ROOT="$HOME/.pyenv"
 [[ -d "$PYENV_ROOT/bin" ]] && export PATH="$PYENV_ROOT/bin:$PATH"
 command -v pyenv &>/dev/null && eval "$(pyenv init - 2>/dev/null)" 2>/dev/null
 PYENV_BLOCK
-        chown "$REAL_USER:$REAL_USER" "$PYENV_INIT"
+        chown "${REAL_USER}:${USER_GROUP:-$REAL_USER}" "$PYENV_INIT"
     fi
     # Migrate: ensure both 2>/dev/null are present (suppresses uutils readlink errors on Ubuntu 26+)
     if [[ -f "$PYENV_INIT" ]] && grep -q 'pyenv init' "$PYENV_INIT" \
@@ -171,7 +171,7 @@ export MAVEN_HOME="${HOME}/.sdkman/candidates/maven/current"
 export M2_HOME="${MAVEN_HOME}"
 export PATH="${JAVA_HOME}/bin:${MAVEN_HOME}/bin:${PATH}"
 JAVABLOCK
-        chown "$REAL_USER:$REAL_USER" "$BASHRC"
+        chown "${REAL_USER}:${USER_GROUP:-$REAL_USER}" "$BASHRC"
         ok "SDKMAN init + JAVA_HOME + MAVEN_HOME added to .bashrc"
     elif ! grep -q 'sdkman-init.sh' "$BASHRC" 2>/dev/null; then
         cat >> "$BASHRC" << 'SDKINIT'
@@ -180,7 +180,7 @@ JAVABLOCK
 export SDKMAN_DIR="${HOME}/.sdkman"
 [[ -s "${SDKMAN_DIR}/bin/sdkman-init.sh" ]] && source "${SDKMAN_DIR}/bin/sdkman-init.sh"
 SDKINIT
-        chown "$REAL_USER:$REAL_USER" "$BASHRC"
+        chown "${REAL_USER}:${USER_GROUP:-$REAL_USER}" "$BASHRC"
         ok "SDKMAN init added to .bashrc"
     else
         skip "Java/Maven/SDKMAN env vars (already in .bashrc)"

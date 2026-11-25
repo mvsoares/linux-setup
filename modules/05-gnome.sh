@@ -4,11 +4,30 @@
 init_sub 9
 
 # ── Dependencies ──────────────────────────────────────────────────────────────
+_apt_has_candidate() {
+    apt-cache policy "$1" 2>/dev/null | awk '/Candidate:/{c=$2} END{exit (c == "" || c == "(none)") ? 1 : 0}'
+}
+
+_install_pinta() {
+    local check_cmd="$1" install_cmd="$2"
+    if "$check_cmd" pinta &>/dev/null; then
+        "$install_cmd" pinta
+    elif command -v flatpak &>/dev/null; then
+        flatpak list --app 2>/dev/null | grep -q "com.github.PintaProject.Pinta" \
+            || { flatpak install -y --noninteractive flathub com.github.PintaProject.Pinta >> "$LOG_FILE" 2>&1 \
+                && ok "Flatpak: com.github.PintaProject.Pinta" || true; }
+    fi
+}
+
+_dnf_has_pkg() { dnf -q info "$1" &>/dev/null; }
+
 if is_fedora; then
-    dnf_each gnome-tweaks gnome-extensions-app gnome-shell-extension-appindicator dconf-editor gnome-text-editor pinta
+    dnf_each gnome-tweaks gnome-extensions-app gnome-shell-extension-appindicator dconf-editor gnome-text-editor
+    _install_pinta _dnf_has_pkg dnf_each
 else
     apt_each gnome-tweaks gnome-shell-extensions gnome-shell-extension-manager \
-             gnome-shell-extension-appindicator dconf-editor gnome-text-editor pinta gnome-screenshot
+             gnome-shell-extension-appindicator dconf-editor gnome-text-editor gnome-screenshot
+    _install_pinta _apt_has_candidate apt_each
 fi
 gtk-update-icon-cache -f /usr/share/icons/hicolor 2>/dev/null || true
 tick "GNOME dependencies"

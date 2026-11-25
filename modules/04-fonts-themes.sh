@@ -19,7 +19,7 @@ install_nerd_font() {
     fi
     local url="https://github.com/ryanoasis/nerd-fonts/releases/download/${NERD_FONT_VER}/${slug}.zip"
     local tmp_zip="/tmp/nf-${slug}-$$.zip"
-    if curl -fsSL "${CURL_TIMEOUT_OPTS[@]}" "$url" -o "$tmp_zip" >> "$LOG_FILE" 2>&1; then
+    if curl -fsSL --retry 2 --retry-delay 2 "${CURL_TIMEOUT_OPTS[@]}" "$url" -o "$tmp_zip" >> "$LOG_FILE" 2>&1; then
         mkdir -p "$dest"
         unzip -qo "$tmp_zip" -d "$dest" >> "$LOG_FILE" 2>&1 || true
         rm -f "$tmp_zip"
@@ -151,7 +151,13 @@ info "Package manager general & emoji fonts..."
 if is_fedora; then
     dnf_each lato-fonts open-sans-fonts urw-base35-fonts \
              abattis-cantarell-fonts google-noto-fonts-common liberation-fonts \
-             google-noto-color-emoji-fonts fontawesome-fonts
+             google-noto-color-emoji-fonts
+    for _fa in fontawesome-fonts fontawesome-fonts-all; do
+        if dnf -q info "$_fa" &>/dev/null; then
+            dnf_each "$_fa"
+            break
+        fi
+    done
 else
     apt_each fonts-lato fonts-open-sans fonts-urw-base35 \
              fonts-cantarell fonts-noto fonts-liberation fonts-freefont-ttf \

@@ -85,7 +85,7 @@ __pycache__/
 .ruff_cache/
 .pytest_cache/
 GITIGNORE
-    chown "$REAL_USER:$REAL_USER" "$GLOBAL_GITIGNORE"
+    chown "${REAL_USER}:${USER_GROUP:-$REAL_USER}" "$GLOBAL_GITIGNORE"
     ok "Global gitignore deployed"
 else
     ok "Global gitignore already present"
@@ -166,7 +166,7 @@ if "test ! -d ~/.tmux/plugins/tpm" \
    "run 'git clone https://github.com/tmux-plugins/tpm ~/.tmux/plugins/tpm'"
 run '~/.tmux/plugins/tpm/tpm'
 TMUX
-    chown "$REAL_USER:$REAL_USER" "$TMUX_CONF"
+    chown "${REAL_USER}:${USER_GROUP:-$REAL_USER}" "$TMUX_CONF"
     ok "tmux config (Dracula-themed, Ctrl-a, RGB/WezTerm passthrough, TPM)"
 fi
 
@@ -214,7 +214,7 @@ use_nvm() {
     fi
 }
 DIRENVRC
-    chown -R "$REAL_USER:$REAL_USER" "$DIRENV_DIR"
+    chown -R "${REAL_USER}:${USER_GROUP:-$REAL_USER}" "$DIRENV_DIR"
     ok "direnv config with uv/nvm helpers"
 fi
 tick "direnv + helpers"
@@ -249,7 +249,7 @@ indent_style = tab
 [*.{yml,yaml}]
 indent_size = 2
 EDITORCONFIG
-    chown "$REAL_USER:$REAL_USER" "$EDITORCONFIG"
+    chown "${REAL_USER}:${USER_GROUP:-$REAL_USER}" "$EDITORCONFIG"
     ok "Global .editorconfig created"
 else
     skip "Global .editorconfig (already exists)"
@@ -260,7 +260,7 @@ tick "Global .editorconfig"
 SSH_DIR="${USER_HOME}/.ssh"
 mkdir -p "$SSH_DIR"
 chmod 700 "$SSH_DIR"
-chown "$REAL_USER:$REAL_USER" "$SSH_DIR"
+chown "${REAL_USER}:${USER_GROUP:-$REAL_USER}" "$SSH_DIR"
 
 if [[ ! -f "${SSH_DIR}/id_ed25519" ]]; then
     info "No SSH key found. Generate one with:"
@@ -284,7 +284,7 @@ Host github.com
     IdentityFile ~/.ssh/id_ed25519
 SSHCONFIG
     chmod 600 "${SSH_DIR}/config"
-    chown "$REAL_USER:$REAL_USER" "${SSH_DIR}/config"
+    chown "${REAL_USER}:${USER_GROUP:-$REAL_USER}" "${SSH_DIR}/config"
     ok "SSH config created with sensible defaults"
 else
     skip "SSH config (already exists)"

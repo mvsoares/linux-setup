@@ -86,7 +86,11 @@ detect_user() {
     [[ -z "$REAL_USER" ]] && REAL_USER="$(id -un 1000 2>/dev/null || echo "")"
     USER_HOME=$(getent passwd "$REAL_USER" | cut -d: -f6 2>/dev/null || echo "/root")
     USER_ID=$(id -u "$REAL_USER" 2>/dev/null || echo "1000")
-    USER_GROUP=$(id -gn "$REAL_USER" 2>/dev/null || echo "$REAL_USER")
+    if USER_GROUP=$(id -gn "$REAL_USER" 2>/dev/null); then
+        :
+    else
+        USER_GROUP=$(id -g "$REAL_USER" 2>/dev/null || echo "$REAL_USER")
+    fi
     export REAL_USER USER_HOME USER_ID USER_GROUP
 }
 

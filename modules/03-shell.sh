@@ -242,7 +242,7 @@ symbol = "󰸏 "
 format = ' [$symbol($project)]($style)'
 symbol = "󱇶 "
 TOML
-        chown "$REAL_USER:$REAL_USER" "$STARSHIP_CFG"
+        chown "${REAL_USER}:${USER_GROUP:-$REAL_USER}" "$STARSHIP_CFG"
         ok "Starship config created"
     else
         skip "Starship config (already exists)"
@@ -325,7 +325,7 @@ BASHRC="${USER_HOME}/.bashrc"
 if [[ -f "$BASHRC" ]]; then
     BACKUP="${USER_HOME}/.bashrc.bak.$(date +%Y%m%d%H%M%S)"
     cp "$BASHRC" "$BACKUP"
-    chown "$REAL_USER:$REAL_USER" "$BACKUP"
+    chown "${REAL_USER}:${USER_GROUP:-$REAL_USER}" "$BACKUP"
     sed -i 's/^HISTSIZE=1000$/HISTSIZE=50000/' "$BASHRC"
     sed -i 's/^HISTFILESIZE=2000$/HISTFILESIZE=100000/' "$BASHRC"
     sed -i 's/^#shopt -s globstar$/shopt -s globstar/' "$BASHRC"
@@ -413,7 +413,7 @@ command -v zoxide &>/dev/null && eval "$(zoxide init bash --cmd cd)"
 ZOXIDEBLOCK
     fi
 
-    chown "$REAL_USER:$REAL_USER" "$BASHRC"
+    chown "${REAL_USER}:${USER_GROUP:-$REAL_USER}" "$BASHRC"
     ok "Bashrc tuned (backup: ${BACKUP})"
 fi
 tick "Bashrc improvements"

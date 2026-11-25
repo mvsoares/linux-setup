@@ -38,7 +38,7 @@ metadata_expire=1h" \
             bn="$(basename "$d")"
             mkdir -p "${USER_HOME}/.local/share/applications"
             sed 's|Exec=\(/usr/share/codium[^ ]*\)|Exec=\1 --ozone-platform=x11|g' "$d" > "${USER_HOME}/.local/share/applications/${bn}"
-            chown "$REAL_USER:$REAL_USER" "${USER_HOME}/.local/share/applications/${bn}"
+            chown "${REAL_USER}:${USER_GROUP:-$REAL_USER}" "${USER_HOME}/.local/share/applications/${bn}"
         fi
     done
 
@@ -46,14 +46,14 @@ metadata_expire=1h" \
     VSCODE_SETTINGS="${USER_HOME}/.config/Code/User/settings.json"
     CODIUM_USER_DIR="${USER_HOME}/.config/VSCodium/User"
     if [[ -f "$VSCODE_SETTINGS" ]] && [[ ! -f "${CODIUM_USER_DIR}/settings.json" ]]; then
-        install -d -o "$REAL_USER" -g "$REAL_USER" "$CODIUM_USER_DIR"
+        install -d -o "$REAL_USER" -g "${USER_GROUP:-$REAL_USER}" "$CODIUM_USER_DIR"
         for f in settings.json keybindings.json; do
             src="${USER_HOME}/.config/Code/User/${f}"
             [[ -f "$src" ]] && cp "$src" "${CODIUM_USER_DIR}/${f}" 2>/dev/null
         done
         [[ -d "${USER_HOME}/.config/Code/User/snippets" ]] && \
             cp -r "${USER_HOME}/.config/Code/User/snippets/." "${CODIUM_USER_DIR}/snippets/" 2>/dev/null
-        chown -R "$REAL_USER:$REAL_USER" "$CODIUM_USER_DIR"
+        chown -R "${REAL_USER}:${USER_GROUP:-$REAL_USER}" "$CODIUM_USER_DIR"
         ok "VSCode settings mirrored to VSCodium"
     fi
 
@@ -191,7 +191,7 @@ WEZWRAP
     fi
 
     # Loader + defaults are repo-owned; settings.json/user.lua stay untouched.
-    if bash "${SCRIPT_DIR}/lib/wezterm-deploy.sh" "$USER_HOME" "$REAL_USER:$(id -gn "$REAL_USER")" >> "$LOG_FILE" 2>&1; then
+    if bash "${SCRIPT_DIR}/lib/wezterm-deploy.sh" "$USER_HOME" "$REAL_USER:${USER_GROUP:-$REAL_USER}" >> "$LOG_FILE" 2>&1; then
         ok "WezTerm config deployed (preferences in ~/.config/wezterm/settings.json)"
     else
         warn "WezTerm config deploy failed"
@@ -200,7 +200,7 @@ WEZWRAP
     # Append/upgrade bash hook for running command + cwd in WezTerm tab titles
     BASHRC="${USER_HOME}/.bashrc"
     touch "$BASHRC"
-    chown "$REAL_USER:$REAL_USER" "$BASHRC"
+    chown "${REAL_USER}:${USER_GROUP:-$REAL_USER}" "$BASHRC"
 
     if grep -q '# END linux-setup: wezterm-hook v2' "$BASHRC" 2>/dev/null; then
         skip "WezTerm bash hook (v2 already up to date)"
@@ -248,7 +248,7 @@ if [[ "${TERM_PROGRAM:-}" == "WezTerm" ]]; then
 fi
 # END linux-setup: wezterm-hook v2
 WEZTERM_HOOK
-        chown "$REAL_USER:$REAL_USER" "$BASHRC"
+        chown "${REAL_USER}:${USER_GROUP:-$REAL_USER}" "$BASHRC"
         ok "WezTerm bash hook added/upgraded to v2 (guarded, base64 -w0, array-safe)"
     fi
 
@@ -273,20 +273,16 @@ WEZTERM_HOOK
 fi
 
 # ── AI Code Assist CLIs ───────────────────────────────────────────────────
-# Helper: run npm as real user using nvm when present, or system npm otherwise
+# Helper: check/run npm cleanly inside as_user (nvm.sh is not `set -u` safe in root's shell)
 NVM_DIR="${USER_HOME}/.nvm"
 _npm_prefix=""
-if [[ -s "${NVM_DIR}/nvm.sh" ]]; then
-    export NVM_DIR
-    # shellcheck source=/dev/null
-    source "${NVM_DIR}/nvm.sh"
-    _npm_prefix="export NVM_DIR='${NVM_DIR}' && source '${NVM_DIR}/nvm.sh' && "
-fi
+[[ -s "${NVM_DIR}/nvm.sh" ]] && _npm_prefix="export NVM_DIR='${NVM_DIR}' && source '${NVM_DIR}/nvm.sh' && "
+_has_npm() { as_user "${_npm_prefix}command -v npm" &>/dev/null; }
 
 # Gemini CLI (Google)
 if as_user "${_npm_prefix}command -v gemini" &>/dev/null; then
     skip "Gemini CLI"
-elif command -v npm &>/dev/null; then
+elif _has_npm; then
     info "Installing Gemini CLI..."
     as_user "${_npm_prefix}npm install -g @google/gemini-cli" >> "$LOG_FILE" 2>&1 \
         && ok "Gemini CLI installed" || warn "Gemini CLI install failed — run: npm install -g @google/gemini-cli"
@@ -302,7 +298,7 @@ else
     info "Installing Claude Code CLI..."
     if as_user "curl -fsSL --connect-timeout 15 --max-time 180 https://claude.ai/install.sh | bash" >> "$LOG_FILE" 2>&1; then
         ok "Claude Code installed (native)"
-    elif command -v npm &>/dev/null; then
+    elif _has_npm; then
         as_user "${_npm_prefix}npm install -g @anthropic-ai/claude-code" >> "$LOG_FILE" 2>&1 \
             && ok "Claude Code installed (npm)" || warn "Claude Code install failed"
     else
@@ -314,7 +310,7 @@ tick "Claude Code CLI"
 # Codex CLI (OpenAI)
 if as_user "${_npm_prefix}command -v codex" &>/dev/null; then
     skip "Codex CLI"
-elif command -v npm &>/dev/null; then
+elif _has_npm; then
     info "Installing OpenAI Codex CLI..."
     as_user "${_npm_prefix}npm install -g @openai/codex" >> "$LOG_FILE" 2>&1 \
         && ok "Codex CLI installed" || warn "Codex CLI install failed — run: npm install -g @openai/codex"
